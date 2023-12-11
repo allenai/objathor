@@ -2,3 +2,6 @@ openai==1.3.8
 numpy==1.24.4
 requests==2.31.0
 prior==1.0.3
+nltk @ git+https://github.com/nltk/nltk@582e6e35f0e6c984b44ec49dcb8846d9c011d0a8
+compress_pickle==2.1.0
+tqdm==4.66.1
