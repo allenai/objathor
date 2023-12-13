@@ -42,3 +42,15 @@ def all_synsets(top_synset_str: Optional[str] = None) -> List[str]:
 
 def synset_definitions(synset_strs: Sequence[str]):
     return [wn.synset(synset_str).definition() for synset_str in synset_strs]
+
+
+def synset_lemmas(synset_strs: Sequence[str]):
+    return [wn.synset(synset_str).lemma_names() for synset_str in synset_strs]
+
+
+def synset_hyponyms(synset_strs: Sequence[str]):
+    return [wn.synset(synset_str).hyponyms() for synset_str in synset_strs]
+
+
+def synset_hypernyms(synset_strs: Sequence[str]):
+    return [wn.synset(synset_str).hypernyms() for synset_str in synset_strs]
