@@ -70,18 +70,14 @@ def get_answer(
     messages = prompt + ([{"role": "user", "content": query}] if query != "" else [])
 
     def chat_completion_create() -> str:
-        res = (
-            client()
-            .chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=2000,
-                temperature=0.0,
-                **chat_completion_cfg,
-            )
-            .choices[0]
-            .message.content
+        all_kwargs = dict(
+            model=model,
+            messages=messages,
+            max_tokens=2000,
+            temperature=0.0,
         )
+        all_kwargs.update(chat_completion_cfg)
+        res = client().chat.completions.create(**all_kwargs).choices[0].message.content
         return res
 
     return access_gpt_with_retries(
