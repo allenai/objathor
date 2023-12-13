@@ -88,7 +88,6 @@ def describe_asset_from_views(
         user_messages.extend(
             [
                 dict(type="text", text=f"View {num}"),
-                # dict(type="image_url", image_url=dict(url=url, detail="high")),
                 dict(type="image_url", image_url=dict(url=url, detail="low")),
             ]
         )
