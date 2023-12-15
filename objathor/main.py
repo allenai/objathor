@@ -41,13 +41,13 @@ def annotate_asset(
     output_file: Union[str, Callable[[Dict[str, Any]], bool]],
     **kwargs: Any,
 ) -> None:
-    annotated = compress_pickle.load("data/annotation_sample.pkl.gz")
-    uid = next(iter(annotated.keys()))
-    annotated = annotated[uid]
+    # annotated = compress_pickle.load("data/annotation_sample.pkl.gz")
+    # uid = next(iter(annotated.keys()))
+    # annotated = annotated[uid]
+    # anno = annotated["anno"]
+    # urls = annotated["urls"]
     anno, urls = get_initial_annotation(uid)
-    anno = annotated["anno"]
-    urls = annotated["urls"]
-    anno["pre-rendered_views_urls"] = urls
+    anno["pre_rendered_views_urls"] = urls
     anno["uid"] = uid
     write(anno, output_file, **kwargs)
 
