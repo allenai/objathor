@@ -1,9 +1,10 @@
-from typing import List, Tuple, Sequence, Any, Optional, Dict, TypedDict
+from typing import List, Tuple, Sequence, Any, Optional, Dict
 import json
 
 import requests
 
-from utils.gpt_utils import get_answer
+from objathor.utils.gpt_utils import get_answer
+from objathor.utils.queries import Text, Image, ComposedMessage
 
 
 DEFAULT_THUMBNAIL_SOURCE_URL = "https://objaverse-im.s3.us-west-2.amazonaws.com"
@@ -60,23 +61,15 @@ def describe_asset_from_views(
 
     # Construct the initial prompt message. For the system description, we're using the
     # default content used in the OpenAI API document.
-    prompt = [
-        dict(
-            role="system",
-            content=[
-                dict(
-                    type="text",
-                    text="You are ChatGPT, a large language model trained by OpenAI capable of looking at images."
-                    "\nCurrent date: 2023-03-05\nKnowledge cutoff: 2022-02\nImage Capabilities: Enabled",
-                )
-            ],
-        )
-    ]
+    prompt = Text(
+        "You are ChatGPT, a large language model trained by OpenAI capable of looking at images."
+        "\nCurrent date: 2023-03-05\nKnowledge cutoff: 2022-02\nImage Capabilities: Enabled",
+        role="system",
+    )
 
     user_messages = [
-        dict(
-            type="text",
-            text=f"Here are {len(thumbnail_tuples)} views of a 3D asset."
+        Text(
+            f"Here are {len(thumbnail_tuples)} views of a 3D asset."
             f" The series of images show the same asset from rotated views, so that you can see all sides of it.",
         )
     ]
@@ -87,17 +80,17 @@ def describe_asset_from_views(
         urls.append(url)
         user_messages.extend(
             [
-                dict(type="text", text=f"View {num}"),
-                dict(type="image_url", image_url=dict(url=url, detail="low")),
+                Text(f"View {num}"),
+                Image(url),
             ]
         )
 
     # Finally, ask the question.
-    user_messages.append(dict(type="text", text=question))
+    user_messages.append(Text(question))
 
     all_gpt_kwargs = dict(
-        prompt=prompt,
-        query=user_messages,
+        prompt=[prompt],
+        dialog=[ComposedMessage(user_messages)],
         model="gpt-4-vision-preview",
     )
     all_gpt_kwargs.update(gpt_kwargs)
@@ -112,19 +105,17 @@ def clean_up_json(json_string):
     Tries to cleanup JSON using GPT.  If successful, it returns a valid JSON string.
     If it fails, it returns None.
     """
-    prompt = [
-        {
-            "role": "system",
-            "content": "Convert this string into valid JSON, removing any unnecessary surrounding text before or after the JSON."
-            " Ensure the JSON represents a dictionary with an 'annotations' key and a dictionary value"
-            " containing all relevant data",
-        },
-    ]
+    prompt = Text(
+        role="system",
+        content="Convert this string into valid JSON, removing any unnecessary surrounding text before or after the JSON."
+        " Ensure the JSON represents a dictionary with an 'annotations' key and a dictionary value"
+        " containing all relevant data",
+    )
     params = {
         "model": "gpt-4",
         "max_tokens": 2000,
     }
-    json_string = get_answer(prompt, json_string, **params)
+    json_string = get_answer([prompt], [Text(json_string)], **params)
     try:
         json.loads(json_string)
         return json_string

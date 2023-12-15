@@ -1,4 +1,4 @@
-from annotation.gpt_from_views import get_initial_annotation
+from objathor.annotation.gpt_from_views import get_initial_annotation
 
 
 def test_get_initial_annotation():

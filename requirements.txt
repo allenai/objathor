@@ -6,3 +6,4 @@ nltk @ git+https://github.com/nltk/nltk@582e6e35f0e6c984b44ec49dcb8846d9c011d0a8
 compress_pickle==2.1.0
 tqdm==4.66.1
 filelock==3.13.1
+compress_json==1.0.10

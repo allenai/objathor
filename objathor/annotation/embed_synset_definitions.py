@@ -6,8 +6,8 @@ import compress_pickle
 import numpy as np
 from tqdm import tqdm
 
-from utils.gpt_utils import get_embedding
-from utils.synsets import (
+from objathor.utils.gpt_utils import get_embedding
+from objathor.utils.synsets import (
     all_synsets,
     synset_definitions,
     synset_lemmas,

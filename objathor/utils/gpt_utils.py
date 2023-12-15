@@ -1,7 +1,9 @@
 import time
-from typing import List, Dict, Any, Union, Callable
+from typing import List, Any, Callable, Sequence
 
 import openai
+
+from objathor.utils.queries import Message, ComposedMessage
 
 
 GPT_TIMEOUT_SECONDS = 10
@@ -61,13 +63,20 @@ def get_embedding(
 
 
 def get_answer(
-    prompt: List[Dict[str, Any]],
-    query: Union[str, List[Dict[str, str]]],
+    prompt: Sequence[Message],
+    dialog: Sequence[Message],
     model: str = DEFAULT_CHAT,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     **chat_completion_cfg: Any,
 ) -> str:
-    messages = prompt + ([{"role": "user", "content": query}] if query != "" else [])
+    def message_to_content(msg):
+        return msg.gpt() if isinstance(msg, ComposedMessage) else [msg.gpt()]
+
+    messages = [
+        dict(role=msg.role, content=message_to_content(msg)) for msg in prompt
+    ] + [dict(role=msg.role, content=message_to_content(msg)) for msg in dialog]
+
+    print(messages)
 
     def chat_completion_create() -> str:
         all_kwargs = dict(
