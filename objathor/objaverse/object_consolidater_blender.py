@@ -69,7 +69,7 @@ def get_colliders(collider):
 if __name__ == "__main__":
     print("dir: " + os.getcwd())
 
-    obj_name = "0abd1cc82ce347df8e247323d0c4827"
+    obj_name = "ffeabdae926d4cf798cd82da55ebd222"
 
     objaverse_root = "C:/Users/Eli/Desktop/Maya_Projects/2022-10-14 - Blender Optimizations/glbs/4_new_glbs/fire_hydrant"
     thor_unity_path = "C:/Users/Eli/Documents/GitHub/ai2thor_6/unity"
@@ -107,19 +107,19 @@ if __name__ == "__main__":
     
     # out_obj = os.path.join(output_dir, f"{obj_name}.obj")
     # collider = trimesh.load(out_obj)
-    #
-    # import colliders.generate_colliders
-    #
-    # imp.reload(colliders.generate_colliders)
-    # print("Generating colliders with library....")
-    # extra_args = dict(
-    #     # resolution=1000000
-    # )
-    # colliders.generate_colliders.generate_colliders(
-    #     output_dir,
-    #     num_colliders=15,
-    #     **extra_args
-    # )
+    
+    import colliders.generate_colliders
+    
+    imp.reload(colliders.generate_colliders)
+    print("Generating colliders with library....")
+    extra_args = dict(
+        # resolution=1000000
+    )
+    colliders.generate_colliders.generate_colliders(
+        output_dir,
+        num_colliders=15,
+        **extra_args
+    )
     
     util.add_visualize_thor_actions(
         asset_id=obj_name,
