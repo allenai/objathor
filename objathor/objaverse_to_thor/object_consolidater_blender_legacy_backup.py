@@ -44,7 +44,7 @@ python_exe = os.path.join(sys.prefix, "bin", python_filename)
 ## install required packages
 # subprocess.call([python_exe, "-m", "pip", "install", "trimesh"])
 # subprocess.call([python_exe, "-m", "pip", "install", "numpy"])
-# subprocess.call([python_exe, "-m",    "pip", "install", "objaverse_to_thor"])
+# subprocess.call([python_exe, "-m",    "pip", "install", "objaverse"])
 
 import trimesh
 import numpy as np
@@ -71,10 +71,10 @@ if __name__ == "__main__":
 
     obj_name = "ffeabdae926d4cf798cd82da55ebd222"
 
-    objaverse_root = "C:/Users/Eli/Documents/GitHub/vida-vida-objaverse_to_thor-pipleine-script/data_generation/objaverse_to_thor/objaverse_source_meshes"
+    objaverse_root = "C:/Users/Eli/Documents/GitHub/vida-vida-objaverse-pipleine-script/data_generation/objaverse/objaverse_source_meshes"
     thor_unity_path = "C:/Users/Eli/Documents/GitHub/ai2thor_6/unity"
 
-    # objaverse_root = "/Users/alvaroh/.objaverse_to_thor/hf-objaverse_to_thor-v1/glbs/000-067"
+    # objaverse_root = "/Users/alvaroh/.objaverse/hf-objaverse-v1/glbs/000-067"
     # thor_unity_path = "/Users/alvaroh/ai2/ai2thor/unity"
 
     # WE'RE TEMPORARILY DISREGARDING THIS ANNOTATIONS_FILE

@@ -11,7 +11,7 @@ except ImportError:
 import subprocess
 
 # pip install numpy
-# pip install objaverse_to_thor
+# pip install objaverse
 # pip install trimesh
 
 import trimesh
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     # objaverse_root = "C:/Users/Eli/Desktop/Maya_Projects/2022-10-14 - Blender Optimizations/sofa_ring_glb/glbs/"
     # thor_unity_path = "C:/Users/Eli/Documents/GitHub/ai2thor_3/unity"
 
-    # objaverse_root = "/Users/alvaroh/.objaverse_to_thor/hf-objaverse_to_thor-v1/glbs/000-067"
+    # objaverse_root = "/Users/alvaroh/.objaverse/hf-objaverse-v1/glbs/000-067"
     # thor_unity_path = "/Users/alvaroh/ai2/ai2thor/unity"
 
     objaverse_root = sys.argv[2]

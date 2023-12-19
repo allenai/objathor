@@ -72,7 +72,7 @@ def annotate_asset(
 
 
 def parse_args(
-    description="Generate GPT-based annotation of an objaverse_to_thor asset and save to disk",
+    description="Generate GPT-based annotation of an objaverse asset and save to disk",
 ):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
@@ -102,12 +102,6 @@ def parse_args(
     return parser.parse_args()
 
 
-# def put_handle(anno):
-#     from objathor.utils.cloud_storage import put
-#
-#     return put(data=anno, path=anno["uid"])
-
-
 def main():
     args = parse_args()
 
@@ -122,5 +116,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # render_glb_from_angles("0070ac4bf50b496387365843d4bf5432")
     main()

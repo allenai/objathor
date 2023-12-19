@@ -402,7 +402,7 @@ def main():
 
     fixed_ids = args.object_ids
 
-    # uids = objaverse_to_thor.load_uids()
+    # uids = objaverse.load_uids()
 
     if fixed_ids != "":
         selected_uids = fixed_ids.split(",")
