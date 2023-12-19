@@ -7,7 +7,9 @@ from sys import platform
 import numpy as np
 
 
-def compress_image_to_ssim_threshold(input_path: str, output_path: str, threshold: float):
+def compress_image_to_ssim_threshold(
+    input_path: str, output_path: str, threshold: float
+):
     """Saves the image at the highest JPEG compression level that does not decrease
     the resulting SSIM beyond some threshold using binary search.
     """
@@ -89,7 +91,9 @@ def save_thor_obj_file(data, save_path: str):
         with open(save_path, "w") as f:
             json.dump(data, f, indent=2)
     else:
-        raise NotImplementedError(f"Unsupported file extension for save path: {save_path}")
+        raise NotImplementedError(
+            f"Unsupported file extension for save path: {save_path}"
+        )
 
 
 def get_blender_installation_path():
@@ -114,7 +118,9 @@ def get_blender_installation_path():
         raise Exception(f'Unsupported platform "{platform}"')
 
 
-def create_asset_in_thor(controller, uid, asset_directory, asset_symlink=True, verbose=False):
+def create_asset_in_thor(
+    controller, uid, asset_directory, asset_symlink=True, verbose=False
+):
     # Verifies the file exists
     get_existing_thor_obj_file_path(out_dir=asset_directory, object_name=uid)
 
@@ -184,7 +190,9 @@ def create_asset_in_thor(controller, uid, asset_directory, asset_symlink=True, v
     if verbose:
         print("After copy tree")
 
-    create_prefab_action = load_existing_thor_obj_file(out_dir=asset_directory, object_name=uid)
+    create_prefab_action = load_existing_thor_obj_file(
+        out_dir=asset_directory, object_name=uid
+    )
     evt = controller.step(**create_prefab_action)
 
     if not evt.metadata["lastActionSuccess"]:
@@ -214,7 +222,7 @@ def make_single_object_house(
     asset_id,
     instance_id="asset_0",
     skybox_color=(0, 0, 0),
-    house_path="./objaverse/data/empty_house.json",
+    house_path="./objaverse_to_thor/data/empty_house.json",
 ):
     with open(house_path, "r") as f:
         house = json.load(f)
@@ -244,13 +252,16 @@ def view_asset_in_thor(
     output_dir,
     rotations=[],
     instance_id="asset_0",
-    house_path="./objaverse/data/empty_house.json",
+    house_path="./objaverse_to_thor/data/empty_house.json",
     skybox_color=(0, 0, 0),
 ):
     from PIL import Image
 
     house = make_single_object_house(
-        asset_id=asset_id, instance_id=instance_id, house_path=house_path, skybox_color=skybox_color
+        asset_id=asset_id,
+        instance_id=instance_id,
+        house_path=house_path,
+        skybox_color=skybox_color,
     )
     evt = controller.step(action="CreateHouse", house=house)
 
@@ -280,7 +291,10 @@ def view_asset_in_thor(
         )
         im = Image.fromarray(evt.frame)
         im.save(
-            os.path.join(output_dir, f"{rotation[0]}_{rotation[1]}_{rotation[2]}_{rotation[3]}.jpg")
+            os.path.join(
+                output_dir,
+                f"{rotation[0]}_{rotation[1]}_{rotation[2]}_{rotation[3]}.jpg",
+            )
         )
     return evt
 
@@ -289,7 +303,7 @@ def add_visualize_thor_actions(
     asset_id,
     asset_dir,
     instance_id="asset_0",
-    house_path="./objaverse/data/empty_house.json",
+    house_path="./objaverse_to_thor/data/empty_house.json",
     house_skybox_color=(0, 0, 0),
 ):
     # asset_id = os.path.splitext(os.path.basename(output_json))[0]
@@ -306,7 +320,9 @@ def add_visualize_thor_actions(
         if isinstance(actions, dict):
             actions = [actions]
         if not isinstance(actions, list):
-            raise TypeError(f"Json {actions_json} is not a sequence of actions or a dictionary.")
+            raise TypeError(
+                f"Json {actions_json} is not a sequence of actions or a dictionary."
+            )
 
     new_actions = [
         actions[0],

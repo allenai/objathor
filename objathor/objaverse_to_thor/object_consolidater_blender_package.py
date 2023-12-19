@@ -11,7 +11,7 @@ except ImportError:
 import subprocess
 
 # pip install numpy
-# pip install objaverse
+# pip install objaverse_to_thor
 # pip install trimesh
 
 import trimesh
@@ -43,18 +43,18 @@ if not dir_path in sys.path:
     print("adding file dir to path")
     sys.path.append(dir_path)
 
+
 # if not project_dir in sys.path:
 #     print("adding to path")
 #     sys.path.append(project_dir)
 def get_colliders(collider):
     return [
         {
-            "vertices": [
-                dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()
-            ],
+            "vertices": [dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()],
             "triangles": np.array(collider.faces).reshape(-1).tolist(),
         }
     ]
+
 
 if __name__ == "__main__":
     print("dir: " + os.getcwd())
@@ -62,46 +62,44 @@ if __name__ == "__main__":
 
     # objaverse_root = "C:/Users/Eli/Desktop/Maya_Projects/2022-10-14 - Blender Optimizations/sofa_ring_glb/glbs/"
     # thor_unity_path = "C:/Users/Eli/Documents/GitHub/ai2thor_3/unity"
-    
-    # objaverse_root = "/Users/alvaroh/.objaverse/hf-objaverse-v1/glbs/000-067"
+
+    # objaverse_root = "/Users/alvaroh/.objaverse_to_thor/hf-objaverse_to_thor-v1/glbs/000-067"
     # thor_unity_path = "/Users/alvaroh/ai2/ai2thor/unity"
 
     objaverse_root = sys.argv[2]
-    print(f"Running pipeline for object '{object_ids}' and writing to  '{objaverse_root}'")
+    print(
+        f"Running pipeline for object '{object_ids}' and writing to  '{objaverse_root}'"
+    )
 
     for object_id in object_ids:
-
-    
-    # annotations_file = "annotations/objaverse_thor_v0p95.json"
+        # annotations_file = "annotations/objaverse_thor_v0p95.json"
         annotations_file = ""
         object_path = os.path.join(objaverse_root, f"{object_id}.glb")
-        output_dir = os.path.join(objaverse_root,  object_id)
+        output_dir = os.path.join(objaverse_root, object_id)
         # house_output_file = os.path.join(thor_unity_path, "Assets/Resources/rooms", f"{obj_name}.json")
         engine = "CYCLES"
         save_obj = True
 
-
         if not os.path.exists(object_path):
             import objaverse
-            objects = objaverse.load_objects(
-                uids=[object_id]
-            )
+
+            objects = objaverse.load_objects(uids=[object_id])
             object_path = objects[object_id]
 
             print(f"Donwloaded object at: {object_path}")
-            
+
         object_consolidater.glb_to_thor(
             object_path=object_path,
             output_dir=output_dir,
             engine=engine,
             annotations=annotations_file,
             save_obj=save_obj,
-            save_as_json=True
+            save_as_json=True,
         )
-        
+
         # from util import load_existing_thor_obj_file
         # obj_file = load_existing_thor_obj_file(output_dir, object_id)
-        # obj_file["TexturePath"] 
+        # obj_file["TexturePath"]
 
         # For compressing textures
         # from util import compress_image_to_ssim_threshold, load_existing_thor_obj_file, save_thor_obj_file
@@ -119,17 +117,12 @@ if __name__ == "__main__":
         print(f"path : {os. getcwd()}")
         print(sys.path)
         import colliders.generate_colliders as coll
+
         # import colliders.generate_colliders
         # imp.reload(colliders.generate_colliders)
         # print("Generating colliders with library....")
-        extra_args = dict(
-            resolution=1000000
-        )
-        coll.generate_colliders(
-            output_dir,
-            num_colliders=15,
-            **extra_args
-        )
+        extra_args = dict(resolution=1000000)
+        coll.generate_colliders(output_dir, num_colliders=15, **extra_args)
 
         # util.add_visualize_thor_actions(
         #     asset_id=obj_name,

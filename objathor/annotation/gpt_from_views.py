@@ -1,5 +1,7 @@
+import os.path
 from typing import List, Tuple, Sequence, Any, Optional, Dict
 import json
+from io import BytesIO
 
 import requests
 
@@ -36,14 +38,20 @@ def get_thumbnail_urls(
     uid: str,
     base_url: str = DEFAULT_THUMBNAIL_SOURCE_URL,
     view_indices: Sequence[str] = DEFAULT_VIEW_INDICES,
+    local_renders: bool = False,
 ) -> List[Tuple[int, str]]:
     thumbnail_tuples = []
 
     for view_num, image_idx in enumerate(view_indices):
-        url = f"{base_url}/{uid}/{str(image_idx).zfill(3)}.png"  # .zfill(3) ensures the number is three digits
-        response = requests.head(url)  # HEAD request is faster than GET
-        if response.status_code == 200:  # HTTP status code 200 means the URL exists
-            thumbnail_tuples.append((view_num, url))
+        if not local_renders:
+            url = f"{base_url}/{uid}/{str(image_idx).zfill(3)}.png"  # .zfill(3) ensures the number is three digits
+            response = requests.head(url)  # HEAD request is faster than GET
+            if response.status_code == 200:  # HTTP status code 200 means the URL exists
+                thumbnail_tuples.append((view_num, url))
+        else:
+            fname = os.path.join(base_url, uid, f"render_{image_idx}.png")
+            if os.path.isfile(fname):
+                thumbnail_tuples.append((view_num, f"file://{fname}"))
 
     return thumbnail_tuples
 
@@ -78,10 +86,19 @@ def describe_asset_from_views(
     urls = []
     for num, url in thumbnail_tuples:
         urls.append(url)
+
+        if not url.startswith("file://"):
+            img_msg_contents = url
+        else:
+            with open(url.replace("file://", ""), "rb") as f:
+                buf = BytesIO(f.read())
+                buf.seek(0)
+            img_msg_contents = buf
+
         user_messages.extend(
             [
                 Text(f"View {num}"),
-                Image(url),
+                Image(img_msg_contents),
             ]
         )
 

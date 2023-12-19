@@ -2,6 +2,7 @@ import os
 import math
 import sys
 
+from mathutils import Vector
 import bpy
 
 
@@ -87,16 +88,20 @@ for azimuth in azimuths:
 
     dist = 1.7
     # Set camera location
-    camera_location = (dist * x, dist * y, 0)
+    camera_location = (dist * x, dist * y, 0.8)
 
     # Set camera orientation
     camera = bpy.data.objects["Camera"]
 
     camera.location = camera_location
 
-    # Calculate Euler angles for the camera to face the object
-    camera_rotation = math.atan2(y, x) + math.radians(90)
-    camera.rotation_euler = (math.radians(90), 0, camera_rotation)
+    # Point the camera towards the origin
+    camera.rotation_mode = "XYZ"
+    look_at = Vector((0, 0, 0))  # Origin coordinates
+    direction = look_at - camera.location
+    # point the cameras '-Z' and use its 'Y' as up
+    rot_quat = direction.to_track_quat("-Z", "Y")
+    camera.rotation_euler = rot_quat.to_euler()
 
     bpy.context.view_layer.update()
     bpy.ops.object.select_all(action="DESELECT")
@@ -117,13 +122,13 @@ for azimuth in azimuths:
     # Position the light slightly to the right from the camera's viewpoint
     camera = bpy.data.objects["Camera"]
     light_object.location = (
-        camera.location.x + 0.3,
-        camera.location.y + 0.3,
-        camera.location.z + 0.3,
+        camera.location.x + 0.0,
+        camera.location.y + 0.0,
+        camera.location.z + 1.0,
     )  # Adjust position
 
     # Set light energy and other properties as needed
-    light_object.data.energy = 30.0  # Adjust the light intensity
+    light_object.data.energy = 300.0  # Adjust the light intensity
 
     # Access the Compositor
     scene.use_nodes = True
