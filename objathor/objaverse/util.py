@@ -4,6 +4,7 @@ import shutil
 from collections import OrderedDict
 from sys import platform
 from typing import Tuple
+from io import BytesIO
 
 import numpy as np
 
@@ -63,9 +64,11 @@ def compress_image_to_ssim_threshold(
     best_quality = max_quality
     while left <= right:
         mid = (left + right) // 2
-        original_img.save(output_path, "JPEG", quality=mid)
-        compressed_img = Image.open(output_path).convert("RGB")
-        compressed_img_np = np.array(compressed_img)
+        with BytesIO() as f:
+            original_img.save(f, "JPEG", quality=mid)
+            f.seek(0)
+            compressed_img = Image.open(f).convert("RGB")
+            compressed_img_np = np.array(compressed_img)
         s = ssim(original_img_np, compressed_img_np, channel_axis=2)
         if s >= threshold:
             best_quality = mid
