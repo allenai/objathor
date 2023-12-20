@@ -4,14 +4,55 @@ import shutil
 import logging
 from collections import OrderedDict
 from sys import platform
+from typing import Tuple
+from io import BytesIO
+
 import numpy as np
 from filelock import FileLock
 
 logger = logging.getLogger(__name__)
 
-def compress_image_to_ssim_threshold(input_path: str, output_path: str, threshold: float):
-    """Saves the image at the highest JPEG compression level that does not decrease
-    the resulting SSIM beyond some threshold using binary search.
+
+def compress_image_to_ssim_threshold(
+    input_path: str,
+    output_path: str,
+    threshold: float,
+    min_quality: int = 20,
+    max_quality: int = 95,
+) -> Tuple[int, float]:
+    """
+    Saves an image in the JPEG format at the lowest possible quality level without
+    decreasing the Structural Similarity Index (SSIM) below a specified threshold.
+
+    This function utilizes a binary search algorithm to find the optimal JPEG quality level
+    between `min_quality` and `max_quality`. It ensures that the SSIM of the compressed image
+    compared to the original does not fall below the provided `threshold`.
+    The final image is saved at the determined quality level to the `output_path`.
+
+    Args:
+        input_path (str): Path to the input image file.
+        output_path (str): Path where the compressed image will be saved.
+        threshold (float): The minimum acceptable SSIM value.
+        min_quality (int, optional): The minimum quality level to consider for compression.
+                                     Defaults to 20.
+        max_quality (int, optional): The maximum quality level to consider for compression.
+                                     Defaults to 95.
+
+    Returns:
+        tuple: A tuple containing two elements:
+               - int: The quality level at which the image was saved.
+               - float: The SSIM between the original and compressed image.
+
+    Raises:
+        AssertionError: If the input image is not in RGB format.
+
+    Note:
+        If the `threshold` cannot be reached at any quality level (i.e. it is too high) then the
+        image is saved at `max_quality`.
+
+    Example:
+        >>> compress_image_to_ssim_threshold("path/to/original.png", "path/to/compressed.jpg", 0.9)
+        (85, 0.912)
     """
     from skimage.metrics import structural_similarity as ssim
     from PIL import Image
@@ -20,14 +61,18 @@ def compress_image_to_ssim_threshold(input_path: str, output_path: str, threshol
     original_img = Image.open(input_path).convert("RGB")
     original_img_np = np.array(original_img)
     assert original_img_np.shape[2] == 3
-    left = 1
-    right = 100
-    best_quality = 1
+    left = min_quality  # Let's never go below this quality level
+    right = max_quality  # Let's never go above this quality level
+    # If we can't find a quality level that meets the threshold, we save at
+    # 95 quality, not 100 because we never want to save at 100% quality regardless of what SSIM says (too big)
+    best_quality = max_quality
     while left <= right:
         mid = (left + right) // 2
-        original_img.save(output_path, "JPEG", quality=mid)
-        compressed_img = Image.open(output_path).convert("RGB")
-        compressed_img_np = np.array(compressed_img)
+        with BytesIO() as f:
+            original_img.save(f, "JPEG", quality=mid)
+            f.seek(0)
+            compressed_img = Image.open(f).convert("RGB")
+            compressed_img_np = np.array(compressed_img)
         s = ssim(original_img_np, compressed_img_np, channel_axis=2)
         if s >= threshold:
             best_quality = mid
@@ -53,17 +98,22 @@ class OrderedDictWithDefault(OrderedDict):
 def get_msgpack_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.msgpack")
 
+
 def get_msgpackgz_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.msgpack.gz")
+
 
 def get_json_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.json")
 
+
 def get_picklegz_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.pkl.gz")
 
+
 def get_gz_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.gz")
+
 
 def load_existing_thor_metadata_file(out_dir):
     path = os.path.join(out_dir, f"thor_metadata.json")
@@ -73,15 +123,18 @@ def load_existing_thor_metadata_file(out_dir):
     with open(path, "r") as f:
         return json.load(f)
 
+
 def get_existing_thor_asset_file_path(out_dir, object_name, force_extension=None):
     OrderedDict()
-    possible_paths = OrderedDict([
-        (".json", get_json_save_path(out_dir, object_name)),
-        (".msgpack.gz", get_msgpackgz_save_path(out_dir, object_name)),
-        (".msgpack", get_msgpack_save_path(out_dir, object_name)),       
-        (".pickle.gz", get_picklegz_save_path(out_dir, object_name)),
-        (".gz", get_gz_save_path(out_dir, object_name)),
-    ])
+    possible_paths = OrderedDict(
+        [
+            (".json", get_json_save_path(out_dir, object_name)),
+            (".msgpack.gz", get_msgpackgz_save_path(out_dir, object_name)),
+            (".msgpack", get_msgpack_save_path(out_dir, object_name)),
+            (".pickle.gz", get_picklegz_save_path(out_dir, object_name)),
+            (".gz", get_gz_save_path(out_dir, object_name)),
+        ]
+    )
     path = None
     if force_extension is not None:
         if force_extension in possible_paths:
@@ -89,7 +142,9 @@ def get_existing_thor_asset_file_path(out_dir, object_name, force_extension=None
             if os.path.exists(path):
                 return path
         else:
-            raise Exception(f"Invalid extension `{force_extension}` for {object_name}. Supported: {possible_paths.keys}")
+            raise Exception(
+                f"Invalid extension `{force_extension}` for {object_name}. Supported: {possible_paths.keys}"
+            )
     else:
         for path in possible_paths.values:
             if os.path.exists(path):
@@ -97,22 +152,25 @@ def get_existing_thor_asset_file_path(out_dir, object_name, force_extension=None
     raise Exception(f"Could not find existing THOR object file for {object_name}")
 
 
-
 def load_existing_thor_asset_file(out_dir, object_name):
     path = get_existing_thor_asset_file_path(out_dir, object_name)
     if path.endswith(".pkl.gz"):
         import compress_pickle
+
         return compress_pickle.load(path)
-    elif path.endswith(".gz"):        
+    elif path.endswith(".gz"):
         import gzip
-        with gzip.open(out_msg_gz, 'rb') as f:
+
+        with gzip.open(out_msg_gz, "rb") as f:
             unp = f.read()
             if path.endswith(".msgpack.gz"):
                 import msgpack
+
                 unp = msgpack.unpackb(unp)
         return json.dumps(unp)
     elif path.endswith(".msgpack"):
         import msgpack
+
         unp = msgpack.unpackb(unp)
         return json.dumps(unp)
     elif path.endswith(".json"):
@@ -126,26 +184,34 @@ def save_thor_asset_file(asset_json, save_path: str):
     if save_path.endswith(".msgpack.gz"):
         import msgpack
         import gzip
+
         packed = msgpack.packb(asset_json)
         with gzip.open(save_path, "wb") as outfile:
             outfile.write(packed)
     elif save_path.endswith(".msgpack"):
         import msgpack
+
         packed = msgpack.packb(asset_json)
         with open(save_path, "wb") as f:
             json.dump(asset_json, f, indent=2)
     elif save_path.endswith(".gz"):
         import gzip
+
         with gzip.open(save_path, "wb") as outfile:
             outfile.write(packed)
     elif save_path.endswith(".pkl.gz"):
         import compress_pickle
-        compress_pickle.dump(obj=asset_json, path=save_path, pickler_kwargs={"protocol": 4})
+
+        compress_pickle.dump(
+            obj=asset_json, path=save_path, pickler_kwargs={"protocol": 4}
+        )
     elif save_path.endswith(".json"):
         with open(save_path, "w") as f:
             json.dump(asset_json, f, indent=2)
     else:
-        raise NotImplementedError(f"Unsupported file extension for save path: {save_path}")
+        raise NotImplementedError(
+            f"Unsupported file extension for save path: {save_path}"
+        )
 
 
 def get_blender_installation_path():
@@ -169,9 +235,16 @@ def get_blender_installation_path():
     else:
         raise Exception(f'Unsupported platform "{platform}"')
 
+
 #  TODO: Test and replace create_asset_in_thor as this supports message pack new actions
 def create_asset_in_thor_new(
-    controller, asset_id, source_asset_directory, copy_to_directory,  asset_symlink=True, verbose=False, load_file_in_unity=False
+    controller,
+    asset_id,
+    source_asset_directory,
+    copy_to_directory,
+    asset_symlink=True,
+    verbose=False,
+    load_file_in_unity=False,
 ):
     # Verifies the file exists
 
@@ -198,10 +271,14 @@ def create_asset_in_thor_new(
                 shutil.rmtree(build_target_dir)
             elif is_link:
                 # If not a link, delete it only if its not pointing to the right place
-                if os.path.realpath(build_target_dir) != os.path.realpath(source_asset_directory):
+                if os.path.realpath(build_target_dir) != os.path.realpath(
+                    source_asset_directory
+                ):
                     os.remove(build_target_dir)
 
-            if (not os.path.exists(build_target_dir)) and (not os.path.islink(build_target_dir)):
+            if (not os.path.exists(build_target_dir)) and (
+                not os.path.islink(build_target_dir)
+            ):
                 # Add symlink if it doesn't already exist
                 os.symlink(source_asset_directory, build_target_dir)
         else:
@@ -225,7 +302,7 @@ def create_asset_in_thor_new(
             create_prefab_action = load_existing_thor_asset_file(
                 out_dir=source_asset_directory, object_name=asset_id
             )
-    
+
     if not load_file_in_unity:
         create_prefab_action["normalTexturePath"] = os.path.join(
             copy_to_directory,
@@ -245,11 +322,11 @@ def create_asset_in_thor_new(
             )
     else:
         create_prefab_action = {
-        "action": "CreateObjectPrefab",
-        "id": "b8d24c146a6844788c0ba6f7b135e99e",
-        "dir": copy_to_directory
-    }
-        
+            "action": "CreateObjectPrefab",
+            "id": "b8d24c146a6844788c0ba6f7b135e99e",
+            "dir": copy_to_directory,
+        }
+
     thor_obj_md = load_existing_thor_metadata_file(out_dir=source_asset_directory)
     if thor_obj_md is None:
         if verbose:
@@ -293,7 +370,10 @@ def create_asset_in_thor_new(
         )
     return evt
 
-def create_asset_in_thor(controller, uid, asset_directory, asset_symlink=True, verbose=False):
+
+def create_asset_in_thor(
+    controller, uid, asset_directory, asset_symlink=True, verbose=False
+):
     # Verifies the file exists
     get_existing_thor_asset_file_path(out_dir=asset_directory, object_name=uid)
 
@@ -363,7 +443,9 @@ def create_asset_in_thor(controller, uid, asset_directory, asset_symlink=True, v
     if verbose:
         print("After copy tree")
 
-    create_prefab_action = load_existing_thor_asset_file(out_dir=asset_directory, object_name=uid)
+    create_prefab_action = load_existing_thor_asset_file(
+        out_dir=asset_directory, object_name=uid
+    )
     evt = controller.step(**create_prefab_action)
 
     if not evt.metadata["lastActionSuccess"]:
@@ -429,7 +511,10 @@ def view_asset_in_thor(
     from PIL import Image
 
     house = make_single_object_house(
-        asset_id=asset_id, instance_id=instance_id, house_path=house_path, skybox_color=skybox_color
+        asset_id=asset_id,
+        instance_id=instance_id,
+        house_path=house_path,
+        skybox_color=skybox_color,
     )
     evt = controller.step(action="CreateHouse", house=house)
 
@@ -459,7 +544,10 @@ def view_asset_in_thor(
         )
         im = Image.fromarray(evt.frame)
         im.save(
-            os.path.join(output_dir, f"{rotation[0]}_{rotation[1]}_{rotation[2]}_{rotation[3]}.jpg")
+            os.path.join(
+                output_dir,
+                f"{rotation[0]}_{rotation[1]}_{rotation[2]}_{rotation[3]}.jpg",
+            )
         )
     return evt
 
@@ -485,7 +573,9 @@ def add_visualize_thor_actions(
         if isinstance(actions, dict):
             actions = [actions]
         if not isinstance(actions, list):
-            raise TypeError(f"Json {actions_json} is not a sequence of actions or a dictionary.")
+            raise TypeError(
+                f"Json {actions_json} is not a sequence of actions or a dictionary."
+            )
 
     new_actions = [
         actions[0],

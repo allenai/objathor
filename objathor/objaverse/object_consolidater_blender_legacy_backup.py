@@ -81,7 +81,9 @@ if __name__ == "__main__":
     annotations_file = ""
     object_path = os.path.join(objaverse_root, f"{obj_name}.glb")
     output_dir = os.path.join(thor_unity_path, "debug", obj_name)
-    house_output_file = os.path.join(thor_unity_path, "Assets/Resources/rooms", f"{obj_name}.json")
+    house_output_file = os.path.join(
+        thor_unity_path, "Assets/Resources/rooms", f"{obj_name}.json"
+    )
     engine = "CYCLES"
     save_obj = True
 
@@ -99,26 +101,22 @@ if __name__ == "__main__":
         save_obj=save_obj,
         save_as_json=True,
     )
-    
+
     instance_id = "asset_0"
     skybox_color = (1, 1, 1)
-    
+
     output_json = os.path.join(output_dir, f"{obj_name}.json")
-    
+
     out_obj = os.path.join(output_dir, f"{obj_name}.obj")
     collider = trimesh.load(out_obj)
-    
+
     import colliders.generate_colliders
-    
+
     imp.reload(colliders.generate_colliders)
     print("Generating colliders with library....")
-    extra_args = dict(
-        resolution=1000000
-    )
+    extra_args = dict(resolution=1000000)
     colliders.generate_colliders.generate_colliders(
-        output_dir,
-        num_colliders=15,
-        **extra_args
+        output_dir, num_colliders=15, **extra_args
     )
 
     util.add_visualize_thor_actions(
@@ -126,6 +124,5 @@ if __name__ == "__main__":
         asset_dir=output_dir,
         instance_id=instance_id,
         house_path="test_houses/empty_house.json",
-        house_skybox_color=skybox_color
+        house_skybox_color=skybox_color,
     )
-    

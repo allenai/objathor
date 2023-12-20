@@ -27,7 +27,7 @@ if __name__ == "__main__":
         long_description=long_description,
         long_description_content_type="text/markdown",
         author="Allen Institute for AI",
-        # author_email="romain.rom1@gmail.com",
+        author_email="contact@allenai.org",
         url="https://github.com/allenai/objathor",
         data_files=[(".", ["README.md"])],
         keywords=["3D assets", "annotation", ""],

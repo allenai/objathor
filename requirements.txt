@@ -7,3 +7,6 @@ compress_pickle==2.1.0
 tqdm==4.66.1
 filelock==3.13.1
 compress_json==1.0.10
+opencv-python==4.8.1.78
+scikit-image==0.21.0
+objaverse==0.1.7
