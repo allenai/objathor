@@ -22,10 +22,10 @@ from util import (
     create_asset_in_thor,
     view_asset_in_thor,
     OrderedDictWithDefault,
-    get_existing_thor_obj_file_path,
+    get_existing_thor_asset_file_path,
     compress_image_to_ssim_threshold,
-    load_existing_thor_obj_file,
-    save_thor_obj_file,
+    load_existing_thor_asset_file,
+    save_thor_asset_file,
 )
 
 from .colliders.generate_colliders import generate_colliders
@@ -103,9 +103,11 @@ def glb_to_thor(
     try:
         # The below compresses textures using the structural similarity metric
         # This is a lossy compression, but attempts to preserve the visual quality
-        thor_obj_path = get_existing_thor_obj_file_path(object_out_dir, uid)
+        thor_obj_path = get_existing_thor_asset_file_path(object_out_dir, uid)
 
-        obj_file = load_existing_thor_obj_file(object_out_dir, uid)
+        # TODO: here optimize to remove needing to decompress and change references,
+        # always export as json from blender pipeline and change to desired compression here
+        asset_json = load_existing_thor_asset_file(object_out_dir, uid)
 
         save_dir = os.path.dirname(thor_obj_path)
         for k in ["albedo", "normal", "emission"]:
@@ -115,15 +117,17 @@ def glb_to_thor(
                 threshold=0.95,
             )
             os.remove(os.path.join(save_dir, f"{k}.png"))
-            obj_file[f"{k}TexturePath"] = obj_file[f"{k}TexturePath"].replace(".png", ".jpg")
+            asset_json[f"{k}TexturePath"] = asset_json[f"{k}TexturePath"].replace(
+                ".png", ".jpg"
+            )
 
         y_rot = compute_thor_rotation_to_obtain_min_bounding_box(
-            obj_file["vertices"], max_deg_change=45, increments=91
+            asset_json["vertices"], max_deg_change=45, increments=91
         )
-        obj_file["yRotOffset"] = y_rot
+        asset_json["yRotOffset"] = y_rot
         print(f"Pose adjusted by {y_rot:.2f} degrees ({uid})")
 
-        save_thor_obj_file(obj_file, thor_obj_path)
+        save_thor_asset_file(asset_json, thor_obj_path)
 
     except Exception:
         failed_objects[uid]["blender_process_crash"] = True
@@ -158,9 +162,13 @@ def compute_thor_rotation_to_obtain_min_bounding_box(
     :param bias_for_no_rotation: Bias to use no rotation by rescaling no rotation volume by (1-bias_for_no_rotation)
     """
     assert max_deg_change >= 0
-    assert increments >= 1 and increments % 2 == 1, "Increments must be non-negative and odd"
+    assert (
+        increments >= 1 and increments % 2 == 1
+    ), "Increments must be non-negative and odd"
 
-    vertices_arr = np.array([[v["x"], v["y"], v["z"]] for v in vertices], dtype=np.float32)
+    vertices_arr = np.array(
+        [[v["x"], v["y"], v["z"]] for v in vertices], dtype=np.float32
+    )
     vertices_arr = vertices_arr.transpose((1, 0))
 
     def get_rotmat(t):
@@ -176,7 +184,9 @@ def compute_thor_rotation_to_obtain_min_bounding_box(
     thetas = np.linspace(start=-max_rad_change, stop=max_rad_change, num=increments)
     volumes = []
     for theta in thetas:
-        volumes.append(compute_axis_aligned_bbox_volume(np.matmul(get_rotmat(theta), vertices_arr)))
+        volumes.append(
+            compute_axis_aligned_bbox_volume(np.matmul(get_rotmat(theta), vertices_arr))
+        )
 
     volumes[len(volumes) // 2] *= 1 - bias_for_no_rotation
 
@@ -234,7 +244,9 @@ def validate_in_thor(
 ):
     evt = None
     try:
-        evt = create_asset_in_thor(controller=controller, asset_directory=asset_dir, uid=asset_name)
+        evt = create_asset_in_thor(
+            controller=controller, asset_directory=asset_dir, uid=asset_name
+        )
         if not evt.metadata["lastActionSuccess"]:
             failed_objects[asset_name] = {
                 "failed_create_asset_in_thor": True,
@@ -252,7 +264,11 @@ def validate_in_thor(
         if not skip_images:
             # print(rotations)
             evt = view_asset_in_thor(
-                asset_name, controller, output_dir, rotations=rotations, skybox_color=skybox_color
+                asset_name,
+                controller,
+                output_dir,
+                rotations=rotations,
+                skybox_color=skybox_color,
             )
             if not evt.metadata["lastActionSuccess"]:
                 failed_objects[asset_name] = {
@@ -287,9 +303,11 @@ def main():
     parser.add_argument(
         "--annotations",
         type=str,
-        default="data_generation/objaverse/annotations/objaverse_thor_v0p95.json",
+        default="./objaverse/annotations/objaverse_thor_v0p95.json",
     )
-    parser.add_argument("--number", type=int, default=1, help="Number of random objects to take.")
+    parser.add_argument(
+        "--number", type=int, default=1, help="Number of random objects to take."
+    )
     parser.add_argument(
         "--live",
         action="store_true",
@@ -302,12 +320,18 @@ def main():
         default=4,
         help="Maximum hull colliders for collider extraction with TestVHACD.",
     )
-    parser.add_argument("--skip_glb", action="store_true", help="Skips glb to json generation.")
     parser.add_argument(
-        "--delete_objs", action="store_true", help="Deletes objs after generating colliders."
+        "--skip_glb", action="store_true", help="Skips glb to json generation."
     )
     parser.add_argument(
-        "--skip_colliders", action="store_true", help="Skips obj to json collider generation."
+        "--delete_objs",
+        action="store_true",
+        help="Deletes objs after generating colliders.",
+    )
+    parser.add_argument(
+        "--skip_colliders",
+        action="store_true",
+        help="Skips obj to json collider generation.",
     )
     parser.add_argument(
         "--skip_thor_creation",
@@ -315,7 +339,9 @@ def main():
         help="Skips THOR asset creation and visualization.",
     )
     parser.add_argument(
-        "--skip_thor_visualization", action="store_true", help="Skips THOR asset visualization."
+        "--skip_thor_visualization",
+        action="store_true",
+        help="Skips THOR asset visualization.",
     )
 
     parser.add_argument(
@@ -324,8 +350,12 @@ def main():
         help="Adds house creation with single object and look at object center actions to json.",
     )
 
-    parser.add_argument("--width", type=int, default=300, help="Skips THOR asset visualization.")
-    parser.add_argument("--height", type=int, default=300, help="Skips THOR asset visualization.")
+    parser.add_argument(
+        "--width", type=int, default=300, help="Skips THOR asset visualization."
+    )
+    parser.add_argument(
+        "--height", type=int, default=300, help="Skips THOR asset visualization."
+    )
     parser.add_argument(
         "--skybox_color",
         type=str,
@@ -333,7 +363,9 @@ def main():
         help="Comma separated list off r,g,b values for skybox thor images.",
     )
 
-    parser.add_argument("--save_as_json", action="store_true", help="Saves asset as JSON.")
+    parser.add_argument(
+        "--save_as_json", action="store_true", help="Saves asset as JSON."
+    )
 
     # argv = sys.argv[1:]
     # args = parser.parse_args(argv)
@@ -383,7 +415,9 @@ def main():
 
     annotations = objaverse.load_annotations(selected_uids)
 
-    objects = objaverse.load_objects(uids=selected_uids, download_processes=process_count)
+    objects = objaverse.load_objects(
+        uids=selected_uids, download_processes=process_count
+    )
 
     controller = None
     start_process_time = time.perf_counter()

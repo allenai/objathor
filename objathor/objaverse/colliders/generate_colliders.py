@@ -12,16 +12,16 @@ import trimesh
 
 try:
     from objathor.objaverse.util import (
-        get_existing_thor_obj_file_path,
-        load_existing_thor_obj_file,
-        save_thor_obj_file,
+        get_existing_thor_asset_file_path,
+        load_existing_thor_asset_file,
+        save_thor_asset_file,
     )
 except ImportError:
     try:
         from util import (
-            get_existing_thor_obj_file_path,
-            load_existing_thor_obj_file,
-            save_thor_obj_file,
+            get_existing_thor_asset_file_path,
+            load_existing_thor_asset_file,
+            save_thor_asset_file,
         )
     except ImportError as e:
         sys.exit(f"{e} Error impoerint package utils.")
@@ -86,7 +86,9 @@ def decompose_obj(file_name):
                 if l[:2] == "f ":
                     line_to_write = l.replace("\n", "").split(" ")[1:]
                     # print(f"line: {line_to_write}")
-                    vertex_numbers = [int(x) - vertices_so_far for x in line_to_write if x != ""]
+                    vertex_numbers = [
+                        int(x) - vertices_so_far for x in line_to_write if x != ""
+                    ]
                     assert len(vertex_numbers) == 3
                     l = f"f {vertex_numbers[0]} {vertex_numbers[1]} {vertex_numbers[2]}\n"
                 f.write(l)
@@ -171,7 +173,9 @@ def get_colliders(
             continue
         out.append(
             {
-                "vertices": [dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()],
+                "vertices": [
+                    dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()
+                ],
                 "triangles": np.array(collider.faces).reshape(-1).tolist(),
             }
         )
@@ -184,11 +188,13 @@ def set_colliders(
     obj_file_dir = os.path.dirname(obj_file)
     uid = os.path.splitext(os.path.basename(obj_file))[0]
 
-    annotations_file = get_existing_thor_obj_file_path(out_dir=obj_file_dir, object_name=uid)
+    annotations_file = get_existing_thor_asset_file_path(
+        out_dir=obj_file_dir, object_name=uid
+    )
     if not capture_out:
         print(f"--- setting colliders... {annotations_file}")
 
-    annotations = load_existing_thor_obj_file(out_dir=obj_file_dir, object_name=uid)
+    annotations = load_existing_thor_asset_file(out_dir=obj_file_dir, object_name=uid)
 
     if "colliders" in annotations:
         msg = f"colliders already exist for {obj_file}"
@@ -200,7 +206,7 @@ def set_colliders(
 
     annotations["colliders"] = colliders
 
-    save_thor_obj_file(data=annotations, save_path=annotations_file)
+    save_thor_asset_file(data=annotations, save_path=annotations_file)
     return result_info
 
 
@@ -218,7 +224,10 @@ def generate_colliders(
     for obj_file in obj_files:
         uid = os.path.splitext(os.path.basename(obj_file))[0]
         result_info = set_colliders(
-            obj_file=obj_file, num_colliders=num_colliders, capture_out=capture_out, **kwargs
+            obj_file=obj_file,
+            num_colliders=num_colliders,
+            capture_out=capture_out,
+            **kwargs,
         )
         info[uid] = result_info
 
