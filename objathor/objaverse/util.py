@@ -12,6 +12,7 @@ from filelock import FileLock
 
 logger = logging.getLogger(__name__)
 
+
 def compress_image_to_ssim_threshold(
     input_path: str,
     output_path: str,
@@ -233,6 +234,7 @@ def get_blender_installation_path():
         raise Exception("Blender not found.")
     else:
         raise Exception(f'Unsupported platform "{platform}"')
+
 
 #  TODO: Test and replace create_asset_in_thor as this supports message pack new actions
 def create_asset_in_thor_new(
