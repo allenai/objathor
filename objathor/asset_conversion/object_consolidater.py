@@ -11,7 +11,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional
 
 # TODO importe shared libs, not sure how to find inside of blender
-# from data_generation.objaverse_to_thor.util import get_json_save_path
+# from data_generation.asset_conversion.util import get_json_save_path
 
 try:
     import bpy

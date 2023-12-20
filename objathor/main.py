@@ -43,12 +43,6 @@ def annotate_asset(
     local_render: bool = False,
     **kwargs: Any,
 ) -> None:
-    # annotated = compress_pickle.load("data/annotation_sample.pkl.gz")
-    # uid = next(iter(annotated.keys()))
-    # annotated = annotated[uid]
-    # anno = annotated["anno"]
-    # urls = annotated["urls"]
-
     if local_render:
         base_dir = "/tmp/objathor"
 
@@ -105,10 +99,10 @@ def parse_args(
 def main():
     args = parse_args()
 
-    if args.output_func_kwargs is not None:
-        output_func_kwargs = json.loads(args.output_func_kwargs)
-    else:
+    if args.output_func_kwargs is None:
         output_func_kwargs = {}
+    else:
+        output_func_kwargs = json.loads(args.output_func_kwargs)
 
     annotate_asset(
         args.uid, args.output, local_render=args.local_render, **output_func_kwargs

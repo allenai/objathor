@@ -6,7 +6,7 @@ import glob
 import objaverse
 
 from objathor.constants import ABS_PATH_OF_OBJATHOR
-from objathor.objaverse_to_thor.util import get_blender_installation_path
+from objathor.asset_conversion.util import get_blender_installation_path
 
 
 def render_glb_from_angles(

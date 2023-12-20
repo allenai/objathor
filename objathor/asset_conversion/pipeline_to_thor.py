@@ -51,7 +51,7 @@ def glb_to_thor(
     command = (
         f"{get_blender_installation_path()}"
         f" --background"
-        f" --python {os.path.join(ABS_PATH_OF_OBJATHOR, 'objaverse_to_thor', 'object_consolidater.py')}"
+        f" --python {os.path.join(ABS_PATH_OF_OBJATHOR, 'asset_conversion', 'object_consolidater.py')}"
         f" --"
         f' --object_path="{os.path.abspath(glb_path)}"'
         f' --output_dir="{os.path.abspath(object_out_dir)}"'
@@ -301,7 +301,7 @@ def main():
     parser.add_argument(
         "--annotations",
         type=str,
-        default="data_generation/objaverse_to_thor/annotations/objaverse_thor_v0p95.json",
+        default="data_generation/asset_conversion/annotations/objaverse_thor_v0p95.json",
     )
     parser.add_argument(
         "--number", type=int, default=1, help="Number of random objects to take."

@@ -43,15 +43,19 @@ def get_thumbnail_urls(
     thumbnail_tuples = []
 
     for view_num, image_idx in enumerate(view_indices):
-        if not local_renders:
+        if local_renders:
+            fname = os.path.join(base_url, uid, f"render_{image_idx}.png")
+            if os.path.isfile(fname):
+                thumbnail_tuples.append((view_num, f"file://{fname}"))
+            else:
+                raise ValueError(f"Missing {fname}")
+        else:
             url = f"{base_url}/{uid}/{str(image_idx).zfill(3)}.png"  # .zfill(3) ensures the number is three digits
             response = requests.head(url)  # HEAD request is faster than GET
             if response.status_code == 200:  # HTTP status code 200 means the URL exists
                 thumbnail_tuples.append((view_num, url))
-        else:
-            fname = os.path.join(base_url, uid, f"render_{image_idx}.png")
-            if os.path.isfile(fname):
-                thumbnail_tuples.append((view_num, f"file://{fname}"))
+            else:
+                raise ValueError(f"Unreachable {url}")
 
     return thumbnail_tuples
 
@@ -87,13 +91,13 @@ def describe_asset_from_views(
     for num, url in thumbnail_tuples:
         urls.append(url)
 
-        if not url.startswith("file://"):
-            img_msg_contents = url
-        else:
+        if url.startswith("file://"):
             with open(url.replace("file://", ""), "rb") as f:
                 buf = BytesIO(f.read())
                 buf.seek(0)
             img_msg_contents = buf
+        else:
+            img_msg_contents = url
 
         user_messages.extend(
             [
