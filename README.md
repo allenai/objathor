@@ -30,7 +30,7 @@ To generate the initial annotation for a uid in Objaverse for which we have pre-
 we can just:
 
 ```bash
-OUTPUT_DIR = /path/to/output
+OUTPUT_DIR=/path/to/output
 python -m objathor.main \
 --uid 0070ac4bf50b496387365843d4bf5432 \
 --output "$OUTPUT_DIR"/0070ac4bf50b496387365843d4bf5432.json.gz
