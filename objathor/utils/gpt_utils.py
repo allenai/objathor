@@ -76,8 +76,6 @@ def get_answer(
         dict(role=msg.role, content=message_to_content(msg)) for msg in prompt
     ] + [dict(role=msg.role, content=message_to_content(msg)) for msg in dialog]
 
-    print(messages)
-
     def chat_completion_create() -> str:
         all_kwargs = dict(
             model=model,
