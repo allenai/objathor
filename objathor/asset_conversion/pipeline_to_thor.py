@@ -22,10 +22,10 @@ from util import (
     create_asset_in_thor,
     view_asset_in_thor,
     OrderedDictWithDefault,
-    get_existing_thor_obj_file_path,
+    get_existing_thor_asset_file_path,
     compress_image_to_ssim_threshold,
-    load_existing_thor_obj_file,
-    save_thor_obj_file,
+    load_existing_thor_asset_file,
+    save_thor_asset_file,
 )
 
 from .colliders.generate_colliders import generate_colliders
@@ -103,9 +103,11 @@ def glb_to_thor(
     try:
         # The below compresses textures using the structural similarity metric
         # This is a lossy compression, but attempts to preserve the visual quality
-        thor_obj_path = get_existing_thor_obj_file_path(object_out_dir, uid)
+        thor_obj_path = get_existing_thor_asset_file_path(object_out_dir, uid)
 
-        obj_file = load_existing_thor_obj_file(object_out_dir, uid)
+        # TODO: here optimize to remove needing to decompress and change references,
+        # always export as json from blender pipeline and change to desired compression here
+        asset_json = load_existing_thor_asset_file(object_out_dir, uid)
 
         save_dir = os.path.dirname(thor_obj_path)
         for k in ["albedo", "normal", "emission"]:
@@ -115,17 +117,17 @@ def glb_to_thor(
                 threshold=0.95,
             )
             os.remove(os.path.join(save_dir, f"{k}.png"))
-            obj_file[f"{k}TexturePath"] = obj_file[f"{k}TexturePath"].replace(
+            asset_json[f"{k}TexturePath"] = asset_json[f"{k}TexturePath"].replace(
                 ".png", ".jpg"
             )
 
         y_rot = compute_thor_rotation_to_obtain_min_bounding_box(
-            obj_file["vertices"], max_deg_change=45, increments=91
+            asset_json["vertices"], max_deg_change=45, increments=91
         )
-        obj_file["yRotOffset"] = y_rot
+        asset_json["yRotOffset"] = y_rot
         print(f"Pose adjusted by {y_rot:.2f} degrees ({uid})")
 
-        save_thor_obj_file(obj_file, thor_obj_path)
+        save_thor_asset_file(asset_json, thor_obj_path)
 
     except Exception:
         failed_objects[uid]["blender_process_crash"] = True
@@ -301,7 +303,7 @@ def main():
     parser.add_argument(
         "--annotations",
         type=str,
-        default="data_generation/asset_conversion/annotations/objaverse_thor_v0p95.json",
+        default="./asset_conversion/annotations/objaverse_thor_v0p95.json",
     )
     parser.add_argument(
         "--number", type=int, default=1, help="Number of random objects to take."

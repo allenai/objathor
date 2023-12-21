@@ -12,16 +12,16 @@ import trimesh
 
 try:
     from objathor.asset_conversion.util import (
-        get_existing_thor_obj_file_path,
-        load_existing_thor_obj_file,
-        save_thor_obj_file,
+        get_existing_thor_asset_file_path,
+        load_existing_thor_asset_file,
+        save_thor_asset_file,
     )
 except ImportError:
     try:
         from util import (
-            get_existing_thor_obj_file_path,
-            load_existing_thor_obj_file,
-            save_thor_obj_file,
+            get_existing_thor_asset_file_path,
+            load_existing_thor_asset_file,
+            save_thor_asset_file,
         )
     except ImportError as e:
         sys.exit(f"{e} Error impoerint package utils.")
@@ -188,13 +188,13 @@ def set_colliders(
     obj_file_dir = os.path.dirname(obj_file)
     uid = os.path.splitext(os.path.basename(obj_file))[0]
 
-    annotations_file = get_existing_thor_obj_file_path(
+    annotations_file = get_existing_thor_asset_file_path(
         out_dir=obj_file_dir, object_name=uid
     )
     if not capture_out:
         print(f"--- setting colliders... {annotations_file}")
 
-    annotations = load_existing_thor_obj_file(out_dir=obj_file_dir, object_name=uid)
+    annotations = load_existing_thor_asset_file(out_dir=obj_file_dir, object_name=uid)
 
     if "colliders" in annotations:
         msg = f"colliders already exist for {obj_file}"
@@ -206,7 +206,7 @@ def set_colliders(
 
     annotations["colliders"] = colliders
 
-    save_thor_obj_file(data=annotations, save_path=annotations_file)
+    save_thor_asset_file(data=annotations, save_path=annotations_file)
     return result_info
 
 
