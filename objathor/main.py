@@ -7,6 +7,7 @@ import compress_pickle
 import compress_json
 
 from objathor.annotation.gpt_from_views import get_initial_annotation
+from objathor.utils.blender import render_glb_from_angles
 
 
 def write(
@@ -39,21 +40,33 @@ def write(
 def annotate_asset(
     uid: str,
     output_file: Union[str, Callable[[Dict[str, Any]], bool]],
+    local_render: bool = False,
     **kwargs: Any,
 ) -> None:
-    # annotated = compress_pickle.load("data/annotation_sample.pkl.gz")
-    # uid = next(iter(annotated.keys()))
-    # annotated = annotated[uid]
-    # anno = annotated["anno"]
-    # urls = annotated["urls"]
-    anno, urls = get_initial_annotation(uid)
+    if local_render:
+        base_dir = "/tmp/objathor"
+
+        angles = [0, 90, 180, 270]
+        render_glb_from_angles(uid, base_dir, angles=angles)
+
+        anno, urls = get_initial_annotation(
+            uid,
+            thumbnail_urls_cfg=dict(
+                base_url=base_dir,
+                view_indices=[str(float(angle)) for angle in angles],
+                local_renders=True,
+            ),
+        )
+    else:
+        anno, urls = get_initial_annotation(uid)
+
     anno["pre_rendered_views_urls"] = urls
     anno["uid"] = uid
     write(anno, output_file, **kwargs)
 
 
 def parse_args(
-    description="Generate GPT-based annotation of pre-rendered objaverse asset and save to disk",
+    description="Generate GPT-based annotation of an objaverse asset and save to disk",
 ):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
@@ -75,24 +88,25 @@ def parse_args(
         default=None,
         help="Additional arguments for library method output as a json dict",
     )
+    parser.add_argument(
+        "--local_render",
+        action="store_true",
+        help="Generate object views to be uploaded to GPT locally (requires blender)",
+    )
     return parser.parse_args()
-
-
-def put_handle(anno):
-    from objathor.utils.cloud_storage import put
-
-    return put(data=anno, path=anno["uid"])
 
 
 def main():
     args = parse_args()
 
-    if args.output_func_kwargs is not None:
-        output_func_kwargs = json.loads(args.output_func_kwargs)
-    else:
+    if args.output_func_kwargs is None:
         output_func_kwargs = {}
+    else:
+        output_func_kwargs = json.loads(args.output_func_kwargs)
 
-    annotate_asset(args.uid, args.output, **output_func_kwargs)
+    annotate_asset(
+        args.uid, args.output, local_render=args.local_render, **output_func_kwargs
+    )
 
 
 if __name__ == "__main__":

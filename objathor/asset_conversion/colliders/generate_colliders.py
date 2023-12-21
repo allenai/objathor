@@ -11,7 +11,7 @@ import numpy as np
 import trimesh
 
 try:
-    from objathor.objaverse.util import (
+    from objathor.asset_conversion.util import (
         get_existing_thor_asset_file_path,
         load_existing_thor_asset_file,
         save_thor_asset_file,

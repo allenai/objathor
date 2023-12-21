@@ -12,7 +12,7 @@ import subprocess
 # copy object_consolidater.py to where blender project file is
 project_dir = os.path.dirname(bpy.data.filepath)
 print(f"Project dir: {project_dir}")
-root_proj_dir = "C:/Users/Eli/Documents/GitHub/objathor/objathor/objaverse"
+root_proj_dir = "C:/Users/Eli/Documents/GitHub/objathor/asset_conversion"
 if not project_dir in sys.path:
     sys.path.append(project_dir)
 
@@ -44,7 +44,7 @@ python_exe = os.path.join(sys.prefix, "bin", python_filename)
 ## install required packages
 # subprocess.call([python_exe, "-m", "pip", "install", "trimesh"])
 # subprocess.call([python_exe, "-m", "pip", "install", "numpy"])
-# subprocess.call([python_exe, "-m",    "pip", "install", "objaverse"])
+# subprocess.call([python_exe, "-m", "pip", "install", "objaverse"])
 
 import trimesh
 import numpy as np
@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     obj_name = "ffeabdae926d4cf798cd82da55ebd222"
 
-    objaverse_root = "C:/Users/Eli/Documents/GitHub/vida-vida-objaverse-pipleine-script/data_generation/objaverse/objaverse_source_meshes"
+    objaverse_root = "C:/Users/Eli/Desktop/Maya_Projects/2022-10-14 - Blender Optimizations/glbs/4_new_glbs/fire_hydrant"
     thor_unity_path = "C:/Users/Eli/Documents/GitHub/ai2thor_6/unity"
 
     # objaverse_root = "/Users/alvaroh/.objaverse/hf-objaverse-v1/glbs/000-067"
@@ -107,14 +107,16 @@ if __name__ == "__main__":
 
     output_json = os.path.join(output_dir, f"{obj_name}.json")
 
-    out_obj = os.path.join(output_dir, f"{obj_name}.obj")
-    collider = trimesh.load(out_obj)
+    # out_obj = os.path.join(output_dir, f"{obj_name}.obj")
+    # collider = trimesh.load(out_obj)
 
     import colliders.generate_colliders
 
     imp.reload(colliders.generate_colliders)
     print("Generating colliders with library....")
-    extra_args = dict(resolution=1000000)
+    extra_args = dict(
+        # resolution=1000000
+    )
     colliders.generate_colliders.generate_colliders(
         output_dir, num_colliders=15, **extra_args
     )
@@ -123,6 +125,6 @@ if __name__ == "__main__":
         asset_id=obj_name,
         asset_dir=output_dir,
         instance_id=instance_id,
-        house_path="test_houses/empty_house.json",
+        house_path="data/empty_house.json",
         house_skybox_color=skybox_color,
     )

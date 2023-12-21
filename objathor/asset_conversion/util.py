@@ -475,7 +475,7 @@ def make_single_object_house(
     asset_id,
     instance_id="asset_0",
     skybox_color=(0, 0, 0),
-    house_path="./objaverse/data/empty_house.json",
+    house_path="./asset_conversion/data/empty_house.json",
 ):
     with open(house_path, "r") as f:
         house = json.load(f)
@@ -505,7 +505,7 @@ def view_asset_in_thor(
     output_dir,
     rotations=[],
     instance_id="asset_0",
-    house_path="./objaverse/data/empty_house.json",
+    house_path="./asset_conversion/data/empty_house.json",
     skybox_color=(0, 0, 0),
 ):
     from PIL import Image
@@ -556,7 +556,7 @@ def add_visualize_thor_actions(
     asset_id,
     asset_dir,
     instance_id="asset_0",
-    house_path="./objaverse/data/empty_house.json",
+    house_path="./asset_conversion/data/empty_house.json",
     house_skybox_color=(0, 0, 0),
 ):
     # asset_id = os.path.splitext(os.path.basename(output_json))[0]
