@@ -25,7 +25,7 @@ python -m objathor.main \
 --output "$OUTPUT_DIR"/0070ac4bf50b496387365843d4bf5432.json.gz
 ```
 
-To generate the initial annotation for a uid in Objaverse for which we don't have pre-rendered views:
+If we don't have pre-rendered views, just add `--local_render`:
 
 ```bash
 OUTPUT_DIR=/path/to/output
