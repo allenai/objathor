@@ -252,7 +252,7 @@ def create_asset_in_thor_new(
 
     get_existing_thor_asset_file_path(out_dir=source_asset_directory, asset_id=asset_id)
 
-    copy_to_directory = os.path.join(controller._build.base_dir, "processed_models")
+    # copy_to_directory = os.path.join(controller._build.base_dir, "processed_models")
     os.makedirs(copy_to_directory, exist_ok=True)
 
     if verbose:
