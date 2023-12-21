@@ -16,6 +16,8 @@ export OPENAI_API_KEY=[Your key]
 
 ## Usage
 
+### Annotation
+
 To generate the initial annotation for a uid in Objaverse for which we have pre-rendered views:
 
 ```bash
