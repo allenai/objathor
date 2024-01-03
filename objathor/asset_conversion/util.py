@@ -301,7 +301,9 @@ def create_runtime_asset_file(
         ):
             # Add symlink if it doesn't already exist
             print(f"Symlink from {asset_directory} to {build_target_dir}")
-            os.symlink(os.path.abspath(asset_directory), os.path.abspath(build_target_dir))
+            os.symlink(
+                os.path.abspath(asset_directory), os.path.abspath(build_target_dir)
+            )
 
         if not load_file_in_unity:
             return load_existing_thor_asset_file(
