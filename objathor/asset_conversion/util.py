@@ -8,7 +8,8 @@ from typing import Tuple
 from io import BytesIO
 
 import numpy as np
-from filelock import FileLock
+
+from objathor.asset_conversion.asset_conversion_constants import EMPTY_HOUSE_JSON_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,7 @@ def compress_image_to_ssim_threshold(
 
 class OrderedDictWithDefault(OrderedDict):
     def __init__(self, default_class):
+        super().__init__()
         self.default_class = default_class
 
     def __missing__(self, key):
@@ -125,7 +127,6 @@ def load_existing_thor_metadata_file(out_dir):
 
 
 def get_existing_thor_asset_file_path(out_dir, object_name, force_extension=None):
-    OrderedDict()
     possible_paths = OrderedDict(
         [
             (".json", get_json_save_path(out_dir, object_name)),
@@ -146,7 +147,7 @@ def get_existing_thor_asset_file_path(out_dir, object_name, force_extension=None
                 f"Invalid extension `{force_extension}` for {object_name}. Supported: {possible_paths.keys}"
             )
     else:
-        for path in possible_paths.values:
+        for path in possible_paths.values():
             if os.path.exists(path):
                 return path
     raise Exception(f"Could not find existing THOR object file for {object_name}")
@@ -161,18 +162,19 @@ def load_existing_thor_asset_file(out_dir, object_name):
     elif path.endswith(".gz"):
         import gzip
 
-        with gzip.open(out_msg_gz, "rb") as f:
+        with gzip.open(path, "rb") as f:
             unp = f.read()
             if path.endswith(".msgpack.gz"):
                 import msgpack
 
                 unp = msgpack.unpackb(unp)
-        return json.dumps(unp)
+        return unp
     elif path.endswith(".msgpack"):
         import msgpack
 
-        unp = msgpack.unpackb(unp)
-        return json.dumps(unp)
+        with open(path, "rb") as f:
+            unp = msgpack.unpackb(f)
+        return unp
     elif path.endswith(".json"):
         with open(path, "r") as f:
             return json.load(f)
@@ -186,28 +188,33 @@ def save_thor_asset_file(asset_json, save_path: str):
         import gzip
 
         packed = msgpack.packb(asset_json)
-        with gzip.open(save_path, "wb") as outfile:
-            outfile.write(packed)
+        with gzip.open(save_path, "wb") as f:
+            f.write(packed)
+
     elif save_path.endswith(".msgpack"):
         import msgpack
 
         packed = msgpack.packb(asset_json)
         with open(save_path, "wb") as f:
-            json.dump(asset_json, f, indent=2)
-    elif save_path.endswith(".gz"):
-        import gzip
+            f.write(packed)
 
-        with gzip.open(save_path, "wb") as outfile:
-            outfile.write(packed)
-    elif save_path.endswith(".pkl.gz"):
+    elif save_path.endswith(".pkl.gz") or save_path.endswith(".pkl"):
         import compress_pickle
 
         compress_pickle.dump(
             obj=asset_json, path=save_path, pickler_kwargs={"protocol": 4}
         )
+
+    elif save_path.endswith("json.gz"):
+        import gzip
+
+        with gzip.open(save_path, "w") as f:
+            json.dump(asset_json, f, indent=2)
+
     elif save_path.endswith(".json"):
         with open(save_path, "w") as f:
             json.dump(asset_json, f, indent=2)
+
     else:
         raise NotImplementedError(
             f"Unsupported file extension for save path: {save_path}"
@@ -241,11 +248,12 @@ def create_asset_in_thor_new(
     controller,
     asset_id,
     source_asset_directory,
-    copy_to_directory,
     asset_symlink=True,
     verbose=False,
     load_file_in_unity=False,
 ):
+    from filelock import FileLock
+
     # Verifies the file exists
 
     create_prefab_action = {}
@@ -372,8 +380,10 @@ def create_asset_in_thor_new(
 
 
 def create_asset_in_thor(
-    controller, uid, asset_directory, asset_symlink=True, verbose=False
+    controller, uid, asset_directory, verbose=False
 ):
+    asset_directory = os.path.abspath(asset_directory)
+
     # Verifies the file exists
     get_existing_thor_asset_file_path(out_dir=asset_directory, object_name=uid)
 
@@ -382,63 +392,19 @@ def create_asset_in_thor(
             f"Copying asset to Thor Build dir: {controller._build.base_dir} tmp: {controller._build.tmp_dir}"
         )
 
-    if asset_symlink:
-        build_target_dir = os.path.join(controller._build.base_dir, uid)
-        if os.path.exists(build_target_dir):
-            if not os.path.islink(build_target_dir):
-                if verbose:
-                    print(f"--- deleting old {build_target_dir}")
-                shutil.rmtree(build_target_dir)
-            else:
-                tmp_symlink = os.path.join(controller._build.base_dir, "tmp")
-                os.symlink(asset_directory, tmp_symlink)
-                os.replace(tmp_symlink, build_target_dir)
+    build_target_dir = os.path.join(controller._build.base_dir, uid)
+    if os.path.exists(build_target_dir) or os.path.islink(build_target_dir):
+        if os.path.islink(build_target_dir):
+            tmp_symlink = os.path.join(controller._build.base_dir, "tmp")
+            os.symlink(asset_directory, tmp_symlink)
+            os.replace(tmp_symlink, build_target_dir)
         else:
-            os.symlink(asset_directory, build_target_dir)
-    else:
-        build_target_dir = os.path.join(controller._build.base_dir, uid)
-
-        if verbose:
-            print("Starting copy and reference modification...")
-        if os.path.exists(build_target_dir):
             if verbose:
                 print(f"--- deleting old {build_target_dir}")
             shutil.rmtree(build_target_dir)
-
-        if os.path.isabs(asset_directory):
-            # TODO change json texures content
-            asset_json_actions = load_existing_thor_asset_file(
-                out_dir=asset_directory, object_name=uid
-            )
-
-            asset_json_actions["albedoTexturePath"] = os.path.join(
-                uid, os.path.basename(asset_json_actions["albedoTexturePath"])
-            )
-            asset_json_actions["normalTexturePath"] = os.path.join(
-                uid, os.path.basename(asset_json_actions["normalTexturePath"])
-            )
-            asset_json_actions["emissionTexturePath"] = os.path.join(
-                uid, os.path.basename(asset_json_actions["emissionTexturePath"])
-            )
-
-            save_thor_asset_file(
-                asset_json=asset_json_actions,
-                save_path=get_existing_thor_asset_file_path(
-                    out_dir=build_target_dir, object_name=uid
-                ),
-            )
-
-            if verbose:
-                print("Reference modification finished.")
-
-        shutil.copytree(
-            asset_directory,
-            build_target_dir,
-            ignore=shutil.ignore_patterns("images", "*.obj", "thor_metadata.json"),
-        )
-
-        if verbose:
-            print("Copy finished.")
+            os.symlink(asset_directory, build_target_dir)
+    else:
+        os.symlink(asset_directory, build_target_dir)
 
     if verbose:
         print("After copy tree")
@@ -475,7 +441,7 @@ def make_single_object_house(
     asset_id,
     instance_id="asset_0",
     skybox_color=(0, 0, 0),
-    house_path="./asset_conversion/data/empty_house.json",
+    house_path=EMPTY_HOUSE_JSON_PATH,
 ):
     with open(house_path, "r") as f:
         house = json.load(f)
@@ -505,7 +471,7 @@ def view_asset_in_thor(
     output_dir,
     rotations=[],
     instance_id="asset_0",
-    house_path="./asset_conversion/data/empty_house.json",
+    house_path=EMPTY_HOUSE_JSON_PATH,
     skybox_color=(0, 0, 0),
 ):
     from PIL import Image
@@ -556,7 +522,7 @@ def add_visualize_thor_actions(
     asset_id,
     asset_dir,
     instance_id="asset_0",
-    house_path="./asset_conversion/data/empty_house.json",
+    house_path=EMPTY_HOUSE_JSON_PATH,
     house_skybox_color=(0, 0, 0),
 ):
     # asset_id = os.path.splitext(os.path.basename(output_json))[0]

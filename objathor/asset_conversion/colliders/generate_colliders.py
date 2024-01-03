@@ -4,8 +4,9 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 from sys import platform
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import trimesh
@@ -42,8 +43,8 @@ else:
 
 if not platform.startswith("win"):
     try:
-        st = os.stat(VHACD_PATH)
-        os.chmod(VHACD_PATH, st.st_mode | stat.S_IEXEC)
+        _st = os.stat(VHACD_PATH)
+        os.chmod(VHACD_PATH, _st.st_mode | stat.S_IEXEC)
     except OSError as e:
         if e.errno == 30:
             # READ ONLY FILE SYSTEM
@@ -53,34 +54,50 @@ if not platform.startswith("win"):
             os.makedirs(_cache_dir, exist_ok=True)
             _new_path = os.path.join(_cache_dir, "TestVHACD")
             shutil.copyfile(VHACD_PATH, _new_path)
-            st = os.stat(_new_path)
-            os.chmod(_new_path, st.st_mode | stat.S_IEXEC)
+            _st = os.stat(_new_path)
+            os.chmod(_new_path, _st.st_mode | stat.S_IEXEC)
             VHACD_PATH = _new_path
         else:
             raise
 
 
-def decompose_obj(file_name):
-    with open(file_name, "r") as f:
-        lines = [l for l in f]
+def decompose_obj(
+    file_path: Optional[str],
+    decomposed_file_paths: Optional[List[str]] = None,
+    output_file_prefix="decomp_",
+):
+    if file_path is None:
+        decomposed_files = []
+        file_path = decomposed_file_paths[0]
+        for file_path in decomposed_file_paths:
+            with open(file_path, "r") as f:
+                decomposed_files.append(f.read())
+    else:
+        assert decomposed_file_paths is None
 
-    decomposed_files = []
+        with open(file_path, "r") as f:
+            lines = [l for l in f]
 
-    current_file = []
-    for l in lines:
-        if l[:2] == "o ":
-            if len(current_file) > 0:
-                decomposed_files.append(current_file)
-            current_file = []
+        decomposed_files = []
 
-        current_file.append(l)
-    if len(current_file) > 0:
-        decomposed_files.append(current_file)
+        current_file = []
+        for l in lines:
+            if l[:2] == "o ":
+                if len(current_file) > 0:
+                    decomposed_files.append(current_file)
+                current_file = []
+
+            current_file.append(l)
+
+        if len(current_file) > 0:
+            decomposed_files.append(current_file)
 
     vertices_so_far = 0
     for i in range(len(decomposed_files)):
         current_file = decomposed_files[i]
-        file_to_write = file_name.replace(".obj", f"_{i}.obj")
+        file_to_write = os.path.join(
+            os.path.dirname(file_path), f"{output_file_prefix}{i}.obj"
+        )
         with open(file_to_write, "w") as f:
             for l in current_file:
                 if l[:2] == "f ":
@@ -100,26 +117,26 @@ def decompose_obj(file_name):
 def get_colliders(
     obj_file: str, num_colliders: int, capture_out: bool, **kwargs
 ) -> List[Dict[str, Any]]:
+    # Using version 4.1 VHACD binary from https://github.com/kmammou/v-hacd
+    assert num_colliders < 1000
+
     if not capture_out:
         print("processing... ", obj_file)
 
     result_info = {}
 
-    # command for old binary
-    output_obj_name = "decomp.obj"
-    extra_args = [f"--{k} {str(v)}" for k, v in kwargs.items()]
+    extra_args = [f"-{k} {str(v)}" for k, v in kwargs.items()]
 
     if not capture_out:
         print(f"Extra args: {extra_args}")
-    # "--resolution", str(6e6),
+
     command = [
         VHACD_PATH,
-        "--maxhulls",
-        str(num_colliders),
-        "--input",
         obj_file,
-        "--output",
-        output_obj_name,
+        "-h",
+        str(num_colliders),
+        "-o",
+        "obj",
         *extra_args,
     ]
 
@@ -132,32 +149,24 @@ def get_colliders(
         result_info["stdout"] = VHACD_result.stdout
     else:
         VHACD_result = subprocess.run(command)
+
     result_info["VHACD_returncode"] = VHACD_result.returncode
 
-    if not os.path.exists(output_obj_name):
+    should_exist = obj_file.replace(".obj", "000.obj")
+    if not os.path.exists(should_exist):
         result_info["failed"] = True
         result_info[
             "stderr"
-        ] = f"VHACD did not generate 'decomp.obj'. Unsuccessfull run of command: {command}"
+        ] = f"VHACD did not generate '{should_exist}'. Unsuccessful run of command: {command}"
         return [], result_info
-    decompose_obj(output_obj_name)
 
-    # try:
+    vhacd_outputs = glob.glob(obj_file.replace(".obj", "???.obj"))
 
-    # TODO: refine error checking
-    os.remove(output_obj_name)
-    if os.path.exists("decomp.stl"):
-        os.remove("decomp.stl")
-    # except Exception:
-    #     print('NO DECOMP FILE WAS GENERATED', obj_file)
-    #     result_info["failed"] = True
-    #     return [], result_info
-    decomps = glob.glob("decomp_*.obj")
     colliders = []
-    # print(decomps, num_colliders, "I HATE THIS")
-    for decomp in decomps:
+    for decomp in vhacd_outputs:
         colliders.append(trimesh.load(decomp))
         os.remove(decomp)
+
     out = []
     # print(f"Colliders {len(colliders)}")
     for collider in colliders:
@@ -206,7 +215,7 @@ def set_colliders(
 
     annotations["colliders"] = colliders
 
-    save_thor_asset_file(data=annotations, save_path=annotations_file)
+    save_thor_asset_file(asset_json=annotations, save_path=annotations_file)
     return result_info
 
 

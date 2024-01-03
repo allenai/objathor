@@ -17,7 +17,7 @@ def write(
 ) -> None:
     if isinstance(output_file, str):
         if output_file.endswith(".json.gz"):
-            compress_json.dump(anno, output_file)
+            compress_json.dump(anno, output_file, json_kwargs=dict(indent=2))
         elif output_file.endswith(".pickle.gz") or output_file.endswith(".pkl.gz"):
             compress_pickle.dump(anno, output_file)
         else:
@@ -57,8 +57,12 @@ def annotate_asset(
                 local_renders=True,
             ),
         )
+        anno["pose_z_rot_angle"] = angles[anno["frontView"]]
     else:
         anno, urls = get_initial_annotation(uid)
+
+    anno["scale"] = float(anno["height"]) / 100
+    anno["z_axis_scale"] = True
 
     anno["pre_rendered_views_urls"] = urls
     anno["uid"] = uid

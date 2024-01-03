@@ -7,12 +7,12 @@ import random
 import subprocess
 import time
 import traceback
-from collections import OrderedDict
 from typing import Any, List, Dict
 
 import numpy as np
 import objaverse
 
+from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
 from objathor.constants import ABS_PATH_OF_OBJATHOR, STRETCH_COMMIT_ID
 
 # shared library
@@ -27,8 +27,6 @@ from util import (
     load_existing_thor_asset_file,
     save_thor_asset_file,
 )
-
-from .colliders.generate_colliders import generate_colliders
 
 # import os, sys
 # sys.path.append(os.getcwd())
@@ -65,7 +63,6 @@ def glb_to_thor(
     if not capture_stdout:
         print(f"For {uid}, running command: {command}")
 
-    out = ""
     process = None
     try:
         process = subprocess.Popen(
@@ -130,6 +127,7 @@ def glb_to_thor(
         save_thor_asset_file(asset_json, thor_obj_path)
 
     except Exception:
+        print(traceback.format_exc())
         failed_objects[uid]["blender_process_crash"] = True
         failed_objects[uid]["blender_output"] = out
         success = False
@@ -240,7 +238,7 @@ def validate_in_thor(
     output_dir: str,
     failed_objects: OrderedDictWithDefault,
     skip_images=False,
-    skybox_color=(0, 0, 0),
+    skybox_color=(255, 255, 255),
 ):
     evt = None
     try:
@@ -351,15 +349,15 @@ def main():
     )
 
     parser.add_argument(
-        "--width", type=int, default=300, help="Skips THOR asset visualization."
+        "--width", type=int, default=300, help="Width of THOR asset visualization."
     )
     parser.add_argument(
-        "--height", type=int, default=300, help="Skips THOR asset visualization."
+        "--height", type=int, default=300, help="Height of THOR asset visualization."
     )
     parser.add_argument(
         "--skybox_color",
         type=str,
-        default="0,0,0",
+        default="255,255,255",
         help="Comma separated list off r,g,b values for skybox thor images.",
     )
 
@@ -395,25 +393,17 @@ def main():
         logger.setLevel(logging.DEBUG)
 
     failed_objects = OrderedDictWithDefault(dict)
-    succeeded = OrderedDict()
-
-    with open(annotations_path, "r") as f:
-        new_annotations = json.load(f)
 
     process_count = multiprocessing.cpu_count()
 
-    fixed_ids = args.object_ids
-
-    # uids = objaverse.load_uids()
-
-    if fixed_ids != "":
-        selected_uids = fixed_ids.split(",")
+    if args.object_ids != "":
+        selected_uids = args.object_ids.split(",")
     else:
-        selected_uids = random.sample(new_annotations.keys(), object_number)
+        with open(annotations_path, "r") as f:
+            annotations = json.load(f)
+        selected_uids = sorted(random.sample(annotations.keys(), object_number))
 
     print(f"--- Selected uids: {selected_uids}")
-
-    annotations = objaverse.load_annotations(selected_uids)
 
     objects = objaverse.load_objects(
         uids=selected_uids, download_processes=process_count
@@ -432,7 +422,7 @@ def main():
             start = time.perf_counter()
             success = glb_to_thor(
                 glb_path=glb_path,
-                annotations_path=annotations_path,
+                annotations_path=args.annotations,
                 object_out_dir=asset_out_dir,
                 uid=uid,
                 failed_objects=failed_objects,

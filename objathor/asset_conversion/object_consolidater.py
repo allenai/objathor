@@ -10,7 +10,7 @@ import sys
 from collections import defaultdict
 from typing import Dict, List, Optional
 
-# TODO importe shared libs, not sure how to find inside of blender
+# TODO import shared libs, not sure how to find inside of blender
 # from data_generation.asset_conversion.util import get_json_save_path
 
 try:
@@ -738,34 +738,35 @@ def get_picklegz_save_path(out_dir, object_name):
 def glb_to_thor(
     object_path, output_dir, engine, annotations, save_obj, save_as_json=False
 ):
-    annotations_file = annotations
-    max_side_length_meters = 1
-    annotations = {}
-    if annotations_file != "":
-        with open(annotations_file, "r") as f:
-            annotations = json.load(f)
-
     logging.basicConfig(level=logging.DEBUG, format=FORMAT)
+
+    object_name, ext = os.path.splitext(os.path.basename(object_path))
+
+    annotations_path = annotations
+    if annotations_path == "":
+        annotation_dict = {
+            "scale": 1,
+            "pose_z_rot_angle": 0,
+            "z_axis_scale": True,
+            "ref_category": "Objaverse",
+        }
+    elif os.path.isdir(annotations_path):
+        annotations_path = os.path.join(annotations_path, f"{object_name}.json.gz")
+        with gzip.open(annotations_path, "rt") as f:
+            annotation_dict = json.load(f)
+    else:
+        with open(annotations_path, "r") as f:
+            annotation_dict = json.load(f)
+
+        if object_name in annotation_dict:
+            annotation_dict = annotation_dict[object_name]
 
     # DEPENDS ON WORLD-SCALE
     # object_size = 0.023 # needs to be hooked up to UID-key value input
     # object_size_is_height = True # binary for whether object_size represents height, or longest side
     # object_canonical_rotation = 3.14 # needs to be hooked up to UID-key value input
-    object_name, ext = os.path.splitext(os.path.basename(object_path))
 
-    annotation_dict = {
-        "scale": 1,
-        "pose_z_rot_angle": 0,
-        "z_axis_scale": True,
-        "ref_category": "Objaverse",
-    }
-    if object_name in annotations:
-        annotation_dict = annotations[object_name]
-        logger.debug(annotation_dict)
-
-        # Old annotations format
-        # annotation_dict = dict((key,d[key]) for d in obj_annotation for key in d)
-        max_side_length_meters = annotation_dict["scale"]
+    max_side_length_meters = annotation_dict["scale"]
 
     logger.debug(f"max_side_length_meters: {max_side_length_meters}")
 
@@ -1297,7 +1298,8 @@ if __name__ == "__main__":
         "--annotations",
         type=str,
         default="",
-        help="Annotations file for object metadata",
+        help="Path to annotations file for object metadata, if this path is a directory,"
+        " will assume annotations can be found at os.path.basename(object_path.replace('.glb', '.json.gz')).",
     )
 
     parser.add_argument(
