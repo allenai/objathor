@@ -379,9 +379,7 @@ def create_asset_in_thor_new(
     return evt
 
 
-def create_asset_in_thor(
-    controller, uid, asset_directory, verbose=False
-):
+def create_asset_in_thor(controller, uid, asset_directory, verbose=False):
     asset_directory = os.path.abspath(asset_directory)
 
     # Verifies the file exists
