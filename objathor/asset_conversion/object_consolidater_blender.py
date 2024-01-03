@@ -93,7 +93,7 @@ if __name__ == "__main__":
         objects = objaverse.load_objects(uids=[obj_name], download_processes=1)
         object_path = objects[obj_name]
 
-    object_consolidater.glb_to_thor_cmd(
+    object_consolidater.glb_to_thor(
         object_path=object_path,
         output_dir=output_dir,
         engine=engine,
