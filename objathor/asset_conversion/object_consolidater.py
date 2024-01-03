@@ -515,7 +515,7 @@ def to_dict(
         )
 
         return {
-            "action": "CreateObjectPrefab",
+            # "action": "CreateRuntimeAsset",
             "name": asset_name,
             "receptacleCandidate": receptacle,
             "albedoTexturePath": albedo_path,
@@ -734,14 +734,13 @@ def get_json_save_path(out_dir, object_name):
 def get_picklegz_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.pkl.gz")
 
-
+# TODO cleanup, make args match APIs better
 def glb_to_thor(
-    object_path, output_dir, engine, annotations, save_obj, save_as_json=False
+    object_path, output_dir, annotations_file, save_obj, engine="CYCLES", save_as_json=False, relative_texture_paths=True
 ):
-    annotations_file = annotations
     max_side_length_meters = 1
     annotations = {}
-    if annotations_file != "":
+    if annotations_file is not None and annotations_file != "":
         with open(annotations_file, "r") as f:
             annotations = json.load(f)
 
@@ -1142,9 +1141,10 @@ def glb_to_thor(
     emission_save_path = os.path.join(output_dir, emission_map_name)
     data_block.save_render(filepath=emission_save_path)
 
-    albedo_path = os.path.join(output_dir, f"{albedo_map_name}")
-    normal_path = os.path.join(output_dir, f"{normal_map_name}")
-    emission_path = os.path.join(output_dir, f"{emission_map_name}")
+    albedo_path = albedo_map_name if relative_texture_paths else os.path.join(output_dir, f"{albedo_map_name}")
+    normal_path = normal_map_name if relative_texture_paths else os.path.join(output_dir, f"{normal_map_name}")
+    emission_path = emission_map_name if relative_texture_paths else os.path.join(output_dir, f"{emission_map_name}")
+
     # save_path = os.path.join(output_dir, f"{object_name}.json")
     json_save_path = get_json_save_path(output_dir, object_name)
     picklegz_save_path = get_picklegz_save_path(output_dir, object_name)
@@ -1304,6 +1304,10 @@ if __name__ == "__main__":
         "--receptacle", action="store_true", help="Whether the object is a receptacle."
     )
 
+    parser.add_argument(
+        "--relative_texture_paths", action="store_true", help="Save textures as relative paths."
+    )
+
     parser.add_argument("--obj", action="store_true")
 
     parser.add_argument("--save_as_json", action="store_true")
@@ -1314,7 +1318,8 @@ if __name__ == "__main__":
         object_path=args.object_path,
         output_dir=args.output_dir,
         engine=args.engine,
-        annotations=args.annotations,
+        annotations_file=args.annotations,
         save_obj=args.obj,
         save_as_json=args.save_as_json,
+        relative_texture_paths=args.relative_texture_paths
     )

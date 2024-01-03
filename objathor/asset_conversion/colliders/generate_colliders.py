@@ -29,6 +29,8 @@ except ImportError:
 HOW_MANY_MESSED_UP_MESH = 0
 
 _FILE_DIR = os.path.dirname(os.path.realpath(__file__))
+VHACD_PATH = None
+
 if platform == "linux" or platform == "linux2":
     VHACD_PATH = os.path.join(_FILE_DIR, "linux", "TestVHACD")
     # not sure why/when this worked, command requires specific flags
@@ -40,25 +42,48 @@ elif platform.startswith("win"):
 else:
     raise NotImplementedError
 
-if not platform.startswith("win"):
-    try:
-        st = os.stat(VHACD_PATH)
-        os.chmod(VHACD_PATH, st.st_mode | stat.S_IEXEC)
-    except OSError as e:
-        if e.errno == 30:
-            # READ ONLY FILE SYSTEM
-            # Copy file to cache directory
-            print("Copying VHACD to cache directory")
-            _cache_dir = os.path.join(os.environ["HOME"], ".vhacd")
-            os.makedirs(_cache_dir, exist_ok=True)
-            _new_path = os.path.join(_cache_dir, "TestVHACD")
-            shutil.copyfile(VHACD_PATH, _new_path)
-            st = os.stat(_new_path)
-            os.chmod(_new_path, st.st_mode | stat.S_IEXEC)
-            VHACD_PATH = _new_path
-        else:
-            raise
+def vhacd_init(vhacd_path):
+    if not os.path.exists(vhacd_path):
+        download_vhacd(os.path.abspath(os.path.join(os.path.dirname(vhacd_path), "..")))
+    if not platform.startswith("win"):
+        try:
+            st = os.stat(vhacd_path)
+            os.chmod(vhacd_path, st.st_mode | stat.S_IEXEC)
+        except OSError as e:
+            if e.errno == 30:
+                # READ ONLY FILE SYSTEM
+                # Copy file to cache directory
+                print("Copying VHACD to cache directory")
+                _cache_dir = os.path.join(os.environ["HOME"], ".vhacd")
+                os.makedirs(_cache_dir, exist_ok=True)
+                _new_path = os.path.join(_cache_dir, "TestVHACD")
+                shutil.copyfile(vhacd_path, _new_path)
+                st = os.stat(_new_path)
+                os.chmod(_new_path, st.st_mode | stat.S_IEXEC)
+                vhacd_path = _new_path
+            else:
+                raise
 
+def download_vhacd(out_path):
+    from io import BytesIO
+    from urllib.request import urlopen
+    from zipfile import ZipFile
+
+    url = "https://objathor-vhacd-bin.s3.us-west-2.amazonaws.com/"
+
+    if platform == "linux" or platform == "linux2":
+         url = f"{url}VHACD_linux.zip"
+    elif platform == "darwin":
+        # TODO distinguish intel vs M2
+        url = f"{url}VHACD_osx.zip"
+    elif platform.startswith("win"):
+        win = f"{url}VHACD_osx.zip"
+    else:
+        raise NotImplementedError
+    
+    with urlopen(url) as zipresp:
+        with ZipFile(BytesIO(zipresp.read())) as zfile:
+            zfile.extractall(os.path.abspath(out_path))
 
 def decompose_obj(file_name):
     with open(file_name, "r") as f:
@@ -189,7 +214,7 @@ def set_colliders(
     uid = os.path.splitext(os.path.basename(obj_file))[0]
 
     annotations_file = get_existing_thor_asset_file_path(
-        out_dir=obj_file_dir, object_name=uid
+        out_dir=obj_file_dir, asset_id=uid
     )
     if not capture_out:
         print(f"--- setting colliders... {annotations_file}")
@@ -206,7 +231,7 @@ def set_colliders(
 
     annotations["colliders"] = colliders
 
-    save_thor_asset_file(data=annotations, save_path=annotations_file)
+    save_thor_asset_file(asset_json=annotations, save_path=annotations_file)
     return result_info
 
 
@@ -216,6 +241,8 @@ BASE_PATH = os.getcwd()
 def generate_colliders(
     source_directory, num_colliders=4, delete_objs=False, capture_out=False, **kwargs
 ):
+    vhacd_init(VHACD_PATH)
+
     obj_files = glob.glob(os.path.join(source_directory, "*.obj"))
     # print(obj_files)
 
