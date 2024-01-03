@@ -734,9 +734,16 @@ def get_json_save_path(out_dir, object_name):
 def get_picklegz_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.pkl.gz")
 
+
 # TODO cleanup, make args match APIs better
 def glb_to_thor(
-    object_path, output_dir, annotations_file, save_obj, engine="CYCLES", save_as_json=False, relative_texture_paths=True
+    object_path,
+    output_dir,
+    annotations_file,
+    save_obj,
+    engine="CYCLES",
+    save_as_json=False,
+    relative_texture_paths=True,
 ):
     max_side_length_meters = 1
     annotations = {}
@@ -1141,9 +1148,21 @@ def glb_to_thor(
     emission_save_path = os.path.join(output_dir, emission_map_name)
     data_block.save_render(filepath=emission_save_path)
 
-    albedo_path = albedo_map_name if relative_texture_paths else os.path.join(output_dir, f"{albedo_map_name}")
-    normal_path = normal_map_name if relative_texture_paths else os.path.join(output_dir, f"{normal_map_name}")
-    emission_path = emission_map_name if relative_texture_paths else os.path.join(output_dir, f"{emission_map_name}")
+    albedo_path = (
+        albedo_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{albedo_map_name}")
+    )
+    normal_path = (
+        normal_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{normal_map_name}")
+    )
+    emission_path = (
+        emission_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{emission_map_name}")
+    )
 
     # save_path = os.path.join(output_dir, f"{object_name}.json")
     json_save_path = get_json_save_path(output_dir, object_name)
@@ -1305,7 +1324,9 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--relative_texture_paths", action="store_true", help="Save textures as relative paths."
+        "--relative_texture_paths",
+        action="store_true",
+        help="Save textures as relative paths.",
     )
 
     parser.add_argument("--obj", action="store_true")
@@ -1321,5 +1342,5 @@ if __name__ == "__main__":
         annotations_file=args.annotations,
         save_obj=args.obj,
         save_as_json=args.save_as_json,
-        relative_texture_paths=args.relative_texture_paths
+        relative_texture_paths=args.relative_texture_paths,
     )

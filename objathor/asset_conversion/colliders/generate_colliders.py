@@ -42,6 +42,7 @@ elif platform.startswith("win"):
 else:
     raise NotImplementedError
 
+
 def vhacd_init(vhacd_path):
     if not os.path.exists(vhacd_path):
         download_vhacd(os.path.abspath(os.path.join(os.path.dirname(vhacd_path), "..")))
@@ -64,6 +65,7 @@ def vhacd_init(vhacd_path):
             else:
                 raise
 
+
 def download_vhacd(out_path):
     from io import BytesIO
     from urllib.request import urlopen
@@ -72,7 +74,7 @@ def download_vhacd(out_path):
     url = "https://objathor-vhacd-bin.s3.us-west-2.amazonaws.com/"
 
     if platform == "linux" or platform == "linux2":
-         url = f"{url}VHACD_linux.zip"
+        url = f"{url}VHACD_linux.zip"
     elif platform == "darwin":
         # TODO distinguish intel vs M2
         url = f"{url}VHACD_osx.zip"
@@ -80,10 +82,11 @@ def download_vhacd(out_path):
         win = f"{url}VHACD_osx.zip"
     else:
         raise NotImplementedError
-    
+
     with urlopen(url) as zipresp:
         with ZipFile(BytesIO(zipresp.read())) as zfile:
             zfile.extractall(os.path.abspath(out_path))
+
 
 def decompose_obj(file_name):
     with open(file_name, "r") as f:

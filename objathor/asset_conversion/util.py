@@ -9,6 +9,7 @@ from io import BytesIO
 import pathlib
 
 import numpy as np
+
 # Blender error when referencing this from inside blender
 # from filelock import FileLock
 
@@ -123,20 +124,23 @@ def get_picklegz_save_path(out_dir, object_name):
 def get_gz_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.gz")
 
+
 def get_extension_save_path(out_dir, asset_id, extension):
-    comp_extension = ".{extension}" if  not extension.startswith(".") else extension
+    comp_extension = ".{extension}" if not extension.startswith(".") else extension
     return os.path.join(out_dir, f"{asset_id}{comp_extension}")
 
 
 def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
     OrderedDict()
-    possible_paths = OrderedDict([
-        (".json", get_json_save_path(out_dir, asset_id)),
-        (".msgpack.gz", get_msgpackgz_save_path(out_dir, asset_id)),
-        (".msgpack", get_msgpack_save_path(out_dir, asset_id)),       
-        (".pkl.gz", get_picklegz_save_path(out_dir, asset_id)),
-        (".gz", get_gz_save_path(out_dir, asset_id)),
-    ])
+    possible_paths = OrderedDict(
+        [
+            (".json", get_json_save_path(out_dir, asset_id)),
+            (".msgpack.gz", get_msgpackgz_save_path(out_dir, asset_id)),
+            (".msgpack", get_msgpack_save_path(out_dir, asset_id)),
+            (".pkl.gz", get_picklegz_save_path(out_dir, asset_id)),
+            (".gz", get_gz_save_path(out_dir, asset_id)),
+        ]
+    )
     path = None
     if force_extension is not None:
         if force_extension in possible_paths.keys():
@@ -144,7 +148,9 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
             if os.path.exists(path):
                 return path
         else:
-            raise Exception(f"Invalid extension `{force_extension}` for {asset_id}. Supported: {possible_paths.keys()}")
+            raise Exception(
+                f"Invalid extension `{force_extension}` for {asset_id}. Supported: {possible_paths.keys()}"
+            )
     else:
         for path in possible_paths.values():
             if os.path.exists(path):
@@ -153,34 +159,42 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
 
 
 def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
-    file_path = get_existing_thor_asset_file_path(out_dir, object_name, force_extension=force_extension)
+    file_path = get_existing_thor_asset_file_path(
+        out_dir, object_name, force_extension=force_extension
+    )
     print(f"--------- path {file_path}")
     if file_path.endswith(".pkl.gz"):
         import compress_pickle
+
         return compress_pickle.load(file_path)
     elif file_path.endswith(".msgpack.gz"):
         import gzip
-        with gzip.open(file_path, 'rb') as f:
+
+        with gzip.open(file_path, "rb") as f:
             unp = f.read()
             import msgpack
+
             unp = msgpack.unpackb(unp)
             return unp
             # return json.dumps(unp)
-    elif file_path.endswith(".gz"):        
+    elif file_path.endswith(".gz"):
         import gzip
-        with gzip.open(file_path, 'rb') as f:
+
+        with gzip.open(file_path, "rb") as f:
             unp = f.read()
             return json.dumps(unp)
     elif file_path.endswith(".msgpack"):
-         with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             unp = f.read()
             import msgpack
+
             unp = msgpack.unpackb(unp)
     elif file_path.endswith(".json"):
         with open(file_path, "r") as f:
             return json.load(f)
     else:
         raise NotImplementedError(f"Unsupported file extension for path: {file_path}")
+
 
 def load_existing_thor_metadata_file(out_dir):
     path = os.path.join(out_dir, f"thor_metadata.json")
@@ -192,30 +206,39 @@ def load_existing_thor_metadata_file(out_dir):
 
 
 def save_thor_asset_file(asset_json, save_path: str):
-    extension = ''.join(pathlib.Path(save_path).suffixes)
+    extension = "".join(pathlib.Path(save_path).suffixes)
     if extension == ".msgpack.gz":
         import msgpack
         import gzip
+
         packed = msgpack.packb(asset_json)
         with gzip.open(save_path, "wb") as outfile:
             outfile.write(packed)
-    elif extension ==  ".msgpack":
+    elif extension == ".msgpack":
         import msgpack
+
         packed = msgpack.packb(asset_json)
         with open(save_path, "wb") as outfile:
             outfile.write(packed)
     elif extension == ".gz":
         import gzip
+
         with gzip.open(save_path, "wt") as outfile:
             json.dump(asset_json, outfile, indent=2)
     elif extension == ".pkl.gz":
         import compress_pickle
-        compress_pickle.dump(obj=asset_json, path=save_path, pickler_kwargs={"protocol": 4})
+
+        compress_pickle.dump(
+            obj=asset_json, path=save_path, pickler_kwargs={"protocol": 4}
+        )
     elif extension.endswith(".json"):
         with open(save_path, "w") as f:
             json.dump(asset_json, f, indent=2)
     else:
-        raise NotImplementedError(f"Unsupported file extension for save path: {save_path}")
+        raise NotImplementedError(
+            f"Unsupported file extension for save path: {save_path}"
+        )
+
 
 def get_blender_installation_path():
     paths = {
@@ -238,14 +261,25 @@ def get_blender_installation_path():
     else:
         raise Exception(f'Unsupported platform "{platform}"')
 
+
 def get_runtime_asset_filelock(save_dir, asset_id):
     return os.path.join(save_dir, f"{asset_id}.lock")
 
+
 # TODO  remove  load_file_in_unity param
-def create_runtime_asset_file(asset_directory, save_dir, asset_id, asset_symlink=True, verbose=False, load_file_in_unity=False, use_extension=None):
+def create_runtime_asset_file(
+    asset_directory,
+    save_dir,
+    asset_id,
+    asset_symlink=True,
+    verbose=False,
+    load_file_in_unity=False,
+    use_extension=None,
+):
     build_target_dir = os.path.join(save_dir, asset_id)
     asset = None
     from filelock import FileLock
+
     # TODO figure out plender error
     with FileLock(get_runtime_asset_filelock(save_dir=save_dir, asset_id=asset_id)):
         if asset_symlink:
@@ -258,10 +292,14 @@ def create_runtime_asset_file(asset_directory, save_dir, asset_id, asset_symlink
                 shutil.rmtree(build_target_dir)
             elif is_link:
                 # If not a link, delete it only if its not pointing to the right place
-                if os.path.realpath(build_target_dir) != os.path.realpath(asset_directory):
+                if os.path.realpath(build_target_dir) != os.path.realpath(
+                    asset_directory
+                ):
                     os.remove(build_target_dir)
 
-            if (not os.path.exists(build_target_dir)) and (not os.path.islink(build_target_dir)):
+            if (not os.path.exists(build_target_dir)) and (
+                not os.path.islink(build_target_dir)
+            ):
                 # Add symlink if it doesn't already exist
                 print(f"Symlink from {asset_directory} to {build_target_dir}")
                 os.symlink(asset_directory, build_target_dir)
@@ -316,8 +354,10 @@ def change_asset_paths(asset, save_dir):
         )
     return asset
 
+
 def make_asset_pahts_relative(asset):
     return change_asset_paths(asset, ".")
+
 
 def add_default_annotations(asset, asset_directory, verbose=False):
     thor_obj_md = load_existing_thor_metadata_file(out_dir=asset_directory)
@@ -342,25 +382,34 @@ def add_default_annotations(asset, asset_directory, verbose=False):
         }
     return asset
 
+
 def create_asset(
-    thor_controller, 
-    asset_id, 
-    asset_directory, 
+    thor_controller,
+    asset_id,
+    asset_directory,
     copy_to_dir=None,
-    asset_symlink=True, 
-    verbose=False, 
+    asset_symlink=True,
+    verbose=False,
     load_file_in_unity=False,
-    extension=None
+    extension=None,
 ):
     # Verifies the file exists
     create_prefab_action = {}
 
-    asset_path = get_existing_thor_asset_file_path(out_dir=asset_directory, asset_id=asset_id, force_extension=extension)
-    file_extension = ''.join(pathlib.Path(asset_path).suffixes) if extension is None else extension
+    asset_path = get_existing_thor_asset_file_path(
+        out_dir=asset_directory, asset_id=asset_id, force_extension=extension
+    )
+    file_extension = (
+        "".join(pathlib.Path(asset_path).suffixes) if extension is None else extension
+    )
     if file_extension not in EXTENSIONS_LOADABLE_IN_UNITY:
         load_file_in_unity = False
     print("--------- extension " + extension)
-    copy_to_dir = os.path.join(thor_controller._build.base_dir) if copy_to_dir is None else copy_to_dir
+    copy_to_dir = (
+        os.path.join(thor_controller._build.base_dir)
+        if copy_to_dir is None
+        else copy_to_dir
+    )
 
     # save_dir = os.path.join(controller._build.base_dir, "processed_models")
     os.makedirs(copy_to_dir, exist_ok=True)
@@ -370,36 +419,29 @@ def create_asset(
 
     asset = create_runtime_asset_file(
         asset_directory=asset_directory,
-        save_dir=copy_to_dir, 
-        asset_id=asset_id, 
-        asset_symlink=asset_symlink, 
+        save_dir=copy_to_dir,
+        asset_id=asset_id,
+        asset_symlink=asset_symlink,
         verbose=verbose,
-        load_file_in_unity=load_file_in_unity
+        load_file_in_unity=load_file_in_unity,
     )
 
     create_prefab_action = {}
     if not load_file_in_unity:
         asset = change_asset_paths(asset=asset, save_dir=copy_to_dir)
         asset = add_default_annotations(
-            asset=asset, 
-            asset_directory=asset_directory,
-            verbose=verbose
+            asset=asset, asset_directory=asset_directory, verbose=verbose
         )
-        create_prefab_action = {
-            "action": "CreateRuntimeAsset",
-            "asset": asset
-        }
+        create_prefab_action = {"action": "CreateRuntimeAsset", "asset": asset}
     else:
         create_prefab_action = {
             "action": "CreateRuntimeAsset",
             "id": asset_id,
             "dir": copy_to_dir,
-            "extension": file_extension
+            "extension": file_extension,
         }
         create_prefab_action = add_default_annotations(
-            asset=create_prefab_action, 
-            asset_directory=asset_directory,
-            verbose=verbose
+            asset=create_prefab_action, asset_directory=asset_directory, verbose=verbose
         )
 
     evt = thor_controller.step(**create_prefab_action)
@@ -425,6 +467,7 @@ def create_asset(
         )
 
     return evt
+
 
 def make_single_object_house(
     asset_id,

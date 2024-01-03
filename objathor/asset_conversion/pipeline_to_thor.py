@@ -14,6 +14,7 @@ from pathlib import Path
 
 import objaverse
 import numpy as np
+
 # from .object_consolidater import glb_to_thor as gb
 
 from objathor.constants import ABS_PATH_OF_OBJATHOR, THOR_COMMIT_ID
@@ -30,7 +31,7 @@ from .util import (
     load_existing_thor_asset_file,
     save_thor_asset_file,
     get_extension_save_path,
-    add_default_annotations
+    add_default_annotations,
 )
 
 # from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
@@ -38,6 +39,7 @@ from .colliders.generate_colliders import generate_colliders
 
 FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
+
 
 def glb_to_thor(
     glb_path: str,
@@ -51,10 +53,10 @@ def glb_to_thor(
     save_as_json=False,
     relative_texture_paths=True,
     run_blender_as_module=False,
-    blender_instalation_path=None
+    blender_instalation_path=None,
 ):
     os.makedirs(object_out_dir, exist_ok=True)
-    
+
     if not run_blender_as_module:
         command = (
             f"{blender_instalation_path if blender_instalation_path is not None else get_blender_installation_path()}"
@@ -81,7 +83,7 @@ def glb_to_thor(
 
     if save_as_json:
         command = command + " --save_as_json"
-    
+
     if relative_texture_paths:
         command = command + " --relative_texture_paths"
 
@@ -265,12 +267,16 @@ def validate_in_thor(
     skip_images=False,
     skybox_color=(0, 0, 0),
     load_file_in_unity=False,
-    extension=None
+    extension=None,
 ):
     evt = None
     try:
         evt = create_asset(
-            thor_controller=controller, asset_directory=asset_dir, asset_id=asset_name, load_file_in_unity=load_file_in_unity, extension=extension
+            thor_controller=controller,
+            asset_directory=asset_dir,
+            asset_id=asset_name,
+            load_file_in_unity=load_file_in_unity,
+            extension=extension,
         )
         if not evt.metadata["lastActionSuccess"]:
             failed_objects[asset_name] = {
@@ -314,32 +320,33 @@ def validate_in_thor(
         }
         return False, None
 
+
 # TODO entrypoint for package version of blender, document and type hints, same as old cli API
 # needs to handle stop condition
 def run_pipeline(
     output_dir,
     object_ids,
-    annotations = "",
-    live = False,
-    max_colliders = 4,
-    skip_glb = False,
-    delete_objs = False,
-    skip_colliders = False,
-    skip_thor_creation = False,
-    skip_thor_visualization = False,
-    add_visualize_thor_actions = False,
-    verbose = False,
-    width = 300,
-    height = 300,
-    skybox_color = (0, 0, 0),
-    save_as_json = True,
-    relative_texture_paths = True,
-    **kwargs
+    annotations="",
+    live=False,
+    max_colliders=4,
+    skip_glb=False,
+    delete_objs=False,
+    skip_colliders=False,
+    skip_thor_creation=False,
+    skip_thor_visualization=False,
+    add_visualize_thor_actions=False,
+    verbose=False,
+    width=300,
+    height=300,
+    skybox_color=(0, 0, 0),
+    save_as_json=True,
+    relative_texture_paths=True,
+    **kwargs,
 ):
     if verbose:
         # TODO use logger instead of print
         logger.setLevel(logging.DEBUG)
-    
+
     # glb_to_thor(
     #             object_path=glb_path,
     #             output_dir=asset_out_dir,
@@ -429,32 +436,43 @@ def main():
     )
 
     parser.add_argument(
-        "--absolute_texture_paths", action="store_true", help="Saves textures as absolute paths."
+        "--absolute_texture_paths",
+        action="store_true",
+        help="Saves textures as absolute paths.",
     )
 
     parser.add_argument(
         "--extension",
-        choices=['.json', '.pkl.gz', '.msgpack', '.msgpack.gz', '.gz'],
-        default=".json"
+        choices=[".json", ".pkl.gz", ".msgpack", ".msgpack.gz", ".gz"],
+        default=".json",
     )
 
     parser.add_argument(
-        "--send_asset_to_controller", action="store_true", help="Sends all the asset data to the thor controller."
+        "--send_asset_to_controller",
+        action="store_true",
+        help="Sends all the asset data to the thor controller.",
     )
 
     parser.add_argument(
-        "--blender_as_module", action="store_true", help="Runs blender as a module. Requires bpy to be installed in python environment."
+        "--blender_as_module",
+        action="store_true",
+        help="Runs blender as a module. Requires bpy to be installed in python environment.",
     )
 
     parser.add_argument(
-        "--keep_json_asset", action="store_true", help="Wether it keeps the intermediate .json asset file when storing in a different format to json."
+        "--keep_json_asset",
+        action="store_true",
+        help="Wether it keeps the intermediate .json asset file when storing in a different format to json.",
     )
 
     parser.add_argument(
-        "--blender_installation_path",  type=str, default=None, help="Blender installation path, when blender_as_module = False ", required='--blender_as_module' not in sys.argv
+        "--blender_installation_path",
+        type=str,
+        default=None,
+        help="Blender installation path, when blender_as_module = False ",
+        required="--blender_as_module" not in sys.argv,
     )
-    
-    
+
     # Necessary for mesh decomposition to generate colliders
     # parser.add_argument(
     #     "--obj", action="store_true", help="Saves obj version of asset."
@@ -526,18 +544,20 @@ def main():
                 save_as_json=not args.save_as_pkl,
                 relative_texture_paths=not args.absolute_texture_paths,
                 run_blender_as_module=args.blender_as_module,
-                blender_instalation_path=args.blender_installation_path
+                blender_instalation_path=args.blender_installation_path,
             )
             end = time.perf_counter()
             print(f"GLB to THOR success: {success}. Runtime: {end-start}s")
 
             # print(f"uid in failed {uid in failed_objects} 'Progress: 100.00%' in failed_objects[uid]['blender_output'] {'Progress: 100.00%' in failed_objects[uid]['blender_output']}")
             # Blender bug process exits with error due to minor memory leak but object is converted successfully
-            if uid in failed_objects and "Progress: 100.00%" in failed_objects[uid]['blender_output']:
+            if (
+                uid in failed_objects
+                and "Progress: 100.00%" in failed_objects[uid]["blender_output"]
+            ):
                 # Do not include this check because sometimes it fails regardless
                 # and  "Error: Not freed memory blocks" in failed_objects[uid]['blender_output']:
                 success = True
-
 
         if success and not args.skip_colliders:
             print("OBJ to colliders starting...")
@@ -554,15 +574,22 @@ def main():
             )
             end = time.perf_counter()
             print(f"OBJ to colliders success: {success}. Runtime: {end-start}s")
-        
+
         # Save to desired format, compression step
         save_thor_asset_file(
-            asset_json=add_default_annotations(load_existing_thor_asset_file(out_dir=asset_out_dir, object_name=uid), asset_directory=asset_out_dir),
-            save_path=get_extension_save_path(out_dir=asset_out_dir, asset_id=uid, extension=args.extension)
+            asset_json=add_default_annotations(
+                load_existing_thor_asset_file(out_dir=asset_out_dir, object_name=uid),
+                asset_directory=asset_out_dir,
+            ),
+            save_path=get_extension_save_path(
+                out_dir=asset_out_dir, asset_id=uid, extension=args.extension
+            ),
         )
         if args.extension != ".json" and not args.keep_json_asset:
             print("--- Removing .json asset")
-            json_asset_path = get_existing_thor_asset_file_path(out_dir=asset_out_dir, asset_id=uid, force_extension=".json")
+            json_asset_path = get_existing_thor_asset_file_path(
+                out_dir=asset_out_dir, asset_id=uid, force_extension=".json"
+            )
             os.remove(json_asset_path)
 
         if success and not args.skip_thor_creation:
@@ -591,7 +618,7 @@ def main():
                 skip_images=args.skip_thor_visualization,
                 skybox_color=args.skybox_color.split(","),
                 load_file_in_unity=not args.send_asset_to_controller,
-                extension=args.extension
+                extension=args.extension,
             )
             end = time.perf_counter()
             print(f"THOR visualization success: {success}. Runtime: {end-start}s")
