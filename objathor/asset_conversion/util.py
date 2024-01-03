@@ -467,10 +467,10 @@ def view_asset_in_thor(
     asset_id,
     controller,
     output_dir,
-    rotations=[],
+    rotations=tuple(),
     instance_id="asset_0",
     house_path=EMPTY_HOUSE_JSON_PATH,
-    skybox_color=(0, 0, 0),
+    skybox_color=(255, 255, 255),
 ):
     from PIL import Image
 
@@ -482,20 +482,24 @@ def view_asset_in_thor(
     )
     evt = controller.step(action="CreateHouse", house=house)
 
+    controller.step("BBoxDistance", objectId0=instance_id, objectId1=instance_id)
+    obj = controller.step("AdvancePhysicsStep").metadata["objects"][1]
+    obj_center_arr = np.array(obj["objectOrientedBoundingBox"]["cornerPoints"]).mean(0)
+
     if not evt.metadata["lastActionSuccess"]:
         print(f"Action success: {evt.metadata['lastActionSuccess']}")
         print(f'Error: {evt.metadata["errorMessage"]}')
         return evt
+
     evt = controller.step(action="LookAtObjectCenter", objectId=instance_id)
 
     im = Image.fromarray(evt.frame)
-    # os.makedirs(output_dir, exist_ok=True)
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+
     im.save(os.path.join(output_dir, "neutral.jpg"))
     for rotation in rotations:
-        evt = controller.step(
+        controller.step(
             action="RotateObject",
             angleAxisRotation={
                 "axis": {
@@ -506,14 +510,34 @@ def view_asset_in_thor(
                 "degrees": rotation[3],
             },
         )
-        im = Image.fromarray(evt.frame)
+        obj = controller.last_event.metadata["objects"][1]
+        delta = obj_center_arr - np.array(
+            obj["objectOrientedBoundingBox"]["cornerPoints"]
+        ).mean(0)
+
+        cur_pos = obj["position"]
+        target_pos = {
+            "x": cur_pos["x"] + delta[0],
+            "y": cur_pos["y"] + delta[1],
+            "z": cur_pos["z"] + delta[2],
+        }
+
+        controller.step(
+            action="TeleportObject",
+            objectId=instance_id,
+            position=target_pos,
+            rotation=obj["rotation"],
+            forceAction=True,
+            forceKinematic=True,
+        )
+        im = Image.fromarray(controller.last_event.frame)
         im.save(
             os.path.join(
                 output_dir,
                 f"{rotation[0]}_{rotation[1]}_{rotation[2]}_{rotation[3]}.jpg",
             )
         )
-    return evt
+    return controller.last_event
 
 
 def add_visualize_thor_actions(

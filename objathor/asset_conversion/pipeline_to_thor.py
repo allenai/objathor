@@ -463,6 +463,8 @@ def main():
                     width=args.width,
                     height=args.height,
                     server_class=ai2thor.fifo_server.FifoServer,
+                    antiAliasing=None if args.skip_thor_visualization else "fxaa",
+                    quality="Very Low" if args.skip_thor_visualization else "Ultra",
                 )
             print("THOR visualization starting...")
             success, asset_metadata = validate_in_thor(
