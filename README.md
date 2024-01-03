@@ -48,10 +48,6 @@ python -m objathor.main \
 
 ### GLB to THOR asset conversion
 
-After running:
-
-```python setup.py install```
-
 From the repository root run:
 
 ```
