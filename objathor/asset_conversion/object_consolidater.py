@@ -770,7 +770,12 @@ def glb_to_thor(
 
     logger.debug(f"max_side_length_meters: {max_side_length_meters}")
 
-    receptacle = annotation_dict["ref_category"] in util.get_receptacle_object_types()
+    if "receptacle" in annotation_dict:
+        receptacle = annotation_dict["receptacle"]
+    else:
+        receptacle = (
+            annotation_dict["ref_category"] in util.get_receptacle_object_types()
+        )
 
     # Reset scene
     reset_scene()
