@@ -515,7 +515,7 @@ def to_dict(
         )
 
         return {
-            "action": "CreateObjectPrefab",
+            # "action": "CreateRuntimeAsset",
             "name": asset_name,
             "receptacleCandidate": receptacle,
             "albedoTexturePath": albedo_path,
@@ -735,27 +735,33 @@ def get_picklegz_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.pkl.gz")
 
 
+# TODO cleanup, make args match APIs better
 def glb_to_thor(
-    object_path, output_dir, engine, annotations, save_obj, save_as_json=False
+    object_path,
+    output_dir,
+    annotations_file,
+    save_obj,
+    engine="CYCLES",
+    save_as_json=False,
+    relative_texture_paths=True,
 ):
     logging.basicConfig(level=logging.DEBUG, format=FORMAT)
 
     object_name, ext = os.path.splitext(os.path.basename(object_path))
 
-    annotations_path = annotations
-    if annotations_path == "":
+    if annotations_file == "":
         annotation_dict = {
             "scale": 1,
             "pose_z_rot_angle": 0,
             "z_axis_scale": True,
             "ref_category": "Objaverse",
         }
-    elif os.path.isdir(annotations_path):
-        annotations_path = os.path.join(annotations_path, f"{object_name}.json.gz")
-        with gzip.open(annotations_path, "rt") as f:
+    elif os.path.isdir(annotations_file):
+        annotations_file = os.path.join(annotations_file, f"{object_name}.json.gz")
+        with gzip.open(annotations_file, "rt") as f:
             annotation_dict = json.load(f)
     else:
-        with open(annotations_path, "r") as f:
+        with open(annotations_file, "r") as f:
             annotation_dict = json.load(f)
 
         if object_name in annotation_dict:
@@ -1148,9 +1154,22 @@ def glb_to_thor(
     emission_save_path = os.path.join(output_dir, emission_map_name)
     data_block.save_render(filepath=emission_save_path)
 
-    albedo_path = os.path.join(output_dir, f"{albedo_map_name}")
-    normal_path = os.path.join(output_dir, f"{normal_map_name}")
-    emission_path = os.path.join(output_dir, f"{emission_map_name}")
+    albedo_path = (
+        albedo_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{albedo_map_name}")
+    )
+    normal_path = (
+        normal_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{normal_map_name}")
+    )
+    emission_path = (
+        emission_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{emission_map_name}")
+    )
+
     # save_path = os.path.join(output_dir, f"{object_name}.json")
     json_save_path = get_json_save_path(output_dir, object_name)
     picklegz_save_path = get_picklegz_save_path(output_dir, object_name)
@@ -1311,6 +1330,12 @@ if __name__ == "__main__":
         "--receptacle", action="store_true", help="Whether the object is a receptacle."
     )
 
+    parser.add_argument(
+        "--relative_texture_paths",
+        action="store_true",
+        help="Save textures as relative paths.",
+    )
+
     parser.add_argument("--obj", action="store_true")
 
     parser.add_argument("--save_as_json", action="store_true")
@@ -1321,7 +1346,8 @@ if __name__ == "__main__":
         object_path=args.object_path,
         output_dir=args.output_dir,
         engine=args.engine,
-        annotations=args.annotations,
+        annotations_file=args.annotations,
         save_obj=args.obj,
         save_as_json=args.save_as_json,
+        relative_texture_paths=args.relative_texture_paths,
     )

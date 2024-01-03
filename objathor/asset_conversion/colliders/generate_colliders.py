@@ -30,6 +30,8 @@ except ImportError:
 HOW_MANY_MESSED_UP_MESH = 0
 
 _FILE_DIR = os.path.dirname(os.path.realpath(__file__))
+VHACD_PATH = None
+
 if platform == "linux" or platform == "linux2":
     VHACD_PATH = os.path.join(_FILE_DIR, "linux", "TestVHACD")
     # not sure why/when this worked, command requires specific flags
@@ -41,24 +43,50 @@ elif platform.startswith("win"):
 else:
     raise NotImplementedError
 
-if not platform.startswith("win"):
-    try:
-        _st = os.stat(VHACD_PATH)
-        os.chmod(VHACD_PATH, _st.st_mode | stat.S_IEXEC)
-    except OSError as e:
-        if e.errno == 30:
-            # READ ONLY FILE SYSTEM
-            # Copy file to cache directory
-            print("Copying VHACD to cache directory")
-            _cache_dir = os.path.join(os.environ["HOME"], ".vhacd")
-            os.makedirs(_cache_dir, exist_ok=True)
-            _new_path = os.path.join(_cache_dir, "TestVHACD")
-            shutil.copyfile(VHACD_PATH, _new_path)
-            _st = os.stat(_new_path)
-            os.chmod(_new_path, _st.st_mode | stat.S_IEXEC)
-            VHACD_PATH = _new_path
-        else:
-            raise
+
+def vhacd_init(vhacd_path):
+    if not os.path.exists(vhacd_path):
+        download_vhacd(os.path.abspath(os.path.join(os.path.dirname(vhacd_path), "..")))
+    if not platform.startswith("win"):
+        try:
+            st = os.stat(vhacd_path)
+            os.chmod(vhacd_path, st.st_mode | stat.S_IEXEC)
+        except OSError as e:
+            if e.errno == 30:
+                # READ ONLY FILE SYSTEM
+                # Copy file to cache directory
+                print("Copying VHACD to cache directory")
+                _cache_dir = os.path.join(os.environ["HOME"], ".vhacd")
+                os.makedirs(_cache_dir, exist_ok=True)
+                _new_path = os.path.join(_cache_dir, "TestVHACD")
+                shutil.copyfile(vhacd_path, _new_path)
+                st = os.stat(_new_path)
+                os.chmod(_new_path, st.st_mode | stat.S_IEXEC)
+                vhacd_path = _new_path
+            else:
+                raise
+
+
+def download_vhacd(out_path):
+    from io import BytesIO
+    from urllib.request import urlopen
+    from zipfile import ZipFile
+
+    url = "https://objathor-vhacd-bin.s3.us-west-2.amazonaws.com/"
+
+    if platform == "linux" or platform == "linux2":
+        url = f"{url}VHACD_linux.zip"
+    elif platform == "darwin":
+        # TODO distinguish intel vs M2
+        url = f"{url}VHACD_osx.zip"
+    elif platform.startswith("win"):
+        win = f"{url}VHACD_osx.zip"
+    else:
+        raise NotImplementedError
+
+    with urlopen(url) as zipresp:
+        with ZipFile(BytesIO(zipresp.read())) as zfile:
+            zfile.extractall(os.path.abspath(out_path))
 
 
 def decompose_obj(
@@ -115,6 +143,91 @@ def decompose_obj(
 
 
 def get_colliders(
+    obj_file: str, num_colliders: int, capture_out: bool, **kwargs
+) -> List[Dict[str, Any]]:
+    if not capture_out:
+        print("processing... ", obj_file)
+
+    result_info = {}
+
+    # command for old binary
+    output_obj_name = "decomp.obj"
+    extra_args = [f"--{k} {str(v)}" for k, v in kwargs.items()]
+
+    if not capture_out:
+        print(f"Extra args: {extra_args}")
+    # "--resolution", str(6e6),
+    command = [
+        VHACD_PATH,
+        "--maxhulls",
+        str(num_colliders),
+        "--input",
+        obj_file,
+        "--output",
+        output_obj_name,
+        *extra_args,
+    ]
+
+    if capture_out:
+        VHACD_result = subprocess.run(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+
+        result_info["stderr"] = VHACD_result.stderr
+        result_info["stdout"] = VHACD_result.stdout
+    else:
+        VHACD_result = subprocess.run(command)
+    result_info["VHACD_returncode"] = VHACD_result.returncode
+
+    if not os.path.exists(output_obj_name):
+        result_info["failed"] = True
+        result_info[
+            "stderr"
+        ] = f"VHACD did not generate 'decomp.obj'. Unsuccessfull run of command: {command}"
+        return [], result_info
+    decompose_obj(output_obj_name)
+
+    # try:
+
+    # TODO: refine error checking
+    os.remove(output_obj_name)
+    if os.path.exists("decomp.stl"):
+        os.remove("decomp.stl")
+    # except Exception:
+    #     print('NO DECOMP FILE WAS GENERATED', obj_file)
+    #     result_info["failed"] = True
+    #     return [], result_info
+    decomps = glob.glob("decomp_*.obj")
+    colliders = []
+    # print(decomps, num_colliders, "I HATE THIS")
+    for decomp in decomps:
+        colliders.append(trimesh.load(decomp))
+        os.remove(decomp)
+    out = []
+    # print(f"Colliders {len(colliders)}")
+    for collider in colliders:
+        try:
+            collider.vertices
+        except Exception:
+            print("Collider failed", collider)
+            global HOW_MANY_MESSED_UP_MESH
+            HOW_MANY_MESSED_UP_MESH += 1
+            print("HOW_MANY_MESSED_UP_MESH", HOW_MANY_MESSED_UP_MESH)
+            # result_info["failed"] = True
+            # result_info["HOW_MANY_MESSED_UP_MESH"] = HOW_MANY_MESSED_UP_MESH
+            continue
+        out.append(
+            {
+                "vertices": [
+                    dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()
+                ],
+                "triangles": np.array(collider.faces).reshape(-1).tolist(),
+            }
+        )
+    return out, result_info
+
+
+def get_colliders_vhacd41(
     obj_file: str, num_colliders: int, capture_out: bool, **kwargs
 ) -> List[Dict[str, Any]]:
     # Using version 4.1 VHACD binary from https://github.com/kmammou/v-hacd
@@ -198,7 +311,7 @@ def set_colliders(
     uid = os.path.splitext(os.path.basename(obj_file))[0]
 
     annotations_file = get_existing_thor_asset_file_path(
-        out_dir=obj_file_dir, object_name=uid
+        out_dir=obj_file_dir, asset_id=uid
     )
     if not capture_out:
         print(f"--- setting colliders... {annotations_file}")
@@ -219,12 +332,11 @@ def set_colliders(
     return result_info
 
 
-BASE_PATH = os.getcwd()
-
-
 def generate_colliders(
     source_directory, num_colliders=4, delete_objs=False, capture_out=False, **kwargs
 ):
+    vhacd_init(VHACD_PATH)
+
     obj_files = glob.glob(os.path.join(source_directory, "*.obj"))
     # print(obj_files)
 
@@ -247,21 +359,8 @@ def generate_colliders(
     return info
 
 
-# def generate_object_colliders(obj_file, num_colliders=4, delete_objs=False):
-
-#     for obj_file in obj_files:
-#         uid = os.path.splitext(os.path.basename(obj_file))[0]
-#         result_info = set_colliders(obj_file, num_colliders)
-#         info[uid] = result_info
-
-#     # delete the obj files and the texture files
-#     if delete_objs:
-#         for file in obj_files: #+ texture_files:
-#             os.remove(file)
-#     return info
-
-
 if __name__ == "__main__":
+    BASE_PATH = os.getcwd()
     print("---- Running generate_colliders")
     parser = argparse.ArgumentParser()
     parser.add_argument("--folder", type=str, default=f"{BASE_PATH}/glbs/post")
