@@ -162,7 +162,6 @@ def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
     file_path = get_existing_thor_asset_file_path(
         out_dir, object_name, force_extension=force_extension
     )
-    print(f"--------- path {file_path}")
     if file_path.endswith(".pkl.gz"):
         import compress_pickle
 
@@ -189,6 +188,7 @@ def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
             import msgpack
 
             unp = msgpack.unpackb(unp)
+            return unp
     elif file_path.endswith(".json"):
         with open(file_path, "r") as f:
             return json.load(f)
