@@ -154,9 +154,13 @@ def glb_to_thor(
 
         save_thor_asset_file(asset_json, thor_obj_path)
 
-    except Exception:
-        failed_objects[uid]["blender_process_crash"] = True
-        failed_objects[uid]["blender_output"] = out
+    except Exception as e:
+        logger.error(f"Exception: {e}")
+        failed_objects[uid]["blender_process_crash"] = False
+        failed_objects[uid]["image_compress_fail"] = True
+        #  Do we want this? confuses failure reason
+        # failed_objects[uid]["blender_output"] = out
+        failed_objects[uid]["exception"] = f"{e}"
         success = False
     return success
 
@@ -553,6 +557,7 @@ def main():
             # Blender bug process exits with error due to minor memory leak but object is converted successfully
             if (
                 uid in failed_objects
+                and "blender_output" in failed_objects[uid]
                 and "Progress: 100.00%" in failed_objects[uid]["blender_output"]
             ):
                 # Do not include this check because sometimes it fails regardless
