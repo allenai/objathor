@@ -30,6 +30,8 @@ def run_pipeline_main(object_id, out_path, extension, annotation=None):
             "--blender_as_module",
             f"--annotations={annotation_path}",
             f"--thor_platform={thor_platform}",
+            # TODO remove when vulkan is properly configured in CI, not available through github actions
+            f"--skip_thor_creation",
         ]
     )
 
