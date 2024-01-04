@@ -33,6 +33,8 @@ jobs:
         make install
         make install-dev
     - name: Unit tests
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
         source .env/bin/activate
         make test
