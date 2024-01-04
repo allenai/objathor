@@ -16,4 +16,3 @@ filelock==3.13.1
 compress-pickle==2.1.0
 ai2thor @ git+https://github.com/allenai/ai2thor@e24aa88d86d460f1f5352e28b8e754c3f5966865
 bpy==3.6.0
-scikit-image==0.22.0
