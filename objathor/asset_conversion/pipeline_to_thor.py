@@ -102,7 +102,11 @@ def glb_to_thor(
         out = f"Command timed out, command: {command}"
     except subprocess.CalledProcessError as e:
         result_code = e.returncode
-        print(f"Blender call error: {e.output}")
+        print(f"Blender call error: {e.output}, {out}")
+        out = f"{out}, Exception: {e.output}"
+    except Exception as e:
+        result_code = e.returncode
+        print(f"Blender process error: {e.output}")
         out = e.output
 
     if not capture_stdout:
@@ -116,7 +120,7 @@ def glb_to_thor(
 
     else:
         failed_objects[uid]["blender_process_return_fail"] = True
-        failed_objects[uid]["blender_output"] = out
+        failed_objects[uid]["blender_output"] = out if out else ""
 
     try:
         # The below compresses textures using the structural similarity metric
@@ -355,8 +359,10 @@ def run_pipeline(
     pass
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser()
+    print("--------- argv")
+    print(argv)
 
     parser.add_argument("--output_dir", type=str, default="./output", required=True)
     parser.add_argument(
@@ -474,7 +480,15 @@ def main():
         type=str,
         default=None,
         help="Blender installation path, when blender_as_module = False and we cannot find the installation path automatically.",
-        required=not found_blender,
+        required=(not found_blender) and "--blender_as_module" not in argv,
+    )
+
+    parser.add_argument(
+        "--thor_platform",
+        type=str,
+        default="OSXIntel64" if sys.platform == "darwin" else "CloudRendering",
+        help="THOR platform to use.",
+        choices=["CloudRendering", "OSXIntel64"],  # Linux64
     )
 
     # Necessary for mesh decomposition to generate colliders
@@ -482,7 +496,7 @@ def main():
     #     "--obj", action="store_true", help="Saves obj version of asset."
     # )
 
-    args, unknown = parser.parse_known_args()
+    args, unknown = parser.parse_known_args(argv)
     extra_args_keys = []
     for arg in unknown:
         if arg.startswith(("-", "--")):
@@ -491,7 +505,7 @@ def main():
             extra_args_keys.append(arg.split("=")[0].removeprefix("--"))
             parser.add_argument(arg.split("=")[0], type=str)
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     print(args)
 
     annotations_path = args.annotations
@@ -577,6 +591,7 @@ def main():
             end = time.perf_counter()
             print(f"OBJ to colliders success: {success}. Runtime: {end-start}s")
 
+        print(f"=---- file {asset_out_dir} {uid} extension {args.extension}")
         # Save to desired format, compression step
         save_thor_asset_file(
             asset_json=add_default_annotations(
@@ -603,6 +618,7 @@ def main():
                 controller = ai2thor.controller.Controller(
                     # local_build=True,
                     commit_id=THOR_COMMIT_ID,
+                    platform=args.thor_platform,
                     start_unity=True,
                     scene="Procedural",
                     gridSize=0.25,
@@ -652,4 +668,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
