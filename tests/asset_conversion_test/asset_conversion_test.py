@@ -6,6 +6,7 @@ from sys import platform
 import json
 import pytest
 
+
 def run_pipeline_main(object_id, out_path, extension, annotation=None):
     annotation_filename = "annotation.json"
     os.makedirs(out_path, exist_ok=True)
@@ -28,90 +29,105 @@ def run_pipeline_main(object_id, out_path, extension, annotation=None):
             f"--extension={extension}",
             "--blender_as_module",
             f"--annotations={annotation_path}",
-            f"--thor_platform={thor_platform}"
+            f"--thor_platform={thor_platform}",
         ]
     )
 
 
 def test_pipeline_to_thor_w_annotation():
     object_id = "000074a334c541878360457c672b6c2e"
-    annotation = {object_id: {
-        "category": "flip-flop (sandal)",
-        "category_max_scale": 0.4,
-        "category_min_scale": 0.25,
-        "description": "A black sandal with grey stripes.",
-        "pose_z_rot_angle": 3.67,
-        "ref_category": "Boots",
-        "scale": 0.32,
-        "uid": object_id,
-        "z_axis_scale": False
+    annotation = {
+        object_id: {
+            "category": "flip-flop (sandal)",
+            "category_max_scale": 0.4,
+            "category_min_scale": 0.25,
+            "description": "A black sandal with grey stripes.",
+            "pose_z_rot_angle": 3.67,
+            "ref_category": "Boots",
+            "scale": 0.32,
+            "uid": object_id,
+            "z_axis_scale": False,
         }
     }
     out_path = os.path.abspath(os.path.join(".", "test-out"))
     extension = ".json"
 
     result = run_pipeline_main(
-        object_id=object_id, 
-        out_path=out_path, 
+        object_id=object_id,
+        out_path=out_path,
         extension=extension,
-        annotation=annotation
+        annotation=annotation,
     )
 
-    assert util.get_existing_thor_asset_file_path(out_dir=os.path.join(out_path, object_id), asset_id=object_id) == os.path.join(out_path, object_id, f"{object_id}{extension}")
+    assert util.get_existing_thor_asset_file_path(
+        out_dir=os.path.join(out_path, object_id), asset_id=object_id
+    ) == os.path.join(out_path, object_id, f"{object_id}{extension}")
     shutil.rmtree(out_path)
+
 
 def test_pipeline_to_thor_msgpack_gz():
     object_id = "000074a334c541878360457c672b6c2e"
     out_path = os.path.abspath(os.path.join(".", "test-out"))
-    extension=".msgpack.gz"
+    extension = ".msgpack.gz"
     result = run_pipeline_main(
-        object_id=object_id, 
-        out_path=out_path, 
-        extension=extension
+        object_id=object_id, out_path=out_path, extension=extension
     )
 
-    assert util.get_existing_thor_asset_file_path(out_dir=os.path.join(out_path, object_id), asset_id=object_id) == os.path.join(out_path, object_id, f"{object_id}{extension}")
+    assert util.get_existing_thor_asset_file_path(
+        out_dir=os.path.join(out_path, object_id), asset_id=object_id
+    ) == os.path.join(out_path, object_id, f"{object_id}{extension}")
     shutil.rmtree(out_path)
 
+
 # Sum of tests make it too slow for CI
-@pytest.mark.skipif(platform == "linux" or platform == "linux2",    reason="Too slow for CI")
+@pytest.mark.skipif(
+    platform == "linux" or platform == "linux2", reason="Too slow for CI"
+)
 def test_pipeline_to_thor_msgpack():
     object_id = "000074a334c541878360457c672b6c2e"
     out_path = os.path.abspath(os.path.join(".", "test-out"))
-    extension=".msgpack"
+    extension = ".msgpack"
     result = run_pipeline_main(
-        object_id=object_id, 
-        out_path=out_path, 
-        extension=extension
+        object_id=object_id, out_path=out_path, extension=extension
     )
 
-    assert util.get_existing_thor_asset_file_path(out_dir=os.path.join(out_path, object_id), asset_id=object_id, force_extension=extension) == os.path.join(out_path, object_id, f"{object_id}{extension}")
+    assert util.get_existing_thor_asset_file_path(
+        out_dir=os.path.join(out_path, object_id),
+        asset_id=object_id,
+        force_extension=extension,
+    ) == os.path.join(out_path, object_id, f"{object_id}{extension}")
     shutil.rmtree(out_path)
 
-@pytest.mark.skipif(platform == "linux" or platform == "linux2",    reason="Too slow for CI")
+
+@pytest.mark.skipif(
+    platform == "linux" or platform == "linux2", reason="Too slow for CI"
+)
 def test_pipeline_to_thor_gz():
     object_id = "000074a334c541878360457c672b6c2e"
     out_path = os.path.abspath(os.path.join(".", "test-out"))
-    extension=".gz"
+    extension = ".gz"
     result = run_pipeline_main(
-        object_id=object_id, 
-        out_path=out_path, 
-        extension=extension
+        object_id=object_id, out_path=out_path, extension=extension
     )
 
-    assert util.get_existing_thor_asset_file_path(out_dir=os.path.join(out_path, object_id), asset_id=object_id) == os.path.join(out_path, object_id, f"{object_id}{extension}")
+    assert util.get_existing_thor_asset_file_path(
+        out_dir=os.path.join(out_path, object_id), asset_id=object_id
+    ) == os.path.join(out_path, object_id, f"{object_id}{extension}")
     shutil.rmtree(out_path)
 
-@pytest.mark.skipif(platform == "linux" or platform == "linux2",reason="Too slow for CI")
+
+@pytest.mark.skipif(
+    platform == "linux" or platform == "linux2", reason="Too slow for CI"
+)
 def test_pipeline_to_thor_pkl_gz():
     object_id = "000074a334c541878360457c672b6c2e"
     out_path = os.path.abspath(os.path.join(".", "test-out"))
-    extension=".pkl.gz"
+    extension = ".pkl.gz"
     result = run_pipeline_main(
-        object_id=object_id, 
-        out_path=out_path, 
-        extension=extension
+        object_id=object_id, out_path=out_path, extension=extension
     )
 
-    assert util.get_existing_thor_asset_file_path(out_dir=os.path.join(out_path, object_id), asset_id=object_id) == os.path.join(out_path, object_id, f"{object_id}{extension}")
+    assert util.get_existing_thor_asset_file_path(
+        out_dir=os.path.join(out_path, object_id), asset_id=object_id
+    ) == os.path.join(out_path, object_id, f"{object_id}{extension}")
     shutil.rmtree(out_path)
