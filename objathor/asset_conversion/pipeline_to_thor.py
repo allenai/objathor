@@ -488,7 +488,7 @@ def main(argv=None):
         type=str,
         default=None,
         help="Blender installation path, when blender_as_module = False ",
-        choices=["CloudRendering", "OSXIntel64"] # Linux64
+        choices=["CloudRendering", "OSXIntel64"],  # Linux64
     )
 
     # Necessary for mesh decomposition to generate colliders
