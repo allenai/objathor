@@ -4,6 +4,14 @@ Objaverse asset annotator and importer for use in THOR.
 
 ## Installation
 
+Install ai2thor:
+
+```bash
+pip install --extra-index-url https://ai2thor-pypi.allenai.org ai2thor==0+e24aa88d86d460f1f5352e28b8e754c3f5966865
+```
+
+Install other dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```

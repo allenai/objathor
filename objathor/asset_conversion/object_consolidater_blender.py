@@ -97,7 +97,7 @@ if __name__ == "__main__":
         object_path=object_path,
         output_dir=output_dir,
         engine=engine,
-        annotations=annotations_file,
+        annotations_file=annotations_file,
         save_obj=save_obj,
         save_as_json=True,
     )
