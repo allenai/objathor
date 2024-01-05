@@ -555,7 +555,7 @@ def add_visualize_thor_actions(
     house_skybox_color=(0, 0, 0),
 ):
     # asset_id = os.path.splitext(os.path.basename(output_json))[0]
-    actions_json = os.path.join(asset_dir, f"{asset_id}.json")
+    asset_json = os.path.join(asset_dir, f"{asset_id}.json")
     house = make_single_object_house(
         asset_id=asset_id,
         instance_id=instance_id,
@@ -563,13 +563,13 @@ def add_visualize_thor_actions(
         skybox_color=house_skybox_color,
     )
 
-    with open(actions_json, "r") as f:
-        actions = json.load(f)
+    with open(asset_json, "r") as f:
+        asset = json.load(f)
         if isinstance(actions, dict):
-            actions = [actions]
+            actions = [{"action": "CreateRuntimeAsset", "asset": asset}]
         if not isinstance(actions, list):
             raise TypeError(
-                f"Json {actions_json} is not a sequence of actions or a dictionary."
+                f"Json {asset_json} is not a sequence of actions or a dictionary."
             )
 
     new_actions = [
@@ -577,7 +577,7 @@ def add_visualize_thor_actions(
         dict(action="CreateHouse", house=house),
         dict(action="LookAtObjectCenter", objectId=instance_id),
     ]
-    with open(actions_json, "w") as f:
+    with open(asset_json, "w") as f:
         json.dump(new_actions, f, indent=2)
 
 
