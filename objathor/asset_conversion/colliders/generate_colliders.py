@@ -83,9 +83,14 @@ def download_vhacd(out_path):
     else:
         raise NotImplementedError
 
-    with urlopen(url) as zipresp:
-        with ZipFile(BytesIO(zipresp.read())) as zfile:
-            zfile.extractall(os.path.abspath(out_path))
+    try:
+        with urlopen(url) as zipresp:
+            with ZipFile(BytesIO(zipresp.read())) as zfile:
+                zfile.extractall(os.path.abspath(out_path))
+    except Exception as e:
+        print(
+            f"Error downloading and unziping VHACD. {e}. If you can't reach `{url}` make sure to download the VHACD binary and place in `{VHACD_PATH}`."
+        )
 
 
 def decompose_obj(file_name):

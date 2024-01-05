@@ -363,9 +363,7 @@ def add_default_annotations(asset, asset_directory, verbose=False):
     thor_obj_md = load_existing_thor_metadata_file(out_dir=asset_directory)
     if thor_obj_md is None:
         if verbose:
-            logger.info(
-                f"Object metadata is missing annotations, assuming pickupable."
-            )
+            logger.info(f"Object metadata is missing annotations, assuming pickupable.")
 
         asset["annotations"] = {
             "objectType": "Undefined",
