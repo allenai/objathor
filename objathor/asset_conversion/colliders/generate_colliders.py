@@ -79,7 +79,7 @@ def download_vhacd(out_path):
         # TODO distinguish intel vs M2
         url = f"{url}VHACD_osx.zip"
     elif platform.startswith("win"):
-        win = f"{url}VHACD_osx.zip"
+        url = f"{url}VHACD_win.zip"
     else:
         raise NotImplementedError
 
