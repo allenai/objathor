@@ -567,7 +567,7 @@ def add_visualize_thor_actions(
         asset = json.load(f)
         if isinstance(asset, dict):
             actions = [{"action": "CreateRuntimeAsset", "asset": asset}]
-        if not isinstance(asset, list):
+        elif not isinstance(asset, list):
             raise TypeError(
                 f"Json {asset_json} is not a sequence of actions or a dictionary."
             )
