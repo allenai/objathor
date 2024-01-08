@@ -562,12 +562,12 @@ def add_visualize_thor_actions(
         house_path=house_path,
         skybox_color=house_skybox_color,
     )
-
+    actions = []
     with open(asset_json, "r") as f:
         asset = json.load(f)
-        if isinstance(actions, dict):
+        if isinstance(asset, dict):
             actions = [{"action": "CreateRuntimeAsset", "asset": asset}]
-        if not isinstance(actions, list):
+        if not isinstance(asset, list):
             raise TypeError(
                 f"Json {asset_json} is not a sequence of actions or a dictionary."
             )
