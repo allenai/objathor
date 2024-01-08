@@ -100,7 +100,7 @@ if __name__ == "__main__":
         annotations_file=annotations_file,
         save_obj=save_obj,
         save_as_json=True,
-        relative_texture_paths=False
+        relative_texture_paths=False,
     )
 
     instance_id = "asset_0"
