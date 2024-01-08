@@ -126,7 +126,6 @@ if __name__ == "__main__":
         asset_id=obj_name,
         instance_id=obj_name,
         asset_dir=output_dir,
-        instance_id=instance_id,
         house_path="data/empty_house.json",
         house_skybox_color=skybox_color,
     )
