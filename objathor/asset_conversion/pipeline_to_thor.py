@@ -41,6 +41,25 @@ FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
 
 
+def save_asset_as(asset_id, asset_out_dir, extension, keep_json_asset=False):
+    # Save to desired format, compression step
+    save_thor_asset_file(
+        asset_json=add_default_annotations(
+            load_existing_thor_asset_file(out_dir=asset_out_dir, object_name=asset_id),
+            asset_directory=asset_out_dir,
+        ),
+        save_path=get_extension_save_path(
+            out_dir=asset_out_dir, asset_id=asset_id, extension=extension
+        ),
+    )
+    if extension != ".json" and not keep_json_asset:
+        print("--- Removing .json asset")
+        json_asset_path = get_existing_thor_asset_file_path(
+            out_dir=asset_out_dir, asset_id=asset_id, force_extension=".json"
+        )
+        os.remove(json_asset_path)
+
+
 def glb_to_thor(
     glb_path: str,
     annotations_path: str,
@@ -596,21 +615,12 @@ def main(argv=None):
 
         print(f"=---- file {asset_out_dir} {uid} extension {args.extension}")
         # Save to desired format, compression step
-        save_thor_asset_file(
-            asset_json=add_default_annotations(
-                load_existing_thor_asset_file(out_dir=asset_out_dir, object_name=uid),
-                asset_directory=asset_out_dir,
-            ),
-            save_path=get_extension_save_path(
-                out_dir=asset_out_dir, asset_id=uid, extension=args.extension
-            ),
+        save_asset_as(
+            asset_id=uid,
+            asset_out_dir=asset_out_dir,
+            extension=args.extension,
+            keep_json_asset=args.keep_json_asset,
         )
-        if args.extension != ".json" and not args.keep_json_asset:
-            print("--- Removing .json asset")
-            json_asset_path = get_existing_thor_asset_file_path(
-                out_dir=asset_out_dir, asset_id=uid, force_extension=".json"
-            )
-            os.remove(json_asset_path)
 
         if success and not args.skip_thor_creation:
             import ai2thor.controller
