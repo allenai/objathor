@@ -32,6 +32,9 @@ if __name__ == "__main__":
         data_files=[(".", ["README.md"])],
         keywords=["3D assets", "annotation", ""],
         install_requires=REQUIREMENTS,
+        extras_require={
+            "blender": ["bpy==3.6.0", "mathutils==3.3.0"],
+        },
         classifiers=[
             "Development Status :: 4 - Beta",
             "Intended Audience :: Developers",
