@@ -18,16 +18,32 @@ def render_glb_from_angles(
     glb_path = objaverse.load_objects([glb_uid])[glb_uid]
     object_out_dir = os.path.join(base_dir, glb_uid)
 
-    command = (
-        f"{get_blender_installation_path()}"
-        f" --background"
-        f" --python {os.path.join(ABS_PATH_OF_OBJATHOR, 'utils', 'blender', 'render_glb.py')}"
-        f" --"
-        f' "{os.path.abspath(glb_path)}"'
-        f' "{os.path.abspath(object_out_dir)}"'
-        + " "
-        + " ".join([str(angle) for angle in angles])
-    )
+    try:
+        import bpy
+
+        run_blender_as_module = True
+    except ImportError:
+        run_blender_as_module = False
+    if not run_blender_as_module:
+        command = (
+            f"{get_blender_installation_path()}"
+            f" --background"
+            f" --python {os.path.join(ABS_PATH_OF_OBJATHOR, 'utils', 'blender', 'render_glb.py')}"
+            f" --"
+            f' --glb_path="{os.path.abspath(glb_path)}"'
+            f' --output_dir="{os.path.abspath(object_out_dir)}"'
+            f' --angles={",".join([str(angle) for angle in angles])}'
+        )
+    else:
+        command = (
+            f"python"
+            f" -m"
+            f" objathor.utils.blender.render_glb"
+            f" --"
+            f' --glb_path="{os.path.abspath(glb_path)}"'
+            f' --output_dir="{os.path.abspath(object_out_dir)}"'
+            f' --angles={",".join([str(angle) for angle in angles])}'
+        )
 
     print(f"For {glb_uid}, running command: {command}")
 

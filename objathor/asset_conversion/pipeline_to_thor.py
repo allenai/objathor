@@ -53,7 +53,6 @@ def save_asset_as(asset_id, asset_out_dir, extension, keep_json_asset=False):
         ),
     )
     if extension != ".json" and not keep_json_asset:
-        print("--- Removing .json asset")
         json_asset_path = get_existing_thor_asset_file_path(
             out_dir=asset_out_dir, asset_id=asset_id, force_extension=".json"
         )
@@ -71,10 +70,19 @@ def glb_to_thor(
     generate_obj=True,
     save_as_json=False,
     relative_texture_paths=True,
-    run_blender_as_module=False,
+    run_blender_as_module=None,
     blender_instalation_path=None,
 ):
     os.makedirs(object_out_dir, exist_ok=True)
+
+    if run_blender_as_module is None:
+        try:
+            import bpy
+
+            run_blender_as_module = True
+        except ImportError:
+            run_blender_as_module = False
+        logger.info(f"---- Autodetected run_blender_as_module={run_blender_as_module}")
 
     if not run_blender_as_module:
         command = (
@@ -499,7 +507,6 @@ def main(argv=None):
         type=str,
         default=None,
         help="Blender installation path, when blender_as_module = False ",
-        required="--blender_as_module" not in argv,
     )
 
     parser.add_argument(
@@ -514,6 +521,9 @@ def main(argv=None):
     # parser.add_argument(
     #     "--obj", action="store_true", help="Saves obj version of asset."
     # )
+    blender_as_module_specified = (
+        "--blender_as_module" in argv or "--blender_installation_path" in argv
+    )
 
     args, unknown = parser.parse_known_args(argv)
     extra_args_keys = []
@@ -551,7 +561,7 @@ def main(argv=None):
     else:
         selected_uids = random.sample(fixed_ids.split(","), object_number)
 
-    print(f"--- Selected uids: {selected_uids}")
+    print(f"---- Selected uids: {selected_uids}")
 
     annotations = objaverse.load_annotations(selected_uids)
 
@@ -580,7 +590,9 @@ def main(argv=None):
                 generate_obj=True,
                 save_as_json=not args.save_as_pkl,
                 relative_texture_paths=not args.absolute_texture_paths,
-                run_blender_as_module=args.blender_as_module,
+                run_blender_as_module=args.blender_as_module
+                if blender_as_module_specified
+                else None,
                 blender_instalation_path=args.blender_installation_path,
             )
             end = time.perf_counter()
