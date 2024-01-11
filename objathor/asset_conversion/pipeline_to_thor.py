@@ -11,7 +11,6 @@ import traceback
 from collections import OrderedDict
 from typing import Any, List, Dict
 from pathlib import Path
-import distutils
 
 import objaverse
 import numpy as np
