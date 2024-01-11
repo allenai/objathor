@@ -78,6 +78,7 @@ def glb_to_thor(
     if run_blender_as_module is None:
         try:
             import bpy
+
             run_blender_as_module = True
         except ImportError:
             run_blender_as_module = False
