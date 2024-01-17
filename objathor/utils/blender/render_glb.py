@@ -31,14 +31,14 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
     azimuths = angles
 
     # Get all mesh objects
-    mesh_objects = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    mesh_objects = [cobj for cobj in bpy.context.scene.objects if cobj.type == "MESH"]
 
     # Merge all mesh objects into a single object
     if mesh_objects:
         bpy.context.view_layer.objects.active = mesh_objects[0]
         bpy.ops.object.select_all(action="DESELECT")
-        for obj in mesh_objects:
-            obj.select_set(True)
+        for cobj in mesh_objects:
+            cobj.select_set(True)
         bpy.ops.object.join()
 
         # Get the merged object
@@ -54,17 +54,9 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
 
     bpy.context.view_layer.update()
 
-    # Replace the default light with a new light source
-    for _obj in bpy.context.scene.objects:
-        if _obj.type == "LIGHT":
-            bpy.data.lights.remove(_obj.data)  # Remove the default light
-
-    # Select the imported object
-    obj = bpy.context.active_object
-
     # Normalize object size
-    max_size = max(obj.dimensions)
-    obj.scale /= max_size
+    max_size = max(merged_object.dimensions)
+    merged_object.scale /= max_size
 
     # Set up rendering parameters
     scene = bpy.context.scene
@@ -101,14 +93,14 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
 
         bpy.context.view_layer.update()
         bpy.ops.object.select_all(action="DESELECT")
-        obj.select_set(True)
+        merged_object.select_set(True)
         bpy.context.view_layer.objects.active = obj
         # bpy.ops.view3d.camera_to_view_selected()
 
         # Replace the default light with a new light source
-        for obj in bpy.context.scene.objects:
-            if obj.type == "LIGHT":
-                bpy.data.lights.remove(obj.data)  # Remove the default light
+        for cobj in bpy.context.scene.objects:
+            if cobj.type == "LIGHT":
+                bpy.data.lights.remove(cobj.data)  # Remove the default light
 
         # Create a new light source (e.g., Point light)
         light_data = bpy.data.lights.new(name="NewLight", type="POINT")
