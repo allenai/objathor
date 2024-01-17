@@ -67,8 +67,6 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
 
     # Calculate camera position for each azimuth
     for azimuth in azimuths:
-        obj = bpy.context.active_object
-
         # Calculate camera position
         radians = math.radians(azimuth)
         x = math.cos(radians)
@@ -94,7 +92,7 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
         bpy.context.view_layer.update()
         bpy.ops.object.select_all(action="DESELECT")
         merged_object.select_set(True)
-        bpy.context.view_layer.objects.active = obj
+        bpy.context.view_layer.objects.active = merged_object
         # bpy.ops.view3d.camera_to_view_selected()
 
         # Replace the default light with a new light source
