@@ -159,7 +159,14 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
+# Mac caches
 .DS_Store
+._*
+
+# VHACD
 TestVHACD
-objathor/asset_conversion/*/LICENSE.txt
+objathor/asset_conversion/**/LICENSE.txt
 output
+log.txt
+
+#data/
