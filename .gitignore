@@ -166,3 +166,4 @@ cython_debug/
 # TestVHACD for mac
 objathor/asset_conversion/colliders/__MACOSX
 objathor/asset_conversion/colliders/osx
+log.txt
