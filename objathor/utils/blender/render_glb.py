@@ -35,6 +35,10 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
 
     # Merge all mesh objects into a single object
     if mesh_objects:
+        for cobj in bpy.context.scene.objects:
+            if cobj.type == "LIGHT":
+                bpy.data.lights.remove(cobj.data)  # Remove all lights
+
         bpy.context.view_layer.objects.active = mesh_objects[0]
         bpy.ops.object.select_all(action="DESELECT")
         for cobj in mesh_objects:
@@ -98,7 +102,7 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
         # Replace the default light with a new light source
         for cobj in bpy.context.scene.objects:
             if cobj.type == "LIGHT":
-                bpy.data.lights.remove(cobj.data)  # Remove the default light
+                bpy.data.lights.remove(cobj.data)  # Remove all lights
 
         # Create a new light source (e.g., Point light)
         light_data = bpy.data.lights.new(name="NewLight", type="POINT")
