@@ -122,7 +122,7 @@ def get_picklegz_save_path(out_dir, object_name):
 
 
 def get_gz_save_path(out_dir, object_name):
-    return os.path.join(out_dir, f"{object_name}.gz")
+    return os.path.join(out_dir, f"{object_name}.json.gz")
 
 
 def get_extension_save_path(out_dir, asset_id, extension):
@@ -138,7 +138,7 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
             (".msgpack.gz", get_msgpackgz_save_path(out_dir, asset_id)),
             (".msgpack", get_msgpack_save_path(out_dir, asset_id)),
             (".pkl.gz", get_picklegz_save_path(out_dir, asset_id)),
-            (".gz", get_gz_save_path(out_dir, asset_id)),
+            (".json.gz", get_gz_save_path(out_dir, asset_id)),
         ]
     )
     path = None
@@ -220,7 +220,7 @@ def save_thor_asset_file(asset_json, save_path: str):
         packed = msgpack.packb(asset_json)
         with open(save_path, "wb") as outfile:
             outfile.write(packed)
-    elif extension == "json.gz":
+    elif extension == ".json.gz":
         import gzip
 
         with gzip.open(save_path, "wt") as outfile:

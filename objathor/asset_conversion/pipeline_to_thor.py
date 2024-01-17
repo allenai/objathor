@@ -473,7 +473,7 @@ def main(argv=None):
 
     parser.add_argument(
         "--extension",
-        choices=[".json", ".pkl.gz", ".msgpack", ".msgpack.gz", ".gz"],
+        choices=[".json", ".pkl.gz", ".msgpack", ".msgpack.gz", ".json.gz"],
         default=".json",
     )
 

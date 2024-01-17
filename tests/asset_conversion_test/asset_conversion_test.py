@@ -107,7 +107,7 @@ def test_pipeline_to_thor_msgpack():
 def test_pipeline_to_thor_gz():
     object_id = "000074a334c541878360457c672b6c2e"
     out_path = os.path.abspath(os.path.join(".", "test-out"))
-    extension = ".gz"
+    extension = ".json.gz"
     result = run_pipeline_main(
         object_id=object_id, out_path=out_path, extension=extension
     )
