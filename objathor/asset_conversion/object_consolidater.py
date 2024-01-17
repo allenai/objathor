@@ -716,12 +716,14 @@ def weld_vertices(vertex_selection: tuple = ("all"), distance_threshold: float =
     else:
         logger.debug("The active object is not a mesh")
 
+
 def regularize_normals():
     bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_mode(type='VERT')
+    bpy.ops.mesh.select_mode(type="VERT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.object.mode_set(mode="OBJECT")
+
 
 def delete_everything():
     materials = bpy.data.materials
@@ -1218,10 +1220,10 @@ def glb_to_thor(
             bpy.ops.object.duplicate()
             bpy.context.view_layer.objects.active = bpy.context.selected_objects[-1]
             bpy.ops.object.mode_set(mode="EDIT")
-            bpy.ops.mesh.select_mode(type='FACE')
-            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.select_mode(type="FACE")
+            bpy.ops.mesh.select_all(action="SELECT")
             bpy.ops.mesh.flip_normals()
-            bpy.ops.mesh.select_all(action='DESELECT')
+            bpy.ops.mesh.select_all(action="DESELECT")
             bpy.ops.object.mode_set(mode="OBJECT")
         else:
             logger.debug("MESH-ELEMENT HAS BORDER: FALSE")
