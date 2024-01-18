@@ -35,8 +35,9 @@ if __name__ == "__main__":
         keywords=["3D assets", "annotation", ""],
         install_requires=REQUIREMENTS,
         extras_require={
+            "all": REQUIREMENTS_ANNOTATION + REQUIREMENTS_BLENDER,
             "blender": REQUIREMENTS_BLENDER,
-            "annotation": REQUIREMENTS_ANNOTATION
+            "annotation": REQUIREMENTS_ANNOTATION,
         },
         classifiers=[
             "Development Status :: 4 - Beta",
