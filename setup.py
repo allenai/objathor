@@ -16,7 +16,7 @@ if __name__ == "__main__":
             ]
 
     REQUIREMENTS = _read_reqs("requirements.txt")
-    REQUIREMENTS_BLENDER = _read_reqs("../requirements-blender.txt")
+    REQUIREMENTS_BLENDER = _read_reqs("requirements-blender.txt")
     REQUIREMENTS_ANNOTATION = _read_reqs("requirements-annotation.txt")
 
     setup(
@@ -36,7 +36,7 @@ if __name__ == "__main__":
         install_requires=REQUIREMENTS,
         extras_require={
             "blender": REQUIREMENTS_BLENDER,
-            "annotation": REQUIREMENTS_ANNOTATION
+            "annotation": REQUIREMENTS_ANNOTATION,
         },
         classifiers=[
             "Development Status :: 4 - Beta",
