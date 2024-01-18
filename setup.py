@@ -16,7 +16,7 @@ if __name__ == "__main__":
             ]
 
     REQUIREMENTS = _read_reqs("requirements.txt")
-    REQUIREMENTS_BLENDER = _read_reqs("requirements-blender.txt")
+    REQUIREMENTS_BLENDER = _read_reqs("../requirements-blender.txt")
     REQUIREMENTS_ANNOTATION = _read_reqs("requirements-annotation.txt")
 
     setup(
