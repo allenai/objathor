@@ -1296,7 +1296,6 @@ def glb_to_thor(
     rotate_for_unity(vispoints, export=False)
 
 
-# ALVARO What's this for?
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format=FORMAT)
 
