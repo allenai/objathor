@@ -6,6 +6,7 @@ import math
 import os
 import random
 import shutil
+import ssl
 import sys
 from collections import defaultdict
 from typing import Dict, List, Optional
@@ -150,7 +151,7 @@ def join_meshes() -> bpy.types.Object:
     return mesh
 
 
-def is_mesh_manifold(mesh: bpy.types.Object) -> bool:
+def is_mesh_open(mesh: bpy.types.Object) -> bool:
     bpy.ops.object.editmode_toggle()
     bm = bmesh.from_edit_mesh(mesh.data)
 
@@ -162,14 +163,14 @@ def is_mesh_manifold(mesh: bpy.types.Object) -> bool:
     for f in bm.faces:
         f.select = False
 
-    # Select all non-manifold edges
+    # Look for boundary edges
     for edge in bm.edges:
-        if not edge.is_manifold:
+        if edge.is_boundary:
             bpy.ops.object.editmode_toggle()
-            return False
+            return True
     # Write the BMesh back to the mesh and exit edit mode
     bpy.ops.object.editmode_toggle()
-    return True
+    return False
 
 
 def decimate(mesh: bpy.types.Object, decimation_ratio: float) -> None:
@@ -716,6 +717,14 @@ def weld_vertices(vertex_selection: tuple = ("all"), distance_threshold: float =
         logger.debug("The active object is not a mesh")
 
 
+def regularize_normals():
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_mode(type="VERT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+
 def delete_everything():
     materials = bpy.data.materials
     # delete all the materials
@@ -817,10 +826,9 @@ def glb_to_thor(
 
     source_object = bpy.context.selected_objects[0]
 
-    # Check whether mesh is manifold or not
-    manifold_mesh = is_mesh_manifold(source_object)
-
-    logger.debug("MESH IS MANIFOLD: " + str(manifold_mesh))
+    # Check whether mesh is open or not
+    open_mesh = is_mesh_open(source_object)
+    logger.debug("MESH HAS BORDER: " + str(open_mesh))
 
     # Rotate object into canonical rotation
     logger.debug(annotation_dict["pose_z_rot_angle"])
@@ -968,6 +976,8 @@ def glb_to_thor(
                 )
                 weld_vertices(vertex_selection=("nonborder"), distance_threshold=0.001)
                 logger.debug(f"Post: {str(len(target_object.data.vertices))}")
+                regularize_normals()
+
                 # Adding "squeaky-axle" coefficient to difficult-to-decimate asset, to strike balance between decent quality and some amount of decimation
                 squeaky_axle_coefficient = 1.5
                 target_poly_count = squeaky_axle_coefficient * dec_min
@@ -1184,6 +1194,7 @@ def glb_to_thor(
             element_spacing_amount * -i,
         )
         source_objects[i].select_set(True)
+
     bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
     bpy.ops.object.join()
     source_object = bpy.context.selected_objects[0]
@@ -1194,8 +1205,9 @@ def glb_to_thor(
     bpy.ops.mesh.separate(type="LOOSE")
     target_objects = bpy.context.selected_objects
 
-    bpy.ops.object.select_all(action="DESELECT")
+    # When repositioning target object elements, make any open ones double-sided by duplicating their geometry and flipping the normals
     for i in range(0, len(target_objects)):
+        bpy.ops.object.select_all(action="DESELECT")
         target_objects[i].name = "object_" + str(i).zfill(4) + "_target"
         target_objects[i].location = (
             element_spacing_amount * -i,
@@ -1203,7 +1215,24 @@ def glb_to_thor(
             element_spacing_amount * -i,
         )
         target_objects[i].select_set(True)
+        if is_mesh_open(target_objects[i]):
+            logger.debug("MESH-ELEMENT HAS BORDER: TRUE")
+            bpy.ops.object.duplicate()
+            bpy.context.view_layer.objects.active = bpy.context.selected_objects[-1]
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_mode(type="FACE")
+            bpy.ops.mesh.select_all(action="SELECT")
+            bpy.ops.mesh.flip_normals()
+            bpy.ops.mesh.select_all(action="DESELECT")
+            bpy.ops.object.mode_set(mode="OBJECT")
+        else:
+            logger.debug("MESH-ELEMENT HAS BORDER: FALSE")
+
+    # Recombine all objects into single one
+    bpy.ops.object.select_all(action="SELECT")
+    source_object.select_set(False)
     bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
+
     bpy.ops.object.join()
     target_object = bpy.context.selected_objects[0]
     target_object.name = object_name
