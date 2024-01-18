@@ -8,7 +8,7 @@ Objaverse asset annotator and importer for use in THOR.
 pip install objathor[annotation,blender]
 ```
 
-Here the following extras are installed: `annotation` to use openai to generate annotations and `blender` installed as a module.
+Here the following extras are installed: `annotation` to use openai to generate annotations and `blender` as a python module.
 
 
 From source:
