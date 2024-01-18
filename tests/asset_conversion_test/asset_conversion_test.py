@@ -1,4 +1,6 @@
-from objathor.asset_conversion.pipeline_to_thor import main as pipeline_main
+from objathor.asset_conversion.pipeline_to_thor import (
+    optimize_assets_for_thor as pipeline_main,
+)
 import objathor.asset_conversion.util as util
 import os
 import shutil

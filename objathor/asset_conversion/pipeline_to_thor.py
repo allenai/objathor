@@ -8,11 +8,12 @@ import subprocess
 import sys
 import time
 import traceback
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Sequence, Optional
 
 import numpy as np
 import objaverse
 
+import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
 from objathor.constants import ABS_PATH_OF_OBJATHOR, THOR_COMMIT_ID
 
@@ -30,6 +31,7 @@ from objathor.asset_conversion.util import (
     get_extension_save_path,
     add_default_annotations,
 )
+import ai2thor.controller
 
 FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
@@ -87,7 +89,11 @@ def glb_to_thor(
     process = None
     try:
         process = subprocess.Popen(
-            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=os.environ.copy(),
         )
         out, _ = process.communicate(timeout=timeout)
         out = out.decode()
@@ -269,6 +275,8 @@ def validate_in_thor(
     skybox_color=(255, 255, 255),
     load_file_in_unity=False,
     extension=None,
+    angle_increment: int = 90,
+    axes=((0, 1, 0),),  # (1, 0, 0)),
 ):
     evt = None
     try:
@@ -288,13 +296,12 @@ def validate_in_thor(
             return False, None
 
         asset_metadata = evt.metadata["actionReturn"]
-        angle_increment = 45
-        angles = [n * angle_increment for n in range(0, round(360 / angle_increment))]
-        axes = [(0, 1, 0), (1, 0, 0)]
-        rotations = [(x, y, z, degrees) for degrees in angles for (x, y, z) in axes]
 
         if not skip_images:
-            # print(rotations)
+            angles = [
+                n * angle_increment for n in range(0, round(360 / angle_increment))
+            ]
+            rotations = [(x, y, z, degrees) for degrees in angles for (x, y, z) in axes]
             evt = view_asset_in_thor(
                 asset_name,
                 controller,
@@ -359,17 +366,199 @@ def run_pipeline(
     pass
 
 
-def main(argv=None):
+def optimize_assets_for_thor(
+    output_dir: str,
+    uid_to_glb_path: Dict[str, str],
+    annotations_path: str,
+    max_colliders: int,
+    skip_glb: bool,
+    blender_as_module: bool,
+    extension: str,
+    thor_platform: Optional[str] = None,
+    blender_installation_path: Optional[str] = None,
+    controller: ai2thor.controller.Controller = None,
+    live: bool = False,
+    save_as_pkl: bool = True,
+    absolute_texture_paths: bool = False,
+    delete_objs: bool = False,
+    keep_json_asset: bool = False,
+    skip_thor_creation: bool = False,
+    width: int = 300,
+    height: int = 300,
+    skip_thor_visualization: bool = False,
+    skybox_color: Sequence[int] = (255, 255, 255),
+    send_asset_to_controller: bool = False,
+    add_visualize_thor_actions: bool = False,
+    skip_colliders: bool = False,
+    **extra_collider_kwargs: Dict[str, Any],
+):
+    report_out_path = os.path.join(output_dir, "failed_objects.json")
+
+    failed_objects = OrderedDictWithDefault(dict)
+
+    print(f"--- Selected uids: {list(uid_to_glb_path.values())}")
+
+    start_process_time = time.perf_counter()
+
+    for uid, glb_path in uid_to_glb_path.items():
+        start_obj_time = time.perf_counter()
+        asset_out_dir = os.path.join(output_dir, uid)
+        metadata_output_file = os.path.join(asset_out_dir, "thor_metadata.json")
+
+        if os.path.isdir(annotations_path):
+            if os.path.exists(os.path.join(annotations_path, f"{uid}.json")):
+                sub_annotations_path = os.path.join(annotations_path, f"{uid}.json")
+            elif os.path.exists(
+                os.path.join(annotations_path, uid, f"annotations.json.gz")
+            ):
+                sub_annotations_path = os.path.join(
+                    annotations_path, uid, f"annotations.json.gz"
+                )
+            else:
+                raise RuntimeError(
+                    f"Annotations path {annotations_path} does not contain annotations for {uid}"
+                )
+        else:
+            sub_annotations_path = annotations_path
+
+        success = True
+        if not skip_glb:
+            print("GLB to THOR starting...")
+            start = time.perf_counter()
+            success = glb_to_thor(
+                glb_path=glb_path,
+                annotations_path=sub_annotations_path,
+                object_out_dir=asset_out_dir,
+                uid=uid,
+                failed_objects=failed_objects,
+                capture_stdout=not live,
+                generate_obj=True,
+                save_as_json=not save_as_pkl,
+                relative_texture_paths=not absolute_texture_paths,
+                run_blender_as_module=blender_as_module,
+                blender_instalation_path=blender_installation_path,
+            )
+            end = time.perf_counter()
+            print(f"GLB to THOR success: {success}. Runtime: {end-start}s")
+
+            # print(f"uid in failed {uid in failed_objects} 'Progress: 100.00%' in failed_objects[uid]['blender_output'] {'Progress: 100.00%' in failed_objects[uid]['blender_output']}")
+            # Blender bug process exits with error due to minor memory leak but object is converted successfully
+            if (
+                uid in failed_objects
+                and "blender_output" in failed_objects[uid]
+                and "Progress: 100.00%" in failed_objects[uid]["blender_output"]
+            ):
+                # Do not include this check because sometimes it fails regardless
+                # and  "Error: Not freed memory blocks" in failed_objects[uid]['blender_output']:
+                success = True
+
+        if success and not skip_colliders:
+            print("OBJ to colliders starting...")
+            start = time.perf_counter()
+            success = obj_to_colliders(
+                uid=uid,
+                object_out_dir=asset_out_dir,
+                max_colliders=max_colliders,
+                capture_stdout=(not live),
+                failed_objects=failed_objects,
+                delete_objs=delete_objs,
+                **extra_collider_kwargs,
+            )
+            end = time.perf_counter()
+            print(f"OBJ to colliders success: {success}. Runtime: {end-start}s")
+
+        if success:
+            print(f"Saving {asset_out_dir} {uid} with extension {extension}")
+            # Save to desired format, compression step
+            save_thor_asset_file(
+                asset_json=add_default_annotations(
+                    load_existing_thor_asset_file(
+                        out_dir=asset_out_dir, object_name=uid
+                    ),
+                    asset_directory=asset_out_dir,
+                ),
+                save_path=get_extension_save_path(
+                    out_dir=asset_out_dir, asset_id=uid, extension=extension
+                ),
+            )
+            if extension != ".json" and not keep_json_asset:
+                print("Removing .json asset")
+                json_asset_path = get_existing_thor_asset_file_path(
+                    out_dir=asset_out_dir, asset_id=uid, force_extension=".json"
+                )
+                os.remove(json_asset_path)
+
+        if success and not skip_thor_creation:
+            import ai2thor.controller
+            import ai2thor.fifo_server
+
+            start = time.perf_counter()
+            if not controller:
+                controller = ai2thor.controller.Controller(
+                    # local_build=True,
+                    commit_id=THOR_COMMIT_ID,
+                    platform=thor_platform,
+                    start_unity=True,
+                    scene="Procedural",
+                    gridSize=0.25,
+                    width=width,
+                    height=height,
+                    server_class=ai2thor.fifo_server.FifoServer,
+                    antiAliasing=None if skip_thor_visualization else "fxaa",
+                    quality="Very Low" if skip_thor_visualization else "Ultra",
+                )
+
+            print("THOR visualization starting...")
+            success, asset_metadata = validate_in_thor(
+                controller,
+                asset_out_dir,
+                uid,
+                os.path.join(asset_out_dir, "thor_renders"),
+                failed_objects=failed_objects,
+                skip_images=skip_thor_visualization,
+                skybox_color=skybox_color,
+                load_file_in_unity=not send_asset_to_controller,
+                extension=extension,
+            )
+            end = time.perf_counter()
+            print(f"THOR visualization success: {success}. Runtime: {end-start}s")
+            controller.reset(scene="Procedural")
+
+            if add_visualize_thor_actions:
+                objathor.asset_conversion.add_visualize_thor_actions(
+                    asset_id=uid, asset_dir=asset_out_dir
+                )
+
+            if success and asset_metadata:
+                with open(metadata_output_file, "w") as f:
+                    json.dump(asset_metadata, f, indent=2)
+
+            end = time.perf_counter()
+            print(
+                f"Finished Object '{uid}' success: {success}. Object Runtime: {end-start_obj_time}s"
+            )
+
+    failed_json_str = json.dumps(failed_objects)
+
+    if len(failed_objects):
+        with open(report_out_path, "w") as f:
+            f.write(failed_json_str)
+    print(f"Failed objects: {failed_json_str}")
+    end = time.perf_counter()
+    print(f"Total Runtime: {end-start_process_time}s")
+
+
+def main():
     parser = argparse.ArgumentParser()
     print("--------- argv")
-    print(argv)
+    print(sys.argv[1:])
 
     parser.add_argument("--output_dir", type=str, default="./output", required=True)
     parser.add_argument(
-        "--object_ids",
+        "--uids",
         type=str,
         default="",
-        help="Comma separated list of object ids to process, overrides number.",
+        help="Comma separated list of objaverse object ids to process, overrides number.",
     )
     parser.add_argument(
         "--annotations",
@@ -465,7 +654,7 @@ def main(argv=None):
     parser.add_argument(
         "--keep_json_asset",
         action="store_true",
-        help="Wether it keeps the intermediate .json asset file when storing in a different format to json.",
+        help="Whether it keeps the intermediate .json asset file when storing in a different format to json.",
     )
 
     found_blender = False
@@ -480,7 +669,7 @@ def main(argv=None):
         type=str,
         default=None,
         help="Blender installation path, when blender_as_module = False and we cannot find the installation path automatically.",
-        required=(not found_blender) and "--blender_as_module" not in argv,
+        required=(not found_blender) and "--blender_as_module" not in sys.argv[1:],
     )
 
     parser.add_argument(
@@ -491,12 +680,7 @@ def main(argv=None):
         choices=["CloudRendering", "OSXIntel64"],  # Linux64
     )
 
-    # Necessary for mesh decomposition to generate colliders
-    # parser.add_argument(
-    #     "--obj", action="store_true", help="Saves obj version of asset."
-    # )
-
-    args, unknown = parser.parse_known_args(argv)
+    args, unknown = parser.parse_known_args(sys.argv[1:])
     extra_args_keys = []
     for arg in unknown:
         if arg.startswith(("-", "--")):
@@ -505,167 +689,49 @@ def main(argv=None):
             extra_args_keys.append(arg.split("=")[0].removeprefix("--"))
             parser.add_argument(arg.split("=")[0], type=str)
 
-    args = parser.parse_args(argv)
+    args = parser.parse_args(sys.argv[1:])
     print(args)
-
-    annotations_path = args.annotations
-    object_number = args.number
-    max_colliders = args.max_colliders
-    out_metadata_filename = "thor_metadata.json"
-
-    output_dir = args.output_dir
-    report_out_path = os.path.join(output_dir, "failed_objects.json")
-
     if args.verbose:
         # TODO use logger instead of print
         logger.setLevel(logging.DEBUG)
 
-    failed_objects = OrderedDictWithDefault(dict)
-
-    process_count = multiprocessing.cpu_count()
-
-    if args.object_ids != "":
-        selected_uids = args.object_ids.split(",")
+    uids = args.uids
+    if uids != "":
+        selected_uids = uids.split(",")
     else:
-        with open(annotations_path, "r") as f:
+        with open(args.annotations, "r") as f:
             annotations = json.load(f)
-        selected_uids = sorted(random.sample(annotations.keys(), object_number))
+        selected_uids = sorted(random.sample(annotations.keys(), args.number))
 
-    print(f"--- Selected uids: {selected_uids}")
-
-    objects = objaverse.load_objects(
-        uids=selected_uids, download_processes=process_count
+    uid_to_glb_path = objaverse.load_objects(
+        uids=uids, download_processes=multiprocessing.cpu_count()
     )
 
-    controller = None
-    start_process_time = time.perf_counter()
-
-    for uid, glb_path in objects.items():
-        start_obj_time = time.perf_counter()
-        asset_out_dir = os.path.join(output_dir, uid)
-
-        success = True
-        if not args.skip_glb:
-            print("GLB to THOR starting...")
-            start = time.perf_counter()
-            success = glb_to_thor(
-                glb_path=glb_path,
-                annotations_path=args.annotations,
-                object_out_dir=asset_out_dir,
-                uid=uid,
-                failed_objects=failed_objects,
-                capture_stdout=not args.live,
-                generate_obj=True,
-                save_as_json=not args.save_as_pkl,
-                relative_texture_paths=not args.absolute_texture_paths,
-                run_blender_as_module=args.blender_as_module,
-                blender_instalation_path=args.blender_installation_path,
-            )
-            end = time.perf_counter()
-            print(f"GLB to THOR success: {success}. Runtime: {end-start}s")
-
-            # print(f"uid in failed {uid in failed_objects} 'Progress: 100.00%' in failed_objects[uid]['blender_output'] {'Progress: 100.00%' in failed_objects[uid]['blender_output']}")
-            # Blender bug process exits with error due to minor memory leak but object is converted successfully
-            if (
-                uid in failed_objects
-                and "blender_output" in failed_objects[uid]
-                and "Progress: 100.00%" in failed_objects[uid]["blender_output"]
-            ):
-                # Do not include this check because sometimes it fails regardless
-                # and  "Error: Not freed memory blocks" in failed_objects[uid]['blender_output']:
-                success = True
-
-        if success and not args.skip_colliders:
-            print("OBJ to colliders starting...")
-            extra_args = {key: getattr(args, key) for key in extra_args_keys}
-            start = time.perf_counter()
-            success = obj_to_colliders(
-                uid=uid,
-                object_out_dir=asset_out_dir,
-                max_colliders=max_colliders,
-                capture_stdout=(not args.live),
-                failed_objects=failed_objects,
-                delete_objs=args.delete_objs,
-                **extra_args,
-            )
-            end = time.perf_counter()
-            print(f"OBJ to colliders success: {success}. Runtime: {end-start}s")
-
-        print(f"=---- file {asset_out_dir} {uid} extension {args.extension}")
-        # Save to desired format, compression step
-        save_thor_asset_file(
-            asset_json=add_default_annotations(
-                load_existing_thor_asset_file(out_dir=asset_out_dir, object_name=uid),
-                asset_directory=asset_out_dir,
-            ),
-            save_path=get_extension_save_path(
-                out_dir=asset_out_dir, asset_id=uid, extension=args.extension
-            ),
-        )
-        if args.extension != ".json" and not args.keep_json_asset:
-            print("--- Removing .json asset")
-            json_asset_path = get_existing_thor_asset_file_path(
-                out_dir=asset_out_dir, asset_id=uid, force_extension=".json"
-            )
-            os.remove(json_asset_path)
-
-        if success and not args.skip_thor_creation:
-            import ai2thor.controller
-            import ai2thor.fifo_server
-
-            start = time.perf_counter()
-            if not controller:
-                controller = ai2thor.controller.Controller(
-                    # local_build=True,
-                    commit_id=THOR_COMMIT_ID,
-                    platform=args.thor_platform,
-                    start_unity=True,
-                    scene="Procedural",
-                    gridSize=0.25,
-                    width=args.width,
-                    height=args.height,
-                    server_class=ai2thor.fifo_server.FifoServer,
-                    antiAliasing=None if args.skip_thor_visualization else "fxaa",
-                    quality="Very Low" if args.skip_thor_visualization else "Ultra",
-                )
-            print("THOR visualization starting...")
-            success, asset_metadata = validate_in_thor(
-                controller,
-                asset_out_dir,
-                uid,
-                os.path.join(asset_out_dir, "images"),
-                failed_objects=failed_objects,
-                skip_images=args.skip_thor_visualization,
-                skybox_color=args.skybox_color.split(","),
-                load_file_in_unity=not args.send_asset_to_controller,
-                extension=args.extension,
-            )
-            end = time.perf_counter()
-            print(f"THOR visualization success: {success}. Runtime: {end-start}s")
-            controller.reset(scene="Procedural")
-
-            if args.add_visualize_thor_actions:
-                add_visualize_thor_actions(asset_id=uid, asset_dir=asset_out_dir)
-
-            metadata_output_file = os.path.join(asset_out_dir, out_metadata_filename)
-            if success and asset_metadata:
-                with open(metadata_output_file, "w") as f:
-                    json.dump(asset_metadata, f, indent=2)
-
-            end = time.perf_counter()
-            print(
-                f"Finished Object '{uid}' success: {success}. Object Runtime: {end-start_obj_time}s"
-            )
-
-    failed_json_str = json.dumps(failed_objects)
-
-    if len(failed_objects):
-        with open(report_out_path, "w") as f:
-            f.write(failed_json_str)
-    print(f"Failed objects: {failed_json_str}")
-    end = time.perf_counter()
-    print(f"Total Runtime: {end-start_process_time}s")
+    optimize_assets_for_thor(
+        output_dir=args.output_dir,
+        uid_to_glb_path=uid_to_glb_path,
+        annotations_path=args.annotations,
+        max_colliders=args.max_colliders,
+        skip_glb=args.skip_glb,
+        blender_as_module=args.blender_as_module,
+        extension=args.extension,
+        thor_platform=args.thor_platform,
+        blender_installation_path=args.blender_installation_path,
+        live=args.live,
+        save_as_pkl=args.save_as_pkl,
+        absolute_texture_paths=args.absolute_texture_paths,
+        delete_objs=args.delete_objs,
+        keep_json_asset=args.keep_json_asset,
+        skip_thor_creation=args.skip_thor_creation,
+        width=args.width,
+        height=args.height,
+        skip_thor_visualization=args.skip_thor_visualization,
+        skybox_color=tuple(map(int, args.skybox_color.split(","))),
+        send_asset_to_controller=args.send_asset_to_controller,
+        add_visualize_thor_actions=args.add_visualize_thor_actions,
+        skip_colliders=args.skip_colliders,
+    )
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

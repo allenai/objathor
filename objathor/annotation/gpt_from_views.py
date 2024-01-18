@@ -46,6 +46,9 @@ def get_thumbnail_urls(
     for view_num, image_idx in enumerate(view_indices):
         if local_renders:
             fname = os.path.join(base_url, uid, f"render_{image_idx}.png")
+            if not os.path.exists(fname):
+                fname = os.path.join(base_url, f"render_{image_idx}.png")
+
             if os.path.isfile(fname):
                 thumbnail_tuples.append((view_num, f"file://{fname}"))
             else:

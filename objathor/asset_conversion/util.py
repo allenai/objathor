@@ -155,7 +155,7 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
         for path in possible_paths.values():
             if os.path.exists(path):
                 return path
-    raise Exception(f"Could not find existing THOR object file for {asset_id}")
+    raise RuntimeError(f"Could not find existing THOR object file for {asset_id}")
 
 
 def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
@@ -491,6 +491,7 @@ def view_asset_in_thor(
     )
     evt = controller.step(action="CreateHouse", house=house)
 
+    # Computing the bbox distance below causes the object-oriented bounding box to be created
     controller.step("BBoxDistance", objectId0=instance_id, objectId1=instance_id)
     obj = controller.step("AdvancePhysicsStep").metadata["objects"][1]
     obj_center_arr = np.array(obj["objectOrientedBoundingBox"]["cornerPoints"]).mean(0)
@@ -500,13 +501,15 @@ def view_asset_in_thor(
         print(f'Error: {evt.metadata["errorMessage"]}')
         return evt
 
-    evt = controller.step(action="LookAtObjectCenter", objectId=instance_id)
-
-    im = Image.fromarray(evt.frame)
+    controller.step(action="LookAtObjectCenter", objectId=instance_id)
 
     os.makedirs(output_dir, exist_ok=True)
 
-    im.save(os.path.join(output_dir, "neutral.jpg"))
+    # Neural image if wanted, we don't really need this as the loop saves a neural position
+    # image anyway
+    # im = Image.fromarray(evt.frame)
+    # im.save(os.path.join(output_dir, "neutral.jpg"))
+
     for rotation in rotations:
         controller.step(
             action="RotateObject",
@@ -556,7 +559,6 @@ def add_visualize_thor_actions(
     house_path=EMPTY_HOUSE_JSON_PATH,
     house_skybox_color=(255, 255, 255),
 ):
-    # asset_id = os.path.splitext(os.path.basename(output_json))[0]
     actions_json = os.path.join(asset_dir, f"{asset_id}.json")
     house = make_single_object_house(
         asset_id=asset_id,

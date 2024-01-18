@@ -737,10 +737,10 @@ def get_picklegz_save_path(out_dir, object_name):
 
 # TODO cleanup, make args match APIs better
 def glb_to_thor(
-    object_path,
-    output_dir,
-    annotations_file,
-    save_obj,
+    object_path: str,
+    output_dir: str,
+    annotations_file: str,
+    save_obj: bool,
     engine="CYCLES",
     save_as_json=False,
     relative_texture_paths=True,
@@ -760,8 +760,12 @@ def glb_to_thor(
         annotations_file = os.path.join(annotations_file, f"{object_name}.json.gz")
         with gzip.open(annotations_file, "rt") as f:
             annotation_dict = json.load(f)
-    else:
-        with open(annotations_file, "r") as f:
+    elif annotations_file:
+        with (
+            gzip.open(annotations_file, "rt")
+            if annotations_file.endswith(".gz")
+            else open(annotations_file, "r")
+        ) as f:
             annotation_dict = json.load(f)
 
         if object_name in annotation_dict:
