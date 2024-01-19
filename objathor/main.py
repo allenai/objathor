@@ -264,7 +264,7 @@ def annotate_and_optimize_asset(
     blender_as_module: bool,
     blender_installation_path: str,
     thor_platform: str,
-    keep_json_asset: bool
+    keep_json_asset: bool,
 ) -> None:
     output_dir_with_uid = cast(str, os.path.join(output_dir, uid))
     os.makedirs(output_dir_with_uid, exist_ok=True)
@@ -281,11 +281,7 @@ def annotate_and_optimize_asset(
     if os.path.exists(annotations_path):
         print(f"Annotations already exist at {annotations_path}, will use these.")
     else:
-        if (
-            is_objaverse
-            and use_objaversehome
-            and uid in get_objaverse_annotations()
-        ):
+        if is_objaverse and use_objaversehome and uid in get_objaverse_annotations():
             anno = get_objaverse_annotations()[uid]
             if "ref_category" not in anno:
                 anno["ref_category"] = get_objaverse_ref_categories()[uid]
@@ -369,5 +365,5 @@ if __name__ == "__main__":
         blender_as_module=args.blender_as_module,
         blender_installation_path=args.blender_installation_path,
         thor_platform=args.thor_platform,
-        keep_json_asset=args.keep_json_asset
+        keep_json_asset=args.keep_json_asset,
     )
