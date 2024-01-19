@@ -126,12 +126,11 @@ def get_gz_save_path(out_dir, object_name):
 
 
 def get_extension_save_path(out_dir, asset_id, extension):
-    comp_extension = ".{extension}" if not extension.startswith(".") else extension
+    comp_extension = f".{extension}" if not extension.startswith(".") else extension
     return os.path.join(out_dir, f"{asset_id}{comp_extension}")
 
 
 def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
-    OrderedDict()
     possible_paths = OrderedDict(
         [
             (".json", get_json_save_path(out_dir, asset_id)),
@@ -141,7 +140,7 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
             (".gz", get_gz_save_path(out_dir, asset_id)),
         ]
     )
-    path = None
+
     if force_extension is not None:
         if force_extension in possible_paths.keys():
             path = possible_paths[force_extension]
@@ -155,6 +154,7 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
         for path in possible_paths.values():
             if os.path.exists(path):
                 return path
+
     raise RuntimeError(f"Could not find existing THOR object file for {asset_id}")
 
 

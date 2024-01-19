@@ -520,41 +520,49 @@ def optimize_assets_for_thor(
             import ai2thor.fifo_server
 
             start = time.perf_counter()
-            if not controller:
-                controller = ai2thor.controller.Controller(
-                    # local_build=True,
-                    commit_id=THOR_COMMIT_ID,
-                    platform=thor_platform,
-                    start_unity=True,
-                    scene="Procedural",
-                    gridSize=0.25,
-                    width=width,
-                    height=height,
-                    server_class=ai2thor.fifo_server.FifoServer,
-                    antiAliasing=None if skip_thor_visualization else "fxaa",
-                    quality="Very Low" if skip_thor_visualization else "Ultra",
-                )
+            given_controller = controller is not None
+            try:
+                if not controller:
+                    controller = ai2thor.controller.Controller(
+                        # local_build=True,
+                        commit_id=THOR_COMMIT_ID,
+                        platform=thor_platform,
+                        start_unity=True,
+                        scene="Procedural",
+                        gridSize=0.25,
+                        width=width,
+                        height=height,
+                        server_class=ai2thor.fifo_server.FifoServer,
+                        antiAliasing=None if skip_thor_visualization else "fxaa",
+                        quality="Very Low" if skip_thor_visualization else "Ultra",
+                    )
 
-            print("THOR visualization starting...")
-            success, asset_metadata = validate_in_thor(
-                controller,
-                asset_out_dir,
-                uid,
-                os.path.join(asset_out_dir, "thor_renders"),
-                failed_objects=failed_objects,
-                skip_images=skip_thor_visualization,
-                skybox_color=skybox_color,
-                load_file_in_unity=not send_asset_to_controller,
-                extension=extension,
-            )
-            end = time.perf_counter()
-            print(f"THOR visualization success: {success}. Runtime: {end-start}s")
-            controller.reset(scene="Procedural")
-
-            if add_visualize_thor_actions:
-                objathor.asset_conversion.add_visualize_thor_actions(
-                    asset_id=uid, asset_dir=asset_out_dir
+                print("THOR visualization starting...")
+                success, asset_metadata = validate_in_thor(
+                    controller,
+                    asset_out_dir,
+                    uid,
+                    os.path.join(asset_out_dir, "thor_renders"),
+                    failed_objects=failed_objects,
+                    skip_images=skip_thor_visualization,
+                    skybox_color=skybox_color,
+                    load_file_in_unity=not send_asset_to_controller,
+                    extension=extension,
                 )
+                end = time.perf_counter()
+                print(f"THOR visualization success: {success}. Runtime: {end-start}s")
+                controller.reset(scene="Procedural")
+
+                if add_visualize_thor_actions:
+                    objathor.asset_conversion.add_visualize_thor_actions(
+                        asset_id=uid, asset_dir=asset_out_dir
+                    )
+            finally:
+                try:
+                    if not given_controller:
+                        controller.stop()
+                except:
+                    pass
 
             if success and asset_metadata:
                 with open(metadata_output_file, "w") as f:

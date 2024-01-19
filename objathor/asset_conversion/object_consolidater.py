@@ -1335,8 +1335,6 @@ def glb_to_thor(
     rotate_for_unity(vispoints, export=False)
 
 
-"""
-# ALVARO What's this for?
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format=FORMAT)
 
@@ -1385,4 +1383,3 @@ if __name__ == "__main__":
         save_as_json=args.save_as_json,
         relative_texture_paths=args.relative_texture_paths,
     )
-"""

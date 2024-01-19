@@ -78,7 +78,7 @@ def annotate_asset(
                 local_renders=True,
             ),
         )
-        anno["pose_z_rot_angle"] = np.deg2rad * render_angles[anno["frontView"]]
+        anno["pose_z_rot_angle"] = np.deg2rad(render_angles[anno["frontView"]])
 
         anno["scale"] = float(anno["height"]) / 100
         anno["z_axis_scale"] = True
@@ -244,20 +244,37 @@ def parse_args(
     return parser.parse_args()
 
 
-def annotate_and_optimize_asset():
-    args = parse_args()
-
-    output_dir = args.output
-    output_dir_with_uid = cast(str, os.path.join(args.output, args.uid))
+def annotate_and_optimize_asset(
+    uid: Optional[str],
+    glb_path: Optional[str],
+    output_dir: str,
+    use_objaversehome: bool,
+    max_colliders: int,
+    delete_objs: bool,
+    skip_thor_creation: bool,
+    skip_thor_visualization: bool,
+    add_visualize_thor_actions: bool,
+    width: int,
+    height: int,
+    skybox_color: str,
+    save_as_pkl: bool,
+    absolute_texture_paths: bool,
+    extension: str,
+    send_asset_to_controller: bool,
+    blender_as_module: bool,
+    blender_installation_path: str,
+    thor_platform: str,
+    keep_json_asset: bool
+) -> None:
+    output_dir_with_uid = cast(str, os.path.join(output_dir, uid))
     os.makedirs(output_dir_with_uid, exist_ok=True)
 
     objaverse_uids = objaverse.load_uids()
-    is_objaverse = args.uid in objaverse_uids
+    is_objaverse = uid in objaverse_uids
 
-    glb_path = args.glb
     if glb_path is None:
         assert is_objaverse, "If glb_path is not provided, uid must be an objaverse uid"
-        glb_path = objaverse.load_objects([args.uid])[args.uid]
+        glb_path = objaverse.load_objects([uid])[uid]
 
     # ANNOTATION
     annotations_path = os.path.join(output_dir_with_uid, f"annotations.json.gz")
@@ -266,16 +283,16 @@ def annotate_and_optimize_asset():
     else:
         if (
             is_objaverse
-            and args.use_objaversehome
-            and args.uid in get_objaverse_annotations()
+            and use_objaversehome
+            and uid in get_objaverse_annotations()
         ):
-            anno = get_objaverse_annotations()[args.uid]
+            anno = get_objaverse_annotations()[uid]
             if "ref_category" not in anno:
-                anno["ref_category"] = get_objaverse_ref_categories()[args.uid]
+                anno["ref_category"] = get_objaverse_ref_categories()[uid]
             write(anno, annotations_path)
         else:
             annotate_asset(
-                uid=args.uid,
+                uid=uid,
                 glb_path=glb_path,
                 output_dir=output_dir_with_uid,
             )
@@ -283,26 +300,26 @@ def annotate_and_optimize_asset():
     # OPTIMIZATION
     optimize_assets_for_thor(
         output_dir=output_dir,
-        uid_to_glb_path={args.uid: glb_path},
+        uid_to_glb_path={uid: glb_path},
         annotations_path=output_dir,
-        max_colliders=args.max_colliders,
+        max_colliders=max_colliders,
         skip_glb=False,
-        blender_as_module=args.blender_as_module,
-        extension=args.extension,
-        thor_platform=args.thor_platform,
-        blender_installation_path=args.blender_installation_path,
+        blender_as_module=blender_as_module,
+        extension=extension,
+        thor_platform=thor_platform,
+        blender_installation_path=blender_installation_path,
         live=False,
-        save_as_pkl=args.save_as_pkl,
-        absolute_texture_paths=args.absolute_texture_paths,
-        delete_objs=args.delete_objs,
-        keep_json_asset=args.keep_json_asset,
-        skip_thor_creation=args.skip_thor_creation,
-        width=args.width,
-        height=args.height,
-        skip_thor_visualization=args.skip_thor_visualization,
-        skybox_color=tuple(map(int, args.skybox_color.split(","))),
-        send_asset_to_controller=args.send_asset_to_controller,
-        add_visualize_thor_actions=args.add_visualize_thor_actions,
+        save_as_pkl=save_as_pkl,
+        absolute_texture_paths=absolute_texture_paths,
+        delete_objs=delete_objs,
+        keep_json_asset=keep_json_asset,
+        skip_thor_creation=skip_thor_creation,
+        width=width,
+        height=height,
+        skip_thor_visualization=skip_thor_visualization,
+        skybox_color=tuple(map(int, skybox_color.split(","))),
+        send_asset_to_controller=send_asset_to_controller,
+        add_visualize_thor_actions=add_visualize_thor_actions,
     )
 
     # TODO: Should we use CLIP to validate that the assets still look like the blender renders? Example below
@@ -331,4 +348,26 @@ def annotate_and_optimize_asset():
 
 
 if __name__ == "__main__":
-    annotate_and_optimize_asset()
+    args = parse_args()
+    annotate_and_optimize_asset(
+        uid=args.uid,
+        glb_path=args.glb,
+        output_dir=args.output,
+        use_objaversehome=args.use_objaversehome,
+        max_colliders=args.max_colliders,
+        delete_objs=args.delete_objs,
+        skip_thor_creation=args.skip_thor_creation,
+        skip_thor_visualization=args.skip_thor_visualization,
+        add_visualize_thor_actions=args.add_visualize_thor_actions,
+        width=args.width,
+        height=args.height,
+        skybox_color=args.skybox_color,
+        save_as_pkl=args.save_as_pkl,
+        absolute_texture_paths=args.absolute_texture_paths,
+        extension=args.extension,
+        send_asset_to_controller=args.send_asset_to_controller,
+        blender_as_module=args.blender_as_module,
+        blender_installation_path=args.blender_installation_path,
+        thor_platform=args.thor_platform,
+        keep_json_asset=args.keep_json_asset
+    )
