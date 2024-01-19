@@ -80,13 +80,18 @@ def download_vhacd(out_path):
         # TODO distinguish intel vs M2
         url = f"{url}VHACD_osx.zip"
     elif platform.startswith("win"):
-        win = f"{url}VHACD_osx.zip"
+        url = f"{url}VHACD_win.zip"
     else:
         raise NotImplementedError
 
-    with urlopen(url) as zipresp:
-        with ZipFile(BytesIO(zipresp.read())) as zfile:
-            zfile.extractall(os.path.abspath(out_path))
+    try:
+        with urlopen(url) as zipresp:
+            with ZipFile(BytesIO(zipresp.read())) as zfile:
+                zfile.extractall(os.path.abspath(out_path))
+    except Exception as e:
+        print(
+            f"Error downloading and unziping VHACD. {e}. If you can't reach `{url}` make sure to download the VHACD binary and place in `{VHACD_PATH}`."
+        )
 
 
 def decompose_obj(

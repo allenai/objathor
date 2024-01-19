@@ -37,6 +37,24 @@ FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
 
 
+def save_asset_as(asset_id, asset_out_dir, extension, keep_json_asset=False):
+    # Save to desired format, compression step
+    save_thor_asset_file(
+        asset_json=add_default_annotations(
+            load_existing_thor_asset_file(out_dir=asset_out_dir, object_name=asset_id),
+            asset_directory=asset_out_dir,
+        ),
+        save_path=get_extension_save_path(
+            out_dir=asset_out_dir, asset_id=asset_id, extension=extension
+        ),
+    )
+    if extension != ".json" and not keep_json_asset:
+        json_asset_path = get_existing_thor_asset_file_path(
+            out_dir=asset_out_dir, asset_id=asset_id, force_extension=".json"
+        )
+        os.remove(json_asset_path)
+
+
 def glb_to_thor(
     glb_path: str,
     annotations_path: str,
@@ -48,10 +66,19 @@ def glb_to_thor(
     generate_obj=True,
     save_as_json=False,
     relative_texture_paths=True,
-    run_blender_as_module=False,
+    run_blender_as_module=None,
     blender_instalation_path=None,
 ):
     os.makedirs(object_out_dir, exist_ok=True)
+
+    if run_blender_as_module is None:
+        try:
+            import bpy
+
+            run_blender_as_module = True
+        except ImportError:
+            run_blender_as_module = False
+        logger.info(f"---- Autodetected run_blender_as_module={run_blender_as_module}")
 
     if not run_blender_as_module:
         command = (
@@ -367,31 +394,31 @@ def run_pipeline(
 
 
 def optimize_assets_for_thor(
-    output_dir: str,
-    uid_to_glb_path: Dict[str, str],
-    annotations_path: str,
-    max_colliders: int,
-    skip_glb: bool,
-    blender_as_module: bool,
-    extension: str,
-    thor_platform: Optional[str] = None,
-    blender_installation_path: Optional[str] = None,
-    controller: ai2thor.controller.Controller = None,
-    live: bool = False,
-    save_as_pkl: bool = True,
-    absolute_texture_paths: bool = False,
-    delete_objs: bool = False,
-    keep_json_asset: bool = False,
-    skip_thor_creation: bool = False,
-    width: int = 300,
-    height: int = 300,
-    skip_thor_visualization: bool = False,
-    skybox_color: Sequence[int] = (255, 255, 255),
-    send_asset_to_controller: bool = False,
-    add_visualize_thor_actions: bool = False,
-    skip_colliders: bool = False,
-    **extra_collider_kwargs: Dict[str, Any],
-):
+        output_dir: str,
+        uid_to_glb_path: Dict[str, str],
+        annotations_path: str,
+        max_colliders: int,
+        skip_glb: bool,
+        blender_as_module: bool,
+        extension: str,
+        thor_platform: Optional[str] = None,
+        blender_installation_path: Optional[str] = None,
+        controller: ai2thor.controller.Controller = None,
+        live: bool = False,
+        save_as_pkl: bool = True,
+        absolute_texture_paths: bool = False,
+        delete_objs: bool = False,
+        keep_json_asset: bool = False,
+        skip_thor_creation: bool = False,
+        width: int = 300,
+        height: int = 300,
+        skip_thor_visualization: bool = False,
+        skybox_color: Sequence[int] = (255, 255, 255),
+        send_asset_to_controller: bool = False,
+        add_visualize_thor_actions: bool = False,
+        skip_colliders: bool = False,
+        **extra_collider_kwargs: Dict[str, Any],
+) -> None:
     report_out_path = os.path.join(output_dir, "failed_objects.json")
 
     failed_objects = OrderedDictWithDefault(dict)
@@ -548,10 +575,10 @@ def optimize_assets_for_thor(
     print(f"Total Runtime: {end-start_process_time}s")
 
 
-def main():
+def main(args):
     parser = argparse.ArgumentParser()
     print("--------- argv")
-    print(sys.argv[1:])
+    print(args)
 
     parser.add_argument("--output_dir", type=str, default="./output", required=True)
     parser.add_argument(
@@ -669,7 +696,7 @@ def main():
         type=str,
         default=None,
         help="Blender installation path, when blender_as_module = False and we cannot find the installation path automatically.",
-        required=(not found_blender) and "--blender_as_module" not in sys.argv[1:],
+        required=(not found_blender) and "--blender_as_module" not in args,
     )
 
     parser.add_argument(
@@ -680,7 +707,8 @@ def main():
         choices=["CloudRendering", "OSXIntel64"],  # Linux64
     )
 
-    args, unknown = parser.parse_known_args(sys.argv[1:])
+    args, unknown = parser.parse_known_args(args)
+
     extra_args_keys = []
     for arg in unknown:
         if arg.startswith(("-", "--")):
@@ -689,7 +717,7 @@ def main():
             extra_args_keys.append(arg.split("=")[0].removeprefix("--"))
             parser.add_argument(arg.split("=")[0], type=str)
 
-    args = parser.parse_args(sys.argv[1:])
+    args = parser.parse_args(args)
     print(args)
     if args.verbose:
         # TODO use logger instead of print
@@ -704,7 +732,7 @@ def main():
         selected_uids = sorted(random.sample(annotations.keys(), args.number))
 
     uid_to_glb_path = objaverse.load_objects(
-        uids=uids, download_processes=multiprocessing.cpu_count()
+        uids=selected_uids, download_processes=multiprocessing.cpu_count()
     )
 
     optimize_assets_for_thor(
@@ -734,4 +762,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

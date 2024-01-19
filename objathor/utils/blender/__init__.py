@@ -13,16 +13,32 @@ def render_glb_from_angles(
     angles: Sequence[float] = (0, 90, 180, 270),
     timeout: Optional[int] = 2 * 60,
 ) -> Optional[List[str]]:
-    command = (
-        f"{get_blender_installation_path()}"
-        f" --background"
-        f" --python {os.path.join(ABS_PATH_OF_OBJATHOR, 'utils', 'blender', 'render_glb.py')}"
-        f" --"
-        f' "{os.path.abspath(glb_path)}"'
-        f' "{os.path.abspath(save_dir)}"'
-        + " "
-        + " ".join([str(angle) for angle in angles])
-    )
+    try:
+        import bpy
+
+        run_blender_as_module = True
+    except ImportError:
+        run_blender_as_module = False
+    if not run_blender_as_module:
+        command = (
+            f"{get_blender_installation_path()}"
+            f" --background"
+            f" --python {os.path.join(ABS_PATH_OF_OBJATHOR, 'utils', 'blender', 'render_glb.py')}"
+            f" --"
+            f' --glb_path="{os.path.abspath(glb_path)}"'
+            f' --output_dir="{os.path.abspath(save_dir)}"'
+            f' --angles={",".join([str(angle) for angle in angles])}'
+        )
+    else:
+        command = (
+            f"python"
+            f" -m"
+            f" objathor.utils.blender.render_glb"
+            f" --"
+            f' --glb_path="{os.path.abspath(glb_path)}"'
+            f' --output_dir="{os.path.abspath(save_dir)}"'
+            f' --angles={",".join([str(angle) for angle in angles])}'
+        )
 
     print(f"For {os.path.basename(glb_path)}, running command: {command}")
 

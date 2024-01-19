@@ -100,6 +100,7 @@ if __name__ == "__main__":
         annotations_file=annotations_file,
         save_obj=save_obj,
         save_as_json=True,
+        relative_texture_paths=False,
     )
 
     instance_id = "asset_0"
@@ -123,8 +124,8 @@ if __name__ == "__main__":
 
     util.add_visualize_thor_actions(
         asset_id=obj_name,
+        instance_id=obj_name,
         asset_dir=output_dir,
-        instance_id=instance_id,
         house_path="data/empty_house.json",
         house_skybox_color=skybox_color,
     )

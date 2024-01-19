@@ -340,9 +340,7 @@ def add_default_annotations(asset, asset_directory, verbose=False):
     thor_obj_md = load_existing_thor_metadata_file(out_dir=asset_directory)
     if thor_obj_md is None:
         if verbose:
-            logger.info(
-                f"Object metadata for {asset['name']} is missing annotations, assuming pickupable."
-            )
+            logger.info(f"Object metadata is missing annotations, assuming pickupable.")
 
         asset["annotations"] = {
             "objectType": "Undefined",
@@ -380,7 +378,6 @@ def create_asset(
     )
     if file_extension not in EXTENSIONS_LOADABLE_IN_UNITY:
         load_file_in_unity = False
-    print("--------- extension " + extension)
     copy_to_dir = (
         os.path.join(thor_controller._build.base_dir)
         if copy_to_dir is None
@@ -559,21 +556,21 @@ def add_visualize_thor_actions(
     house_path=EMPTY_HOUSE_JSON_PATH,
     house_skybox_color=(255, 255, 255),
 ):
-    actions_json = os.path.join(asset_dir, f"{asset_id}.json")
+    asset_json = os.path.join(asset_dir, f"{asset_id}.json")
     house = make_single_object_house(
         asset_id=asset_id,
         instance_id=instance_id,
         house_path=house_path,
         skybox_color=house_skybox_color,
     )
-
-    with open(actions_json, "r") as f:
-        actions = json.load(f)
-        if isinstance(actions, dict):
-            actions = [actions]
-        if not isinstance(actions, list):
+    actions = []
+    with open(asset_json, "r") as f:
+        asset = json.load(f)
+        if isinstance(asset, dict):
+            actions = [{"action": "CreateRuntimeAsset", "asset": asset}]
+        elif not isinstance(asset, list):
             raise TypeError(
-                f"Json {actions_json} is not a sequence of actions or a dictionary."
+                f"Json {asset_json} is not a sequence of actions or a dictionary."
             )
 
     new_actions = [
@@ -581,8 +578,9 @@ def add_visualize_thor_actions(
         dict(action="CreateHouse", house=house),
         dict(action="LookAtObjectCenter", objectId=instance_id),
     ]
-    with open(actions_json, "w") as f:
+    with open(asset_json, "w") as f:
         json.dump(new_actions, f, indent=2)
+
 
 
 def get_receptacle_object_types():
