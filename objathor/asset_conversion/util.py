@@ -582,7 +582,6 @@ def add_visualize_thor_actions(
         json.dump(new_actions, f, indent=2)
 
 
-
 def get_receptacle_object_types():
     return {
         "Sink",

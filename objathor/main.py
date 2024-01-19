@@ -11,7 +11,10 @@ import numpy as np
 import objaverse
 
 from objathor.annotation.gpt_from_views import get_initial_annotation
-from objathor.annotation.objaverse_annotations_utils import get_objaverse_annotations, get_objaverse_ref_categories
+from objathor.annotation.objaverse_annotations_utils import (
+    get_objaverse_annotations,
+    get_objaverse_ref_categories,
+)
 from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
 from objathor.asset_conversion.util import get_blender_installation_path
 from objathor.utils.blender import render_glb_from_angles
