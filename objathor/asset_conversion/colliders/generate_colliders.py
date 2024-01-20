@@ -6,7 +6,7 @@ import stat
 import subprocess
 import sys
 from sys import platform
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import trimesh
@@ -148,8 +148,8 @@ def decompose_obj(
 
 
 def get_colliders(
-    obj_file: str, num_colliders: int, capture_out: bool, **kwargs
-) -> List[Dict[str, Any]]:
+    obj_file: str, num_colliders: int, capture_out: bool, timeout=120, **kwargs
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     if not capture_out:
         print("processing... ", obj_file)
 
@@ -175,7 +175,11 @@ def get_colliders(
 
     if capture_out:
         VHACD_result = subprocess.run(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
         )
 
         result_info["stderr"] = VHACD_result.stderr
@@ -198,18 +202,15 @@ def get_colliders(
     os.remove(output_obj_name)
     if os.path.exists("decomp.stl"):
         os.remove("decomp.stl")
-    # except Exception:
-    #     print('NO DECOMP FILE WAS GENERATED', obj_file)
-    #     result_info["failed"] = True
-    #     return [], result_info
+
     decomps = glob.glob("decomp_*.obj")
     colliders = []
-    # print(decomps, num_colliders, "I HATE THIS")
+
     for decomp in decomps:
         colliders.append(trimesh.load(decomp))
         os.remove(decomp)
     out = []
-    # print(f"Colliders {len(colliders)}")
+
     for collider in colliders:
         try:
             collider.vertices

@@ -9,10 +9,11 @@ import compress_json
 import compress_pickle
 import numpy as np
 import objaverse
+from ai2thor.controller import Controller
 
 from objathor.annotation.gpt_from_views import get_initial_annotation
 from objathor.annotation.objaverse_annotations_utils import (
-    get_objaverse_annotations,
+    get_objaverse_home_annotations,
     get_objaverse_ref_categories,
 )
 from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
@@ -265,6 +266,7 @@ def annotate_and_optimize_asset(
     blender_installation_path: str,
     thor_platform: str,
     keep_json_asset: bool,
+    controller: Optional[Controller] = None,
 ) -> None:
     output_dir_with_uid = cast(str, os.path.join(output_dir, uid))
     os.makedirs(output_dir_with_uid, exist_ok=True)
@@ -276,16 +278,33 @@ def annotate_and_optimize_asset(
         assert is_objaverse, "If glb_path is not provided, uid must be an objaverse uid"
         glb_path = objaverse.load_objects([uid])[uid]
 
+    def render_with_blender():
+        blender_render_dir = os.path.join(output_dir_with_uid, "blender_renders")
+        if len(glob.glob(os.path.join(blender_render_dir, "*"))) < 4:
+            os.makedirs(blender_render_dir)
+            render_glb_from_angles(
+                glb_path=glb_path,
+                save_dir=blender_render_dir,
+                angles=(0, 90, 180, 270),
+            )
+
     # ANNOTATION
     annotations_path = os.path.join(output_dir_with_uid, f"annotations.json.gz")
     if os.path.exists(annotations_path):
         print(f"Annotations already exist at {annotations_path}, will use these.")
+        render_with_blender()
     else:
-        if is_objaverse and use_objaversehome and uid in get_objaverse_annotations():
-            anno = get_objaverse_annotations()[uid]
+        if (
+            is_objaverse
+            and use_objaversehome
+            and uid in get_objaverse_home_annotations()
+        ):
+            anno = get_objaverse_home_annotations()[uid]
             if "ref_category" not in anno:
                 anno["ref_category"] = get_objaverse_ref_categories()[uid]
             write(anno, annotations_path)
+
+            render_with_blender()
         else:
             annotate_asset(
                 uid=uid,
@@ -316,6 +335,7 @@ def annotate_and_optimize_asset(
         skybox_color=tuple(map(int, skybox_color.split(","))),
         send_asset_to_controller=send_asset_to_controller,
         add_visualize_thor_actions=add_visualize_thor_actions,
+        controller=controller,
     )
 
     # TODO: Should we use CLIP to validate that the assets still look like the blender renders? Example below

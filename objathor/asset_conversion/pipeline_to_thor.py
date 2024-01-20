@@ -482,16 +482,23 @@ def optimize_assets_for_thor(
         if success and not skip_colliders:
             print("OBJ to colliders starting...")
             start = time.perf_counter()
-            success = obj_to_colliders(
-                uid=uid,
-                object_out_dir=asset_out_dir,
-                max_colliders=max_colliders,
-                capture_stdout=(not live),
-                failed_objects=failed_objects,
-                delete_objs=delete_objs,
-                **extra_collider_kwargs,
-            )
+            try:
+                success = obj_to_colliders(
+                    uid=uid,
+                    object_out_dir=asset_out_dir,
+                    max_colliders=max_colliders,
+                    capture_stdout=(not live),
+                    failed_objects=failed_objects,
+                    delete_objs=delete_objs,
+                    timeout=60,
+                    **extra_collider_kwargs,
+                )
+            except subprocess.TimeoutExpired:
+                print("OBJ to colliders timed out...")
+                success = False
+
             end = time.perf_counter()
+
             print(f"OBJ to colliders success: {success}. Runtime: {end-start}s")
 
         if success:
