@@ -4,8 +4,9 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 from sys import platform
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import trimesh
@@ -93,27 +94,43 @@ def download_vhacd(out_path):
         )
 
 
-def decompose_obj(file_name):
-    with open(file_name, "r") as f:
-        lines = [l for l in f]
+def decompose_obj(
+    file_path: Optional[str],
+    decomposed_file_paths: Optional[List[str]] = None,
+    output_file_prefix="decomp_",
+):
+    if file_path is None:
+        decomposed_files = []
+        file_path = decomposed_file_paths[0]
+        for file_path in decomposed_file_paths:
+            with open(file_path, "r") as f:
+                decomposed_files.append(f.read())
+    else:
+        assert decomposed_file_paths is None
 
-    decomposed_files = []
+        with open(file_path, "r") as f:
+            lines = [l for l in f]
 
-    current_file = []
-    for l in lines:
-        if l[:2] == "o ":
-            if len(current_file) > 0:
-                decomposed_files.append(current_file)
-            current_file = []
+        decomposed_files = []
 
-        current_file.append(l)
-    if len(current_file) > 0:
-        decomposed_files.append(current_file)
+        current_file = []
+        for l in lines:
+            if l[:2] == "o ":
+                if len(current_file) > 0:
+                    decomposed_files.append(current_file)
+                current_file = []
+
+            current_file.append(l)
+
+        if len(current_file) > 0:
+            decomposed_files.append(current_file)
 
     vertices_so_far = 0
     for i in range(len(decomposed_files)):
         current_file = decomposed_files[i]
-        file_to_write = file_name.replace(".obj", f"_{i}.obj")
+        file_to_write = os.path.join(
+            os.path.dirname(file_path), f"{output_file_prefix}{i}.obj"
+        )
         with open(file_to_write, "w") as f:
             for l in current_file:
                 if l[:2] == "f ":
@@ -131,8 +148,8 @@ def decompose_obj(file_name):
 
 
 def get_colliders(
-    obj_file: str, num_colliders: int, capture_out: bool, **kwargs
-) -> List[Dict[str, Any]]:
+    obj_file: str, num_colliders: int, capture_out: bool, timeout=120, **kwargs
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     if not capture_out:
         print("processing... ", obj_file)
 
@@ -158,7 +175,11 @@ def get_colliders(
 
     if capture_out:
         VHACD_result = subprocess.run(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
         )
 
         result_info["stderr"] = VHACD_result.stderr
@@ -181,16 +202,90 @@ def get_colliders(
     os.remove(output_obj_name)
     if os.path.exists("decomp.stl"):
         os.remove("decomp.stl")
-    # except Exception:
-    #     print('NO DECOMP FILE WAS GENERATED', obj_file)
-    #     result_info["failed"] = True
-    #     return [], result_info
+
     decomps = glob.glob("decomp_*.obj")
     colliders = []
-    # print(decomps, num_colliders, "I HATE THIS")
+
     for decomp in decomps:
         colliders.append(trimesh.load(decomp))
         os.remove(decomp)
+    out = []
+
+    for collider in colliders:
+        try:
+            collider.vertices
+        except Exception:
+            print("Collider failed", collider)
+            global HOW_MANY_MESSED_UP_MESH
+            HOW_MANY_MESSED_UP_MESH += 1
+            print("HOW_MANY_MESSED_UP_MESH", HOW_MANY_MESSED_UP_MESH)
+            # result_info["failed"] = True
+            # result_info["HOW_MANY_MESSED_UP_MESH"] = HOW_MANY_MESSED_UP_MESH
+            continue
+        out.append(
+            {
+                "vertices": [
+                    dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()
+                ],
+                "triangles": np.array(collider.faces).reshape(-1).tolist(),
+            }
+        )
+    return out, result_info
+
+
+def get_colliders_vhacd41(
+    obj_file: str, num_colliders: int, capture_out: bool, **kwargs
+) -> List[Dict[str, Any]]:
+    # Using version 4.1 VHACD binary from https://github.com/kmammou/v-hacd
+    assert num_colliders < 1000
+
+    if not capture_out:
+        print("processing... ", obj_file)
+
+    result_info = {}
+
+    extra_args = [f"-{k} {str(v)}" for k, v in kwargs.items()]
+
+    if not capture_out:
+        print(f"Extra args: {extra_args}")
+
+    command = [
+        VHACD_PATH,
+        obj_file,
+        "-h",
+        str(num_colliders),
+        "-o",
+        "obj",
+        *extra_args,
+    ]
+
+    if capture_out:
+        VHACD_result = subprocess.run(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+
+        result_info["stderr"] = VHACD_result.stderr
+        result_info["stdout"] = VHACD_result.stdout
+    else:
+        VHACD_result = subprocess.run(command)
+
+    result_info["VHACD_returncode"] = VHACD_result.returncode
+
+    should_exist = obj_file.replace(".obj", "000.obj")
+    if not os.path.exists(should_exist):
+        result_info["failed"] = True
+        result_info[
+            "stderr"
+        ] = f"VHACD did not generate '{should_exist}'. Unsuccessful run of command: {command}"
+        return [], result_info
+
+    vhacd_outputs = glob.glob(obj_file.replace(".obj", "???.obj"))
+
+    colliders = []
+    for decomp in vhacd_outputs:
+        colliders.append(trimesh.load(decomp))
+        os.remove(decomp)
+
     out = []
     # print(f"Colliders {len(colliders)}")
     for collider in colliders:
@@ -243,9 +338,6 @@ def set_colliders(
     return result_info
 
 
-BASE_PATH = os.getcwd()
-
-
 def generate_colliders(
     source_directory, num_colliders=4, delete_objs=False, capture_out=False, **kwargs
 ):
@@ -273,21 +365,8 @@ def generate_colliders(
     return info
 
 
-# def generate_object_colliders(obj_file, num_colliders=4, delete_objs=False):
-
-#     for obj_file in obj_files:
-#         uid = os.path.splitext(os.path.basename(obj_file))[0]
-#         result_info = set_colliders(obj_file, num_colliders)
-#         info[uid] = result_info
-
-#     # delete the obj files and the texture files
-#     if delete_objs:
-#         for file in obj_files: #+ texture_files:
-#             os.remove(file)
-#     return info
-
-
 if __name__ == "__main__":
+    BASE_PATH = os.getcwd()
     print("---- Running generate_colliders")
     parser = argparse.ArgumentParser()
     parser.add_argument("--folder", type=str, default=f"{BASE_PATH}/glbs/post")

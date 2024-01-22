@@ -33,25 +33,27 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
     # Get all mesh objects
     mesh_objects = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
 
-    # Merge all mesh objects into a single object
-    if mesh_objects:
-        bpy.context.view_layer.objects.active = mesh_objects[0]
-        bpy.ops.object.select_all(action="DESELECT")
-        for obj in mesh_objects:
-            obj.select_set(True)
-        bpy.ops.object.join()
-
-        # Get the merged object
-        merged_object = bpy.context.active_object
-
-        # Center the merged object at the scene's origin
-        bpy.ops.object.origin_set(type="ORIGIN_CENTER_OF_MASS", center="BOUNDS")
-
-        # Move the object to the scene's origin
-        merged_object.location = (0, 0, 0)
-    else:
+    if not mesh_objects:
         print("No mesh objects found in the scene.")
         exit(-1)
+
+    # Merge all mesh objects into a single object
+    bpy.context.view_layer.objects.active = mesh_objects[0]
+    bpy.ops.object.select_all(action="DESELECT")
+
+    for obj in mesh_objects:
+        obj.select_set(True)
+
+    bpy.ops.object.join()
+
+    # Get the merged object
+    merged_object = bpy.context.active_object
+
+    # Center the merged object at the scene's origin
+    bpy.ops.object.origin_set(type="ORIGIN_CENTER_OF_MASS", center="BOUNDS")
+
+    # Move the object to the scene's origin
+    merged_object.matrix_world.translation = (0, 0, 0)
 
     bpy.context.view_layer.update()
 
@@ -60,7 +62,7 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
 
     # Normalize object size
     max_size = max(obj.dimensions)
-    obj.scale = (1 / max_size, 1 / max_size, 1 / max_size)
+    obj.scale /= max_size
 
     # Set up rendering parameters
     scene = bpy.context.scene
@@ -100,9 +102,9 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
         # bpy.ops.view3d.camera_to_view_selected()
 
         # Replace the default light with a new light source
-        for obj in bpy.context.scene.objects:
-            if obj.type == "LIGHT":
-                bpy.data.lights.remove(obj.data)  # Remove the default light
+        for _obj in bpy.context.scene.objects:
+            if _obj.type == "LIGHT":
+                bpy.data.lights.remove(_obj.data)  # Remove the default light
 
         # Create a new light source (e.g., Point light)
         light_data = bpy.data.lights.new(name="NewLight", type="POINT")

@@ -160,3 +160,6 @@ cython_debug/
 .idea/
 
 .DS_Store
+TestVHACD
+objathor/asset_conversion/*/LICENSE.txt
+output
