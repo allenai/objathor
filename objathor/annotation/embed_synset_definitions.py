@@ -1,6 +1,7 @@
 import random
 from typing import Dict
 import os
+import urllib.request
 
 import compress_pickle
 import numpy as np
@@ -16,8 +17,24 @@ from objathor.utils.synsets import (
 )
 
 
+OBJATHOR_DATA_DIR = os.path.join(os.path.expanduser("~"), ".objathor_data")
+
+SYNSET_DEFINITION_EMB_FILE = os.path.join(
+    OBJATHOR_DATA_DIR, "synset_definition_embeddings_single.pkl.gz"
+)
+
+
+def download_embeddings(
+    url: str = "https://prior-datasets.s3.us-east-2.amazonaws.com/vida-synset-embeddings/synset_definition_embeddings_single.pkl.gz",
+):
+    os.makedirs(OBJATHOR_DATA_DIR, exist_ok=True)
+    if not os.path.isfile(SYNSET_DEFINITION_EMB_FILE):
+        urllib.request.urlretrieve(url, SYNSET_DEFINITION_EMB_FILE)
+        assert os.path.isfile(SYNSET_DEFINITION_EMB_FILE)
+
+
 def get_embeddings(
-    fname: str = "data/synset_definition_embeddings.pkl.gz",
+    fname: str = os.path.join(OBJATHOR_DATA_DIR, "synset_definition_embeddings.pkl.gz"),
 ) -> Dict[str, np.ndarray]:
     if os.path.isfile(fname):
         data = compress_pickle.load(fname)
@@ -42,7 +59,7 @@ def get_embeddings(
 
 
 def get_embeddings_single(
-    fname: str = "data/synset_definition_embeddings_single.pkl.gz",
+    fname: str = SYNSET_DEFINITION_EMB_FILE,
 ) -> Dict[str, np.ndarray]:
     if not os.path.isfile(fname):
         data = get_embeddings()
@@ -97,7 +114,10 @@ def local_smoothing(embs: Dict[str, np.ndarray], synset_str: str):
 
 
 def get_lemmas_definition_embeddings(
-    fname: str = "data/synset_lemmas_definitions_embeddings.pkl.gz", max_lemmas: int = 3
+    fname: str = os.path.join(
+        OBJATHOR_DATA_DIR, "synset_lemmas_definitions_embeddings.pkl.gz"
+    ),
+    max_lemmas: int = 3,
 ) -> Dict[str, np.ndarray]:
     if os.path.isfile(fname):
         data = compress_pickle.load(fname)

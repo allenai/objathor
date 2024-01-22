@@ -7,6 +7,7 @@ requests==2.31.0
 prior==1.0.3 # used?
 nltk @ git+https://github.com/nltk/nltk@582e6e35f0e6c984b44ec49dcb8846d9c011d0a8
 tqdm==4.66.1
+scikit-learn==1.4.0
 
 # asset_conversion
 compress_pickle==2.1.0

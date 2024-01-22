@@ -8,6 +8,10 @@ import compress_json
 
 from objathor.annotation.gpt_from_views import get_initial_annotation
 from objathor.utils.blender import render_glb_from_angles
+from objathor.annotation.synset_from_description import (
+    nearest_synsets_from_annotation,
+    OUTPUT_DIR as DESCRIPTION_EMBEDDING_OUTPUT_DIR,
+)
 
 
 def write(
@@ -62,6 +66,10 @@ def annotate_asset(
 
     anno["pre_rendered_views_urls"] = urls
     anno["uid"] = uid
+    anno["near_synsets"] = nearest_synsets_from_annotation(
+        anno, save_to_dir=DESCRIPTION_EMBEDDING_OUTPUT_DIR
+    )
+
     write(anno, output_file, **kwargs)
 
 
