@@ -28,6 +28,16 @@ views in S3 (see an example under [Annotation](#annotation) below), we also need
 
 [Blender install instructions](https://docs.blender.org/manual/en/latest/getting_started/installing/index.html)
 
+### Pre-generated synset definition embeddings for Annotation
+
+For automatic annotation to assign likely synsets given the automatically generated asset description, we need to
+install pre-generated embeddings for all synset definitions:
+
+```bash
+mkdir ~/.objathor_data
+curl https://prior-datasets.s3.us-east-2.amazonaws.com/vida-synset-embeddings/synset_definition_embeddings_single.pkl.gz -o ~/.objathor_data/synset_definition_embeddings_single.pkl.gz
+```
+
 ## Usage
 
 ### Annotation
