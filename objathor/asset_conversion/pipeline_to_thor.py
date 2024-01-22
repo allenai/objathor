@@ -594,6 +594,7 @@ def main(args):
     parser = argparse.ArgumentParser()
     print("--------- argv")
     print(args)
+    orig_args = args[:]
 
     parser.add_argument("--output_dir", type=str, default="./output", required=True)
     parser.add_argument(
@@ -732,7 +733,7 @@ def main(args):
             extra_args_keys.append(arg.split("=")[0].removeprefix("--"))
             parser.add_argument(arg.split("=")[0], type=str)
 
-    args = parser.parse_args(args)
+    args = parser.parse_args(orig_args)
     print(args)
     if args.verbose:
         # TODO use logger instead of print
@@ -744,7 +745,7 @@ def main(args):
     else:
         with open(args.annotations, "r") as f:
             annotations = json.load(f)
-        selected_uids = sorted(random.sample(annotations.keys(), args.number))
+        selected_uids = sorted(random.sample(list(annotations.keys()), args.number))
 
     uid_to_glb_path = objaverse.load_objects(
         uids=selected_uids, download_processes=multiprocessing.cpu_count()

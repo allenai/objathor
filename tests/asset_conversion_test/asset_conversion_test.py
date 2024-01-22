@@ -1,6 +1,4 @@
-from objathor.asset_conversion.pipeline_to_thor import (
-    optimize_assets_for_thor as pipeline_main,
-)
+from objathor.asset_conversion.pipeline_to_thor import main as pipeline_main
 import objathor.asset_conversion.util as util
 import os
 import shutil
@@ -10,6 +8,19 @@ import pytest
 
 
 def run_pipeline_main(object_id, out_path, extension, annotation=None):
+    annotation = annotation or {
+        object_id: {
+            "category": "flip-flop (sandal)",
+            "category_max_scale": 0.4,
+            "category_min_scale": 0.25,
+            "description": "A black sandal with grey stripes.",
+            "pose_z_rot_angle": 3.67,
+            "ref_category": "Boots",
+            "scale": 0.32,
+            "uid": object_id,
+            "z_axis_scale": False,
+        }
+    }
     annotation_filename = "annotation.json"
     os.makedirs(out_path, exist_ok=True)
     annotation_path = ""
@@ -22,6 +33,7 @@ def run_pipeline_main(object_id, out_path, extension, annotation=None):
     else:
         # TODO distinguish intel vs M2
         thor_platform = f"CloudRendering"
+
     return pipeline_main(
         [
             # f"/Users/alvaroh/ai2/objathor/objathor/asset_conversion/pipeline_to_thor.py",
