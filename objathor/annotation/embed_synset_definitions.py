@@ -234,8 +234,8 @@ def get_lemmas_definition_embeddings(
 
 if __name__ == "__main__":
     # data = get_embeddings()
-    # data = get_embeddings_single()
+    data = get_embeddings_single()
     # local_smoothing(data, "wardrobe.n.01")
 
-    data = get_lemmas_definition_embeddings()
+    # data = get_lemmas_definition_embeddings()
     print("DONE")
