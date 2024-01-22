@@ -29,8 +29,20 @@ def download_embeddings(
 ):
     os.makedirs(OBJATHOR_DATA_DIR, exist_ok=True)
     if not os.path.isfile(SYNSET_DEFINITION_EMB_FILE):
-        urllib.request.urlretrieve(url, SYNSET_DEFINITION_EMB_FILE)
-        assert os.path.isfile(SYNSET_DEFINITION_EMB_FILE)
+        print(f"Downloading\n{url}\nto\n{SYNSET_DEFINITION_EMB_FILE}")
+
+        def report_hook(block, block_size, total_size, freq=1e7):
+            if (block * block_size) % freq < block_size:
+                print(f"{block * block_size / total_size * 100:.2f}% downloaded"),
+
+        urllib.request.urlretrieve(
+            url,
+            SYNSET_DEFINITION_EMB_FILE,
+            reporthook=report_hook,
+        )
+
+        print("Finished downloading")
+    assert os.path.isfile(SYNSET_DEFINITION_EMB_FILE)
 
 
 def get_embeddings(
@@ -62,14 +74,15 @@ def get_embeddings_single(
     fname: str = SYNSET_DEFINITION_EMB_FILE,
 ) -> Dict[str, np.ndarray]:
     if not os.path.isfile(fname):
-        data = get_embeddings()
-        for key, value in data.items():
-            data[key] = value.astype(np.float32)
-        compress_pickle.dump(data, fname)
-    else:
-        data = compress_pickle.load(fname)
+        try:
+            download_embeddings()
+        except:
+            data = get_embeddings()
+            for key, value in data.items():
+                data[key] = value.astype(np.float32)
+            compress_pickle.dump(data, fname)
 
-    return data
+    return compress_pickle.load(fname)
 
 
 def local_smoothing(embs: Dict[str, np.ndarray], synset_str: str):

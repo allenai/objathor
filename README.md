@@ -30,8 +30,9 @@ views in S3 (see an example under [Annotation](#annotation) below), we also need
 
 ### Pre-generated synset definition embeddings for Annotation
 
-For automatic annotation to assign likely synsets given the automatically generated asset description, we need to
-install pre-generated embeddings for all synset definitions:
+For automatic annotation to assign likely synsets given the automatically generated asset description, we can
+pre-install pre-generated embeddings for all synset definitions (this can be useful if we cannot write into our home
+directory at run time):
 
 ```bash
 mkdir ~/.objathor_data
