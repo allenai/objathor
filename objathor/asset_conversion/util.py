@@ -1,17 +1,16 @@
 import json
-import os
-import shutil
 import logging
+import os
+import pathlib
+import shutil
 from collections import OrderedDict
+from io import BytesIO
 from sys import platform
 from typing import Tuple
-from io import BytesIO
-import pathlib
 
 import numpy as np
 
-# Blender error when referencing this from inside blender
-# from filelock import FileLock
+from objathor.asset_conversion.asset_conversion_constants import EMPTY_HOUSE_JSON_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +96,7 @@ def compress_image_to_ssim_threshold(
 
 class OrderedDictWithDefault(OrderedDict):
     def __init__(self, default_class):
+        super().__init__()
         self.default_class = default_class
 
     def __missing__(self, key):
@@ -126,12 +126,11 @@ def get_gz_save_path(out_dir, object_name):
 
 
 def get_extension_save_path(out_dir, asset_id, extension):
-    comp_extension = ".{extension}" if not extension.startswith(".") else extension
+    comp_extension = f".{extension}" if not extension.startswith(".") else extension
     return os.path.join(out_dir, f"{asset_id}{comp_extension}")
 
 
 def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
-    OrderedDict()
     possible_paths = OrderedDict(
         [
             (".json", get_json_save_path(out_dir, asset_id)),
@@ -141,7 +140,7 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
             (".gz", get_gz_save_path(out_dir, asset_id)),
         ]
     )
-    path = None
+
     if force_extension is not None:
         if force_extension in possible_paths.keys():
             path = possible_paths[force_extension]
@@ -155,7 +154,8 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
         for path in possible_paths.values():
             if os.path.exists(path):
                 return path
-    raise Exception(f"Could not find existing THOR object file for {asset_id}")
+
+    raise RuntimeError(f"Could not find existing THOR object file for {asset_id}")
 
 
 def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
@@ -220,7 +220,7 @@ def save_thor_asset_file(asset_json, save_path: str):
         packed = msgpack.packb(asset_json)
         with open(save_path, "wb") as outfile:
             outfile.write(packed)
-    elif extension == ".gz":
+    elif extension in ["json.gz", ".gz"]:
         import gzip
 
         with gzip.open(save_path, "wt") as outfile:
@@ -234,6 +234,7 @@ def save_thor_asset_file(asset_json, save_path: str):
     elif extension.endswith(".json"):
         with open(save_path, "w") as f:
             json.dump(asset_json, f, indent=2)
+
     else:
         raise NotImplementedError(
             f"Unsupported file extension for save path: {save_path}"
@@ -271,63 +272,39 @@ def create_runtime_asset_file(
     asset_directory,
     save_dir,
     asset_id,
-    asset_symlink=True,
     verbose=False,
     load_file_in_unity=False,
     use_extension=None,
 ):
-    build_target_dir = os.path.join(save_dir, asset_id)
-    asset = None
     from filelock import FileLock
 
-    # TODO figure out plender error
+    # Verifies the file exists
+    build_target_dir = os.path.join(save_dir, asset_id)
+    asset = None
+
+    # TODO figure out blender error
     with FileLock(get_runtime_asset_filelock(save_dir=save_dir, asset_id=asset_id)):
-        if asset_symlink:
-            exists = os.path.exists(build_target_dir)
-            is_link = os.path.islink(build_target_dir)
-            if exists and not is_link:
-                # If not a link, delete the full directory
-                if verbose:
-                    logger.info(f"Deleting old asset dir: {build_target_dir}")
-                shutil.rmtree(build_target_dir)
-            elif is_link:
-                # If not a link, delete it only if its not pointing to the right place
-                if os.path.realpath(build_target_dir) != os.path.realpath(
-                    asset_directory
-                ):
-                    os.remove(build_target_dir)
-
-            if (not os.path.exists(build_target_dir)) and (
-                not os.path.islink(build_target_dir)
-            ):
-                # Add symlink if it doesn't already exist
-                print(f"Symlink from {asset_directory} to {build_target_dir}")
-                os.symlink(asset_directory, build_target_dir)
-        else:
+        exists = os.path.exists(build_target_dir)
+        is_link = os.path.islink(build_target_dir)
+        if exists and not is_link:
+            # If not a link, delete the full directory
             if verbose:
-                logger.info("Starting copy and reference modification...")
+                logger.info(f"Deleting old asset dir: {build_target_dir}")
+            shutil.rmtree(build_target_dir)
+        elif is_link:
+            # If not a link, delete it only if its not pointing to the right place
+            if os.path.realpath(build_target_dir) != os.path.realpath(asset_directory):
+                os.remove(build_target_dir)
 
-            if os.path.exists(build_target_dir):
-                if verbose:
-                    logger.info(f"Deleting old asset dir: {build_target_dir}")
-                shutil.rmtree(build_target_dir)
-
-            # Here?
-            # save_thor_asset_file(
-            #     asset_json=asset_json_actions,
-            #     save_path=get_existing_thor_asset_file_path(
-            #         out_dir=build_target_dir, object_name=uid
-            #     ),
-            # )
-
-            shutil.copytree(
-                asset_directory,
-                build_target_dir,
-                ignore=shutil.ignore_patterns("images", "*.obj", "thor_metadata.json"),
+        if (not os.path.exists(build_target_dir)) and (
+            not os.path.islink(build_target_dir)
+        ):
+            # Add symlink if it doesn't already exist
+            print(f"Symlink from {asset_directory} to {build_target_dir}")
+            os.symlink(
+                os.path.abspath(asset_directory), os.path.abspath(build_target_dir)
             )
 
-            if verbose:
-                logger.info("Copy finished.")
         if not load_file_in_unity:
             return load_existing_thor_asset_file(
                 out_dir=build_target_dir, object_name=asset_id
@@ -386,7 +363,6 @@ def create_asset(
     asset_id,
     asset_directory,
     copy_to_dir=None,
-    asset_symlink=True,
     verbose=False,
     load_file_in_unity=False,
     extension=None,
@@ -418,7 +394,6 @@ def create_asset(
         asset_directory=asset_directory,
         save_dir=copy_to_dir,
         asset_id=asset_id,
-        asset_symlink=asset_symlink,
         verbose=verbose,
         load_file_in_unity=load_file_in_unity,
     )
@@ -470,7 +445,7 @@ def make_single_object_house(
     asset_id,
     instance_id="asset_0",
     skybox_color=(0, 0, 0),
-    house_path="objathor/asset_conversion/data/empty_house.json",
+    house_path=EMPTY_HOUSE_JSON_PATH,
 ):
     with open(house_path, "r") as f:
         house = json.load(f)
@@ -498,10 +473,10 @@ def view_asset_in_thor(
     asset_id,
     controller,
     output_dir,
-    rotations=[],
+    rotations=tuple(),
     instance_id="asset_0",
-    house_path="objathor/asset_conversion/data/empty_house.json",
-    skybox_color=(0, 0, 0),
+    house_path=EMPTY_HOUSE_JSON_PATH,
+    skybox_color=(255, 255, 255),
 ):
     from PIL import Image
 
@@ -513,20 +488,27 @@ def view_asset_in_thor(
     )
     evt = controller.step(action="CreateHouse", house=house)
 
+    # Computing the bbox distance below causes the object-oriented bounding box to be created
+    controller.step("BBoxDistance", objectId0=instance_id, objectId1=instance_id)
+    obj = controller.step("AdvancePhysicsStep").metadata["objects"][1]
+    obj_center_arr = np.array(obj["objectOrientedBoundingBox"]["cornerPoints"]).mean(0)
+
     if not evt.metadata["lastActionSuccess"]:
         print(f"Action success: {evt.metadata['lastActionSuccess']}")
         print(f'Error: {evt.metadata["errorMessage"]}')
         return evt
-    evt = controller.step(action="LookAtObjectCenter", objectId=instance_id)
 
-    im = Image.fromarray(evt.frame)
-    # os.makedirs(output_dir, exist_ok=True)
+    controller.step(action="LookAtObjectCenter", objectId=instance_id)
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    im.save(os.path.join(output_dir, "neutral.jpg"))
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Neural image if wanted, we don't really need this as the loop saves a neural position
+    # image anyway
+    # im = Image.fromarray(evt.frame)
+    # im.save(os.path.join(output_dir, "neutral.jpg"))
+
     for rotation in rotations:
-        evt = controller.step(
+        controller.step(
             action="RotateObject",
             angleAxisRotation={
                 "axis": {
@@ -537,24 +519,43 @@ def view_asset_in_thor(
                 "degrees": rotation[3],
             },
         )
-        im = Image.fromarray(evt.frame)
+        obj = controller.last_event.metadata["objects"][1]
+        delta = obj_center_arr - np.array(
+            obj["objectOrientedBoundingBox"]["cornerPoints"]
+        ).mean(0)
+
+        cur_pos = obj["position"]
+        target_pos = {
+            "x": cur_pos["x"] + delta[0],
+            "y": cur_pos["y"] + delta[1],
+            "z": cur_pos["z"] + delta[2],
+        }
+
+        controller.step(
+            action="TeleportObject",
+            objectId=instance_id,
+            position=target_pos,
+            rotation=obj["rotation"],
+            forceAction=True,
+            forceKinematic=True,
+        )
+        im = Image.fromarray(controller.last_event.frame)
         im.save(
             os.path.join(
                 output_dir,
                 f"{rotation[0]}_{rotation[1]}_{rotation[2]}_{rotation[3]}.jpg",
             )
         )
-    return evt
+    return controller.last_event
 
 
 def add_visualize_thor_actions(
     asset_id,
     asset_dir,
     instance_id="asset_0",
-    house_path="objathor/asset_conversion/data/empty_house.json",
-    house_skybox_color=(0, 0, 0),
+    house_path=EMPTY_HOUSE_JSON_PATH,
+    house_skybox_color=(255, 255, 255),
 ):
-    # asset_id = os.path.splitext(os.path.basename(output_json))[0]
     asset_json = os.path.join(asset_dir, f"{asset_id}.json")
     house = make_single_object_house(
         asset_id=asset_id,

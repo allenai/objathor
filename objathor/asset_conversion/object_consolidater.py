@@ -11,7 +11,7 @@ import sys
 from collections import defaultdict
 from typing import Dict, List, Optional
 
-# TODO importe shared libs, not sure how to find inside of blender
+# TODO import shared libs, not sure how to find inside of blender
 # from data_generation.asset_conversion.util import get_json_save_path
 
 try:
@@ -746,45 +746,55 @@ def get_picklegz_save_path(out_dir, object_name):
 
 # TODO cleanup, make args match APIs better
 def glb_to_thor(
-    object_path,
-    output_dir,
-    annotations_file,
-    save_obj,
+    object_path: str,
+    output_dir: str,
+    annotations_file: str,
+    save_obj: bool,
     engine="CYCLES",
     save_as_json=False,
     relative_texture_paths=True,
 ):
-    max_side_length_meters = 1
-    annotations = {}
-    if annotations_file is not None and annotations_file != "":
-        with open(annotations_file, "r") as f:
-            annotations = json.load(f)
-
     logging.basicConfig(level=logging.DEBUG, format=FORMAT)
+
+    object_name, ext = os.path.splitext(os.path.basename(object_path))
+
+    if annotations_file == "":
+        annotation_dict = {
+            "scale": 1,
+            "pose_z_rot_angle": 0,
+            "z_axis_scale": True,
+            "ref_category": "Objaverse",
+        }
+    elif os.path.isdir(annotations_file):
+        annotations_file = os.path.join(annotations_file, f"{object_name}.json.gz")
+        with gzip.open(annotations_file, "rt") as f:
+            annotation_dict = json.load(f)
+    elif annotations_file:
+        with (
+            gzip.open(annotations_file, "rt")
+            if annotations_file.endswith(".gz")
+            else open(annotations_file, "r")
+        ) as f:
+            annotation_dict = json.load(f)
+
+        if object_name in annotation_dict:
+            annotation_dict = annotation_dict[object_name]
 
     # DEPENDS ON WORLD-SCALE
     # object_size = 0.023 # needs to be hooked up to UID-key value input
     # object_size_is_height = True # binary for whether object_size represents height, or longest side
     # object_canonical_rotation = 3.14 # needs to be hooked up to UID-key value input
-    object_name, ext = os.path.splitext(os.path.basename(object_path))
 
-    annotation_dict = {
-        "scale": 1,
-        "pose_z_rot_angle": 0,
-        "z_axis_scale": True,
-        "ref_category": "Objaverse",
-    }
-    if object_name in annotations:
-        annotation_dict = annotations[object_name]
-        logger.debug(annotation_dict)
-
-        # Old annotations format
-        # annotation_dict = dict((key,d[key]) for d in obj_annotation for key in d)
-        max_side_length_meters = annotation_dict["scale"]
+    max_side_length_meters = annotation_dict["scale"]
 
     logger.debug(f"max_side_length_meters: {max_side_length_meters}")
 
-    receptacle = annotation_dict["ref_category"] in util.get_receptacle_object_types()
+    if "receptacle" in annotation_dict:
+        receptacle = annotation_dict["receptacle"]
+    else:
+        receptacle = (
+            annotation_dict["ref_category"] in util.get_receptacle_object_types()
+        )
 
     # Reset scene
     reset_scene()
@@ -1344,7 +1354,8 @@ if __name__ == "__main__":
         "--annotations",
         type=str,
         default="",
-        help="Annotations file for object metadata",
+        help="Path to annotations file for object metadata, if this path is a directory,"
+        " will assume annotations can be found at os.path.basename(object_path.replace('.glb', '.json.gz')).",
     )
 
     parser.add_argument(
