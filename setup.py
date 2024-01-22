@@ -16,6 +16,8 @@ if __name__ == "__main__":
             ]
 
     REQUIREMENTS = _read_reqs("requirements.txt")
+    REQUIREMENTS_BLENDER = _read_reqs("requirements-blender.txt")
+    REQUIREMENTS_ANNOTATION = _read_reqs("requirements-annotation.txt")
 
     setup(
         name="objathor",
@@ -33,7 +35,8 @@ if __name__ == "__main__":
         keywords=["3D assets", "annotation", ""],
         install_requires=REQUIREMENTS,
         extras_require={
-            "blender": ["bpy==3.6.0", "mathutils==3.3.0"],
+            "blender": REQUIREMENTS_BLENDER,
+            "annotation": REQUIREMENTS_ANNOTATION,
         },
         classifiers=[
             "Development Status :: 4 - Beta",

@@ -5,7 +5,16 @@ Objaverse asset annotator and importer for use in THOR.
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+pip install objathor[annotation,blender]
+```
+
+Here the following extras are installed: `annotation` to use openai to generate annotations and `blender` as a python module. Installing  the `blender` extra, requires a python `3.10` environment.
+
+
+From source:
+
+```bash
+pip install -e ".[annotation,blender]"
 ```
 
 We recommend setting an environment variable with your OpenAI key:
@@ -15,13 +24,15 @@ export OPENAI_API_KEY=[Your key]
 ```
 
 If we're planning to annotate objects for which we don't have pre-generated
-views in S3 (see an example under [Annotation](#annotation) below), we also need to install blender:
+views in S3 (see an example under [Annotation](#annotation) below), we also need to install blender either as an extra (as shown above) or as an application:
 
 [Blender install instructions](https://docs.blender.org/manual/en/latest/getting_started/installing/index.html)
 
 ## Usage
 
 ### Annotation
+
+You must install the `annotation` extra requirement through pip.
 
 To generate the initial annotation for a uid in Objaverse for which we have pre-rendered views in S3, like
 

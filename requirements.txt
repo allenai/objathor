@@ -1,22 +1,15 @@
 # common
-numpy>=1.23.5
-
-# annotation
-openai==1.3.8
-requests==2.31.0
-prior==1.0.3 # used?
-nltk @ git+https://github.com/nltk/nltk@582e6e35f0e6c984b44ec49dcb8846d9c011d0a8
+numpy==1.23.5
 tqdm==4.66.1
-scikit-learn==1.4.0
 
-# asset_conversion
+# asset conversion (core)
 compress_pickle==2.1.0
 filelock==3.13.1
 compress_json==1.0.10
-opencv-python==4.8.1.78 # used?
 scikit-image==0.21.0
 objaverse==0.1.7
 trimesh==4.0.1
 msgpack==1.0.7
 filelock==3.13.1
+# TODO will be removed once THOR depends on objathor
 ai2thor @ git+https://github.com/allenai/ai2thor@13ef2aba9d0228c30d775cbae0b674f0826a97f2
