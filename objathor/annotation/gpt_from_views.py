@@ -24,6 +24,7 @@ DEFAULT_QUESTION = """Please annotate this 3D asset, corresponding to an object 
     "materials": a Python list of the materials that the object appears to be made of, taking into account the visible exterior and also likely interior (roughly in order of most used material to least used; include "air" if the object interior doesn't seem completely solid),
     "composition": a Python list with the apparent volume mixture of the materials above (make the list sum to 1),
     "mass": approximate mass in kilogram considering typical densities for the materials. For a human being this could be "72",
+    "receptacle": a boolean indicating whether or not this object is a receptacle (e.g. a bowl, a cup, a vase, a box, a bag, etc). Return true or false with no explanations,
     "frontView": which of the views represents the front of the object (value should be the integer index associated with the chosen view). Note that the front view of an object, including furniture, tends to be the view that exhibits the highest degree of symmetry and detail, and it's usually the one you'd expect to observe when using the object,
     "onCeiling": whether this object can appear on the ceiling; return true or false with no explanations. This would be true for a ceiling fan but false for a chair,
     "onWall": whether this object can appear on the wall; return true or false with no explanations. This would be true for a painting but false for a table,
@@ -45,6 +46,9 @@ def get_thumbnail_urls(
     for view_num, image_idx in enumerate(view_indices):
         if local_renders:
             fname = os.path.join(base_url, uid, f"render_{image_idx}.png")
+            if not os.path.exists(fname):
+                fname = os.path.join(base_url, f"render_{image_idx}.png")
+
             if os.path.isfile(fname):
                 thumbnail_tuples.append((view_num, f"file://{fname}"))
             else:
@@ -68,6 +72,7 @@ def describe_asset_from_views(
 ) -> Tuple[str, List[str]]:
     if thumbnail_urls_cfg is None:
         thumbnail_urls_cfg = {}
+
     # Get the urls of the available views.
     thumbnail_tuples = get_thumbnail_urls(uid, **thumbnail_urls_cfg)
 
