@@ -220,7 +220,7 @@ def save_thor_asset_file(asset_json, save_path: str):
         packed = msgpack.packb(asset_json)
         with open(save_path, "wb") as outfile:
             outfile.write(packed)
-    elif extension == "json.gz":
+    elif extension in ["json.gz", ".gz"]:
         import gzip
 
         with gzip.open(save_path, "wt") as outfile:
