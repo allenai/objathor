@@ -1,2 +1,2 @@
-bpy==3.6.0
-mathutils==3.3.0
+bpy>=3.6.0,<4.0.0
+mathutils>=3.3.0
