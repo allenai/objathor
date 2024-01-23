@@ -72,16 +72,16 @@ def get_thumbnail_urls(
 
     for view_num, image_idx in enumerate(view_indices):
         if local_renders:
-            fname = os.path.join(base_url, uid, f"render_{image_idx}.png")
+            fname = os.path.join(base_url, uid, f"render_{image_idx}.jpg")
             if not os.path.exists(fname):
-                fname = os.path.join(base_url, f"render_{image_idx}.png")
+                fname = os.path.join(base_url, f"render_{image_idx}.jpg")
 
             if os.path.isfile(fname):
                 thumbnail_tuples.append((view_num, f"file://{fname}"))
             else:
                 raise ValueError(f"Missing {fname}")
         else:
-            url = f"{base_url}/{uid}/{str(image_idx).zfill(3)}.png"  # .zfill(3) ensures the number is three digits
+            url = f"{base_url}/{uid}/{str(image_idx).zfill(3)}.jpg"  # .zfill(3) ensures the number is three digits
             response = requests.head(url)  # HEAD request is faster than GET
             if response.status_code == 200:  # HTTP status code 200 means the URL exists
                 thumbnail_tuples.append((view_num, url))

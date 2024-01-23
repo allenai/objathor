@@ -89,7 +89,9 @@ def annotate_asset(
     finally:
         if delete_blender_render_dir:
             if os.path.exists(render_dir):
-                for p in glob.glob(os.path.join(render_dir, "*.png")):
+                for p in glob.glob(os.path.join(render_dir, "*.png")) + glob.glob(
+                    os.path.join(render_dir, "*.jpg")
+                ):
                     os.remove(p)
 
                 os.rmdir(render_dir)

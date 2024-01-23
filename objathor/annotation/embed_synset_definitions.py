@@ -257,7 +257,13 @@ if __name__ == "__main__":
     for key, value in data.items():
         data[key] = value.astype(np.float32)
 
-    compress_pickle.dump(data, os.path.join(OBJATHOR_DATA_DIR, "synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz"))
+    compress_pickle.dump(
+        data,
+        os.path.join(
+            OBJATHOR_DATA_DIR,
+            "synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz",
+        ),
+    )
 
     # data = get_embeddings()
     # data = get_embeddings_single()

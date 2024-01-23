@@ -67,7 +67,11 @@ def compress_image_to_ssim_threshold(
     from PIL import Image
 
     # Load the image inside the function
-    original_img = Image.open(input_path).convert("RGB")
+    original_img_rgba = Image.open(input_path)
+    original_img_rgba_on_white = Image.new("RGBA", original_img_rgba.size, "WHITE")
+    original_img_rgba_on_white.paste(original_img_rgba, (0, 0), original_img_rgba)
+    original_img = original_img_rgba_on_white.convert("RGB")
+
     original_img_np = np.array(original_img)
     assert original_img_np.shape[2] == 3
     left = min_quality  # Let's never go below this quality level
@@ -398,7 +402,6 @@ def create_asset(
         load_file_in_unity=load_file_in_unity,
     )
 
-    create_prefab_action = {}
     if not load_file_in_unity:
         asset = change_asset_paths(asset=asset, save_dir=copy_to_dir)
         asset = add_default_annotations(
