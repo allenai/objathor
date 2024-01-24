@@ -47,6 +47,25 @@ mkdir ~/.objathor_data
 curl https://prior-datasets.s3.us-east-2.amazonaws.com/vida-synset-embeddings/synset_definition_embeddings_single.pkl.gz -o ~/.objathor_data/synset_definition_embeddings_single.pkl.gz
 ```
 
+### NLTK dependencies
+
+During the first run, NLTK dependencies are automatically installed, but we can also install them ahead:
+
+```bash
+python -c "import nltk; nltk.download('punkt'); nltk.download('wordnet2022'); nltk.download('brown'); nltk.download('averaged_perceptron_tagger')"
+```
+
+
+### AI2-THOR binary pre-downloading
+
+Assuming we're running on a remote Linux server, we can pre-download the THOR binaries with:
+
+```bash
+python -c "from ai2thor.controller import Controller; from objathor.constants import THOR_COMMIT_ID; c=Controller(download_only=True, platform='CloudRendering', commit_id=THOR_COMMIT_ID)"
+```
+
+(`platform='OSXIntel64'` would be used for a MacOS environment).
+
 ## Usage
 
 ### Annotation

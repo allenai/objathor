@@ -129,6 +129,10 @@ def get_gz_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.gz")
 
 
+def get_json_gz_save_path(out_dir, object_name):
+    return os.path.join(out_dir, f"{object_name}.json.gz")
+
+
 def get_extension_save_path(out_dir, asset_id, extension):
     comp_extension = f".{extension}" if not extension.startswith(".") else extension
     return os.path.join(out_dir, f"{asset_id}{comp_extension}")
@@ -142,6 +146,7 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
             (".msgpack", get_msgpack_save_path(out_dir, asset_id)),
             (".pkl.gz", get_picklegz_save_path(out_dir, asset_id)),
             (".gz", get_gz_save_path(out_dir, asset_id)),
+            (".json.gz", get_json_gz_save_path(out_dir, asset_id)),
         ]
     )
 
@@ -180,7 +185,7 @@ def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
             unp = msgpack.unpackb(unp)
             return unp
             # return json.dumps(unp)
-    elif file_path.endswith(".gz"):
+    elif file_path.endswith(".json.gz") or file_path.endswith(".gz"):
         import gzip
 
         with gzip.open(file_path, "rb") as f:

@@ -83,7 +83,7 @@ def render_glb_from_angles(
                 compress_image_to_ssim_threshold(
                     input_path=brp,
                     output_path=brp[:-4] + ".jpg",
-                    threshold=0.95,
+                    threshold=0.99,
                 )
                 os.remove(brp)
             return glob.glob(os.path.join(os.path.abspath(save_dir), "*.jpg"))
