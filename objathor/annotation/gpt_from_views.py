@@ -8,6 +8,7 @@ import requests
 from objathor.utils.gpt_utils import get_answer
 from objathor.utils.queries import Text, Image, ComposedMessage
 
+# Attribution: code adapted from original by Yue Yang, developed during an internship at AI2
 
 DEFAULT_THUMBNAIL_SOURCE_URL = "https://objaverse-im.s3.us-west-2.amazonaws.com"
 DEFAULT_VIEW_INDICES = ("0", "3", "6", "9")
