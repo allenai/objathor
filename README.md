@@ -70,29 +70,15 @@ python -c "from ai2thor.controller import Controller; from objathor.constants im
 
 ### Annotation
 
-You must install the `annotation` extra requirement through pip.
-
-To generate the initial annotation for a uid in Objaverse for which we have pre-rendered views in S3, like
-
-[https://objaverse-im.s3.us-west-2.amazonaws.com/0070ac4bf50b496387365843d4bf5432/009.png](https://objaverse-im.s3.us-west-2.amazonaws.com/0070ac4bf50b496387365843d4bf5432/009.png),
-
-we can just:
+You must install the `annotation` extra requirement through pip, ad have blender installed,
+either standalone or as a module. The following command will generate annotation, via GPT-4,
+and also generate the conversion to a valid THOR asset.
 
 ```bash
 OUTPUT_DIR=/path/to/output
 python -m objathor.main \
 --uid 0070ac4bf50b496387365843d4bf5432 \
---output "$OUTPUT_DIR"/0070ac4bf50b496387365843d4bf5432.json.gz
-```
-
-If we don't have pre-rendered views, we can just add `--local_render`:
-
-```bash
-OUTPUT_DIR=/path/to/output
-python -m objathor.main \
---uid 0070ac4bf50b496387365843d4bf5432 \
---output "$OUTPUT_DIR"/0070ac4bf50b496387365843d4bf5432.json.gz \
---local_render
+--output "$OUTPUT_DIR"
 ```
 
 ### GLB to THOR asset conversion
