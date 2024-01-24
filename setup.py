@@ -2,6 +2,8 @@ from setuptools import setup, find_packages
 from pathlib import Path
 import os
 
+from objathor.asset_conversion.asset_conversion_constants import EMPTY_HOUSE_JSON_PATH
+
 if __name__ == "__main__":
     with Path(Path(__file__).parent, "README.md").open(encoding="utf-8") as file:
         long_description = file.read()
@@ -45,4 +47,7 @@ if __name__ == "__main__":
             "License :: OSI Approved :: MIT License",
             "Programming Language :: Python :: 3.8",
         ],
+        package_data={
+            "objathor": ["asset_conversion/data/*.json"],
+        },
     )
