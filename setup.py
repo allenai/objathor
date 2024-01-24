@@ -48,6 +48,6 @@ if __name__ == "__main__":
             "Programming Language :: Python :: 3.8",
         ],
         package_data={
-            "objathor": ["objathor/asset_conversion/data/*.json"],
+            "objathor": ["asset_conversion/data/*.json"],
         },
     )
