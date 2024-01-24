@@ -84,13 +84,14 @@ def annotate_asset(
         anno["scale"] = float(anno["height"]) / 100
         anno["z_axis_scale"] = True
 
-        anno["pre_rendered_views_urls"] = urls
         anno["uid"] = uid
         write(anno, save_path, **kwargs)
     finally:
         if delete_blender_render_dir:
             if os.path.exists(render_dir):
-                for p in glob.glob(os.path.join(render_dir, "*.png")):
+                for p in glob.glob(os.path.join(render_dir, "*.png")) + glob.glob(
+                    os.path.join(render_dir, "*.jpg")
+                ):
                     os.remove(p)
 
                 os.rmdir(render_dir)

@@ -36,33 +36,49 @@ views in S3 (see an example under [Annotation](#annotation) below), we also need
 
 [Blender install instructions](https://docs.blender.org/manual/en/latest/getting_started/installing/index.html)
 
+### Pre-generated synset definition embeddings for Annotation
+
+For automatic annotation to assign likely synsets given the automatically generated asset description, we can
+pre-install pre-generated embeddings for all synset definitions (this can be useful if we cannot write into our home
+directory at run time):
+
+```bash
+mkdir ~/.objathor_data
+curl https://prior-datasets.s3.us-east-2.amazonaws.com/vida-synset-embeddings/synset_definition_embeddings_single.pkl.gz -o ~/.objathor_data/synset_definition_embeddings_single.pkl.gz
+```
+
+### NLTK dependencies
+
+During the first run, NLTK dependencies are automatically installed, but we can also install them ahead:
+
+```bash
+python -c "import nltk; nltk.download('punkt'); nltk.download('wordnet2022'); nltk.download('brown'); nltk.download('averaged_perceptron_tagger')"
+```
+
+
+### AI2-THOR binary pre-downloading
+
+Assuming we're running on a remote Linux server, we can pre-download the THOR binaries with:
+
+```bash
+python -c "from ai2thor.controller import Controller; from objathor.constants import THOR_COMMIT_ID; c=Controller(download_only=True, platform='CloudRendering', commit_id=THOR_COMMIT_ID)"
+```
+
+(`platform='OSXIntel64'` would be used for a MacOS environment).
+
 ## Usage
 
 ### Annotation
 
-You must install the `annotation` extra requirement through pip.
-
-To generate the initial annotation for a uid in Objaverse for which we have pre-rendered views in S3, like
-
-[https://objaverse-im.s3.us-west-2.amazonaws.com/0070ac4bf50b496387365843d4bf5432/009.png](https://objaverse-im.s3.us-west-2.amazonaws.com/0070ac4bf50b496387365843d4bf5432/009.png),
-
-we can just:
+You must install the `annotation` extra requirement through pip, ad have blender installed,
+either standalone or as a module. The following command will generate annotation, via GPT-4,
+and also generate the conversion to a valid THOR asset.
 
 ```bash
 OUTPUT_DIR=/path/to/output
 python -m objathor.main \
 --uid 0070ac4bf50b496387365843d4bf5432 \
---output "$OUTPUT_DIR"/0070ac4bf50b496387365843d4bf5432.json.gz
-```
-
-If we don't have pre-rendered views, we can just add `--local_render`:
-
-```bash
-OUTPUT_DIR=/path/to/output
-python -m objathor.main \
---uid 0070ac4bf50b496387365843d4bf5432 \
---output "$OUTPUT_DIR"/0070ac4bf50b496387365843d4bf5432.json.gz \
---local_render
+--output "$OUTPUT_DIR"
 ```
 
 ### GLB to THOR asset conversion

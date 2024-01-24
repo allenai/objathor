@@ -3,7 +3,10 @@ import os
 import subprocess
 from typing import Sequence, List, Optional
 
-from objathor.asset_conversion.util import get_blender_installation_path
+from objathor.asset_conversion.util import (
+    get_blender_installation_path,
+    compress_image_to_ssim_threshold,
+)
 from objathor.constants import ABS_PATH_OF_OBJATHOR
 
 
@@ -12,6 +15,7 @@ def render_glb_from_angles(
     save_dir: str,
     angles: Sequence[float] = (0, 90, 180, 270),
     timeout: Optional[int] = 2 * 60,
+    save_as_jpg: bool = True,
 ) -> Optional[List[str]]:
     try:
         import bpy
@@ -71,6 +75,19 @@ def render_glb_from_angles(
 
     if success:
         print(f"---- Command ran successfully for {glb_path}")
-        return glob.glob(os.path.join(os.path.abspath(save_dir), "*.png"))
+        blender_render_paths = glob.glob(
+            os.path.join(os.path.abspath(save_dir), "*.png")
+        )
+        if save_as_jpg:
+            for brp in blender_render_paths:
+                compress_image_to_ssim_threshold(
+                    input_path=brp,
+                    output_path=brp[:-4] + ".jpg",
+                    threshold=0.99,
+                )
+                os.remove(brp)
+            return glob.glob(os.path.join(os.path.abspath(save_dir), "*.jpg"))
+        else:
+            return blender_render_paths
 
     return None

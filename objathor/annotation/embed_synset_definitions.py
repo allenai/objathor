@@ -1,12 +1,13 @@
-import random
-from typing import Dict
 import os
+import random
+import urllib.request
+from typing import Dict
 
 import compress_pickle
 import numpy as np
 from tqdm import tqdm
 
-from objathor.utils.gpt_utils import get_embedding
+from objathor.utils.gpt_utils import get_embedding, get_embeddings_from_texts
 from objathor.utils.synsets import (
     all_synsets,
     synset_definitions,
@@ -15,10 +16,39 @@ from objathor.utils.synsets import (
     synset_hypernyms,
 )
 
+OBJATHOR_DATA_DIR = os.path.join(os.path.expanduser("~"), ".objathor_data")
+
+SYNSET_DEFINITION_EMB_FILE = os.path.join(
+    OBJATHOR_DATA_DIR, "synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz"
+)
+
+
+def download_embeddings(
+    url: str = "https://prior-datasets.s3.us-east-2.amazonaws.com/vida-synset-embeddings/synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz",
+):
+    os.makedirs(OBJATHOR_DATA_DIR, exist_ok=True)
+    if not os.path.isfile(SYNSET_DEFINITION_EMB_FILE):
+        print(f"Downloading\n{url}\nto\n{SYNSET_DEFINITION_EMB_FILE}")
+
+        def report_hook(block, block_size, total_size, freq=1e7):
+            if (block * block_size) % freq < block_size:
+                print(f"{block * block_size / total_size * 100:.2f}% downloaded"),
+
+        urllib.request.urlretrieve(
+            url,
+            SYNSET_DEFINITION_EMB_FILE,
+            reporthook=report_hook,
+        )
+
+        print("Finished downloading")
+    assert os.path.isfile(SYNSET_DEFINITION_EMB_FILE)
+
 
 def get_embeddings(
-    fname: str = "data/synset_definition_embeddings.pkl.gz",
+    fname: str = os.path.join(OBJATHOR_DATA_DIR, "synset_definition_embeddings.pkl.gz"),
 ) -> Dict[str, np.ndarray]:
+    from nltk.corpus import wordnet2022 as wn
+
     if os.path.isfile(fname):
         data = compress_pickle.load(fname)
     else:
@@ -26,13 +56,32 @@ def get_embeddings(
 
     num_additions = 0
     try:
+        synsets = []
+        texts = []
         for synset_str in tqdm(all_synsets()):
+            if ".n." not in synset_str:
+                continue
+
             if synset_str in data:
                 continue
-            definition = synset_definitions([synset_str])[0]
-            embedding = get_embedding(definition)
+
+            synset = wn.synset(synset_str)
+            lemmas = synset.lemmas()
+            name = lemmas[0].name().replace("_", " ")
+            other_names = [lemma.name().replace("_", " ") for lemma in lemmas[1:]]
+
+            text = f"{name}: {synset.definition()}."
+            if len(other_names) > 0:
+                text += f" Also known as a {', '.join(other_names)}."
+
+            synsets.append(synset.name())
+            texts.append(text)
+
+        embeddings = get_embeddings_from_texts(texts)
+        for synset_str, embedding in zip(synsets, embeddings):
             data[synset_str] = np.array(embedding) / np.linalg.norm(embedding)
-            num_additions += 1
+
+        num_additions += len(texts)
     finally:
         if num_additions > 0:
             print("Saving definition embeddings...")
@@ -42,17 +91,18 @@ def get_embeddings(
 
 
 def get_embeddings_single(
-    fname: str = "data/synset_definition_embeddings_single.pkl.gz",
+    fname: str = SYNSET_DEFINITION_EMB_FILE,
 ) -> Dict[str, np.ndarray]:
     if not os.path.isfile(fname):
-        data = get_embeddings()
-        for key, value in data.items():
-            data[key] = value.astype(np.float32)
-        compress_pickle.dump(data, fname)
-    else:
-        data = compress_pickle.load(fname)
+        try:
+            download_embeddings()
+        except:
+            data = get_embeddings()
+            for key, value in data.items():
+                data[key] = value.astype(np.float32)
+            compress_pickle.dump(data, fname)
 
-    return data
+    return compress_pickle.load(fname)
 
 
 def local_smoothing(embs: Dict[str, np.ndarray], synset_str: str):
@@ -97,7 +147,10 @@ def local_smoothing(embs: Dict[str, np.ndarray], synset_str: str):
 
 
 def get_lemmas_definition_embeddings(
-    fname: str = "data/synset_lemmas_definitions_embeddings.pkl.gz", max_lemmas: int = 3
+    fname: str = os.path.join(
+        OBJATHOR_DATA_DIR, "synset_lemmas_definitions_embeddings.pkl.gz"
+    ),
+    max_lemmas: int = 3,
 ) -> Dict[str, np.ndarray]:
     if os.path.isfile(fname):
         data = compress_pickle.load(fname)
@@ -200,9 +253,21 @@ def get_lemmas_definition_embeddings(
 
 
 if __name__ == "__main__":
+    data = get_embeddings()
+    for key, value in data.items():
+        data[key] = value.astype(np.float32)
+
+    compress_pickle.dump(
+        data,
+        os.path.join(
+            OBJATHOR_DATA_DIR,
+            "synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz",
+        ),
+    )
+
     # data = get_embeddings()
     # data = get_embeddings_single()
     # local_smoothing(data, "wardrobe.n.01")
 
-    data = get_lemmas_definition_embeddings()
+    # data = get_lemmas_definition_embeddings()
     print("DONE")

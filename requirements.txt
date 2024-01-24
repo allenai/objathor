@@ -1,6 +1,7 @@
 # common
 numpy>=1.23.5
 tqdm>=4.66.1
+
 # asset conversion (core)
 compress_pickle>=2.1.0
 filelock>=3.13.1

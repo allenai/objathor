@@ -67,7 +67,11 @@ def compress_image_to_ssim_threshold(
     from PIL import Image
 
     # Load the image inside the function
-    original_img = Image.open(input_path).convert("RGB")
+    original_img_rgba = Image.open(input_path)
+    original_img_rgba_on_white = Image.new("RGBA", original_img_rgba.size, "WHITE")
+    original_img_rgba_on_white.paste(original_img_rgba, (0, 0), original_img_rgba)
+    original_img = original_img_rgba_on_white.convert("RGB")
+
     original_img_np = np.array(original_img)
     assert original_img_np.shape[2] == 3
     left = min_quality  # Let's never go below this quality level
@@ -125,6 +129,10 @@ def get_gz_save_path(out_dir, object_name):
     return os.path.join(out_dir, f"{object_name}.gz")
 
 
+def get_json_gz_save_path(out_dir, object_name):
+    return os.path.join(out_dir, f"{object_name}.json.gz")
+
+
 def get_extension_save_path(out_dir, asset_id, extension):
     comp_extension = f".{extension}" if not extension.startswith(".") else extension
     return os.path.join(out_dir, f"{asset_id}{comp_extension}")
@@ -138,6 +146,7 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
             (".msgpack", get_msgpack_save_path(out_dir, asset_id)),
             (".pkl.gz", get_picklegz_save_path(out_dir, asset_id)),
             (".gz", get_gz_save_path(out_dir, asset_id)),
+            (".json.gz", get_json_gz_save_path(out_dir, asset_id)),
         ]
     )
 
@@ -176,7 +185,7 @@ def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
             unp = msgpack.unpackb(unp)
             return unp
             # return json.dumps(unp)
-    elif file_path.endswith(".gz"):
+    elif file_path.endswith(".json.gz") or file_path.endswith(".gz"):
         import gzip
 
         with gzip.open(file_path, "rb") as f:
@@ -398,7 +407,6 @@ def create_asset(
         load_file_in_unity=load_file_in_unity,
     )
 
-    create_prefab_action = {}
     if not load_file_in_unity:
         asset = change_asset_paths(asset=asset, save_dir=copy_to_dir)
         asset = add_default_annotations(
