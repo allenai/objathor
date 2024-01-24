@@ -6,6 +6,9 @@ except:
     import nltk
 
     nltk.download("wordnet2022")
+    nltk.download("punkt")
+    nltk.download("brown")
+    nltk.download("averaged_perceptron_tagger")
 
     from nltk.corpus import wordnet2022 as wn
 

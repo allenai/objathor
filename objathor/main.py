@@ -19,10 +19,6 @@ from objathor.annotation.objaverse_annotations_utils import (
 from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
 from objathor.asset_conversion.util import get_blender_installation_path
 from objathor.utils.blender import render_glb_from_angles
-from objathor.annotation.synset_from_description import (
-    nearest_synsets_from_annotation,
-    OUTPUT_DIR as DESCRIPTION_EMBEDDING_OUTPUT_DIR,
-)
 
 
 def write(
@@ -85,20 +81,17 @@ def annotate_asset(
         )
         anno["pose_z_rot_angle"] = np.deg2rad(render_angles[anno["frontView"]])
 
-        anno["near_synsets"] = nearest_synsets_from_annotation(
-            anno, save_to_dir=DESCRIPTION_EMBEDDING_OUTPUT_DIR
-        )
-
         anno["scale"] = float(anno["height"]) / 100
         anno["z_axis_scale"] = True
 
-        anno["pre_rendered_views_urls"] = urls
         anno["uid"] = uid
         write(anno, save_path, **kwargs)
     finally:
         if delete_blender_render_dir:
             if os.path.exists(render_dir):
-                for p in glob.glob(os.path.join(render_dir, "*.png")):
+                for p in glob.glob(os.path.join(render_dir, "*.png")) + glob.glob(
+                    os.path.join(render_dir, "*.jpg")
+                ):
                     os.remove(p)
 
                 os.rmdir(render_dir)

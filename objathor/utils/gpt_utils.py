@@ -2,6 +2,7 @@ import time
 from typing import List, Any, Callable, Sequence
 
 import openai
+from tqdm import tqdm
 
 from objathor.utils.queries import Message, ComposedMessage
 
@@ -45,6 +46,43 @@ def access_gpt_with_retries(
     raise RuntimeError(f"Failed to get answer after max_attempts ({max_attempts})")
 
 
+def num_tokens_from_string(string: str, encoding_name: str = "cl100k_base") -> int:
+    """Returns the number of tokens in a text string."""
+    import tiktoken
+
+    encoding = tiktoken.get_encoding(encoding_name)
+    num_tokens = len(encoding.encode(string))
+    return num_tokens
+
+
+def get_embeddings_from_texts(
+    texts: Sequence[str],
+    model: str = DEFAULT_EMBED,
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    chunk_size: int = 1000,
+) -> List[List[float]]:
+    embs = []
+    for i in tqdm(list(range(0, len(texts), chunk_size))):
+        chunk = texts[i : i + chunk_size]
+
+        def embedding_create() -> List[List[float]]:
+            return [
+                d.embedding
+                for d in client()
+                .embeddings.create(
+                    input=[text.replace("\n", " ") for text in chunk],
+                    model=model,
+                )
+                .data
+            ]
+
+        embs.extend(
+            access_gpt_with_retries(func=embedding_create, max_attempts=max_attempts)
+        )
+
+    return embs
+
+
 def get_embedding(
     text: str, model: str = DEFAULT_EMBED, max_attempts: int = DEFAULT_MAX_ATTEMPTS
 ) -> List[float]:
@@ -67,6 +105,7 @@ def get_answer(
     dialog: Sequence[Message],
     model: str = DEFAULT_CHAT,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    verbose: bool = True,
     **chat_completion_cfg: Any,
 ) -> str:
     def message_to_content(msg):
@@ -84,7 +123,16 @@ def get_answer(
             temperature=0.0,
         )
         all_kwargs.update(chat_completion_cfg)
-        res = client().chat.completions.create(**all_kwargs).choices[0].message.content
+        completion = client().chat.completions.create(**all_kwargs)
+        res = completion.choices[0].message.content
+
+        if verbose:
+            pt = completion.usage.prompt_tokens
+            ct = completion.usage.completion_tokens
+            print(
+                f"Prompt tokens: {pt}. Completion tokens: {ct}. Cost: {(pt * 0.01 + ct * 0.03)/1000}."
+            )
+
         return res
 
     return access_gpt_with_retries(
