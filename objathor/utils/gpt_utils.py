@@ -6,7 +6,6 @@ from tqdm import tqdm
 
 from objathor.utils.queries import Message, ComposedMessage
 
-
 GPT_TIMEOUT_SECONDS = 10
 GPT_SLEEP_AFTER_ISSUE_SECONDS = 5
 DEFAULT_MAX_ATTEMPTS = 10
@@ -130,7 +129,7 @@ def get_answer(
             pt = completion.usage.prompt_tokens
             ct = completion.usage.completion_tokens
             print(
-                f"Prompt tokens: {pt}. Completion tokens: {ct}. Cost: ${(pt * 0.01 + ct * 0.03)/1000}."
+                f"Prompt tokens: {pt}. Completion tokens: {ct}. Approx cost: ${(pt * 0.01 + ct * 0.03)/1000:.2g}."
             )
 
         return res

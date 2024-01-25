@@ -4,22 +4,20 @@ import json
 import logging
 import multiprocessing
 import os
-import random
 import subprocess
 import sys
 import time
 import traceback
 from contextlib import contextmanager
-from typing import Any, List, Dict, Sequence, Optional
 from time import perf_counter
+from typing import Any, List, Dict, Sequence, Optional
 
+import ai2thor.controller
 import numpy as np
 import objaverse
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
-from objathor.constants import ABS_PATH_OF_OBJATHOR, THOR_COMMIT_ID
-
 # shared library
 from objathor.asset_conversion.util import (
     add_visualize_thor_actions,
@@ -34,7 +32,7 @@ from objathor.asset_conversion.util import (
     get_extension_save_path,
     add_default_annotations,
 )
-import ai2thor.controller
+from objathor.constants import ABS_PATH_OF_OBJATHOR, THOR_COMMIT_ID
 
 FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
@@ -588,7 +586,8 @@ def main(args):
         type=str,
         default=None,
         help="Comma separated list of object ids (e.g. from objaverse) to process, overrides number. If this is"
-        " unspecified, then we'll use the name of the glb file (see --glb_paths) as the uid (e.g. if the glb file is 'chair.glb' then the uid will be 'chair').",
+        " unspecified, then we'll use the name of the glb file (see --glb_paths) as the uid (e.g. if the glb file is"
+        " 'chair.glb' then the uid will be 'chair').",
     )
     parser.add_argument(
         "--glb_paths",

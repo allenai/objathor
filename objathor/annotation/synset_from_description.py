@@ -26,6 +26,19 @@ Below are a list of synsets from WordNet2022 along with their definitions, lemma
  no other text in your response.
 """
 
+PICK_SINGLE_SYNSET_USING_OBJECT_INFO_TEMPLATE = """\
+I have an object with description:
+
+"{description}"
+
+This object is approximately {scale:0.3g} meters tall.
+
+Below are a list of synsets from WordNet2022 along with their definitions, lemmas, hypernyms, and hyponyms.\
+ Pick exactly one synset that best describes the above object's type and respond with that synset's ID. Include\
+ no other text in your response.
+"""
+
+
 SYNSET_DESCRIPTION_TEMPLATE = """\
 SYNSET ID: {synset_id}
 DEFINITION: {definition}
@@ -34,7 +47,7 @@ HYPERNYMS: {hypernyms}
 HYPONYMS: {hyponyms}"""
 
 
-def synset_to_summary(synset: str) -> str:
+def synset_to_summary_str(synset: str) -> str:
     from nltk.corpus import wordnet2022 as wn
 
     s = wn.synset(synset)
@@ -52,7 +65,7 @@ def prompt_for_best_synset(synsets: Sequence[str]) -> str:
     return (
         PICK_SINGLE_SYNSET_TEMPLATE
         + "\n"
-        + "\n\n".join([synset_to_summary(s) for s in synsets])
+        + "\n\n".join([synset_to_summary_str(s) for s in synsets])
     )
 
 

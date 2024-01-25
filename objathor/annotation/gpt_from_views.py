@@ -1,3 +1,4 @@
+import copy
 import json
 import os.path
 from io import BytesIO
@@ -11,6 +12,8 @@ from objathor.annotation.synset_from_description import (
     prompt_for_best_synset,
     NUM_NEIGHS,
     synsets_from_text,
+    PICK_SINGLE_SYNSET_USING_OBJECT_INFO_TEMPLATE,
+    synset_to_summary_str,
 )
 from objathor.utils.gpt_utils import get_answer
 from objathor.utils.queries import Text, Image, ComposedMessage
@@ -20,31 +23,9 @@ from objathor.utils.queries import Text, Image, ComposedMessage
 DEFAULT_THUMBNAIL_SOURCE_URL = "https://objaverse-im.s3.us-west-2.amazonaws.com"
 DEFAULT_VIEW_INDICES = ("0", "3", "6", "9")
 
-DEFAULT_QUESTION = """Please annotate this 3D asset, corresponding to an object that can be found in a home, with the following values (output valid JSON, without additional comments):
-"annotations": {
-    "description": a description of the object (don't use the term "3D asset" or similar here),
-    "synset": the synset of the object that is most closely related. Try to be as specific as possible. This could be "cat.n.01", "glass.n.03", "bank.n.02", "straight_chair.n.01", etc,
-    "category": a category such as "chair", "table", "building", "person", "airplane", "car", "seashell", "fish", etc. Try to be more specific than "furniture", but possibly more generic than with the synset,
-    "width": approximate width in cm. For a human being this could be "45",
-    "depth": approximate depth in cm. For a human being this could be "25",
-    "height": approximate height in cm. For a human being this could be "175",
-    "volume": approximate volume in l. For a human being this could be "62",
-    "materials": a Python list of the materials that the object appears to be made of, taking into account the visible exterior and also likely interior (roughly in order of most used material to least used; include "air" if the object interior doesn't seem completely solid),
-    "composition": a Python list with the apparent volume mixture of the materials above (make the list sum to 1),
-    "mass": approximate mass in kilogram considering typical densities for the materials. For a human being this could be "72",
-    "receptacle": a boolean indicating whether or not this object is a receptacle (e.g. a bowl, a cup, a vase, a box, a bag, etc). Return true or false with no explanations,
-    "frontView": which of the views represents the front of the object (value should be the integer index associated with the chosen view). Note that the front view of an object, including furniture, tends to be the view that exhibits the highest degree of symmetry and detail, and it's usually the one you'd expect to observe when using the object,
-    "onCeiling": whether this object can appear on the ceiling; return true or false with no explanations. This would be true for a ceiling fan but false for a chair,
-    "onWall": whether this object can appear on the wall; return true or false with no explanations. This would be true for a painting but false for a table,
-    "onFloor": whether this object can appear on the floor; return true or false with no explanations. This would be true for a piano but false for a curtain,
-    "onObject": whether this object can appear on another object; return true or false with no explanations. This would be true for a table lamp but not for a sofa,
-}
-Please output your answer in the above JSON format.
-"""
-
 DEFAULT_QUESTION_NO_SYNSET = """Please annotate this 3D asset, corresponding to an object that can be found in a home, with the following values (output valid JSON, without additional comments):
 "annotations": {
-    "description": a description of the object (don't use the term "3D asset" or similar here),
+    "description": a 1-2 sentence rich visual description of the object (don't use the term "3D asset" or similar here and don't comment on the object's orientation),
     "category": a category such as "chair", "table", "building", "person", "airplane", "car", "seashell", "fish", "toy", etc. Be concise but specific, e.g. do not say "furniture" when "eames chair" would be more specific,
     "width": approximate width in cm. For a human being this could be "45",
     "depth": approximate depth in cm. For a human being this could be "25",
@@ -62,6 +43,20 @@ DEFAULT_QUESTION_NO_SYNSET = """Please annotate this 3D asset, corresponding to 
 }
 Please output your answer in the above JSON format.
 """
+
+_lines = DEFAULT_QUESTION_NO_SYNSET.split("\n")
+DEFAULT_QUESTION = "\n".join(
+    _lines[:3]
+    + [
+        """    "synset": the synset of the object that is most closely related. Try to be as specific as possible. This could be "cat.n.01", "glass.n.03", "bank.n.02", "straight_chair.n.01", etc,"""
+    ]
+    + _lines[3:]
+)
+
+DEFAULT_OPENAI_VISION_PROMPT_2023_03_05 = (
+    "You are ChatGPT, a large language model trained by OpenAI capable of looking at images."
+    "\nCurrent date: 2023-03-05\nKnowledge cutoff: 2022-02\nImage Capabilities: Enabled"
+)
 
 
 def get_thumbnail_urls(
@@ -114,8 +109,7 @@ def describe_asset_from_views(
     # Construct the initial prompt message. For the system description, we're using the
     # default content used in the OpenAI API document.
     prompt = Text(
-        "You are ChatGPT, a large language model trained by OpenAI capable of looking at images."
-        "\nCurrent date: 2023-03-05\nKnowledge cutoff: 2022-02\nImage Capabilities: Enabled",
+        DEFAULT_OPENAI_VISION_PROMPT_2023_03_05,
         role="system",
     )
 
@@ -184,6 +178,91 @@ def clean_up_json(json_string):
         return None
 
 
+def get_best_synset_initial_annotation_message_context(
+    annotation: Dict[str, Any],
+    json_str_of_annotations: str,
+    dialogue_dict: GPTDialogue,
+):
+    near_synsets, distances = nearest_synsets_from_annotation(
+        annotation,
+        save_to_dir=DESCRIPTION_EMBEDDING_OUTPUT_DIR,
+        n_neighbors=NUM_NEIGHS,
+    )
+    annotation["near_synsets"] = {s: d for s, d in zip(near_synsets, distances)}
+
+    for s in synsets_from_text(annotation["category"]):
+        if s not in near_synsets:
+            near_synsets.append(s)
+
+    dialogue_dict = copy.deepcopy(dialogue_dict)
+
+    dialogue_dict["dialog"][0].content.append(
+        Text(content=json_str_of_annotations, role="assistant")
+    )
+    dialogue_dict["dialog"][0].content.append(
+        Text(content=prompt_for_best_synset(near_synsets), role="user")
+    )
+
+    answer = get_answer(**dialogue_dict).strip().lower()
+
+    if answer.startswith("synset id: "):
+        answer = answer.replace("synset id: ", "").strip()
+
+    assert answer in near_synsets, f"Got answer {answer} not in {near_synsets}"
+
+    return answer
+
+
+def get_best_synset_using_annotations(
+    annotation: Dict[str, Any],
+    **chat_kwargs,
+) -> str:
+    near_synsets, distances = nearest_synsets_from_annotation(
+        annotation,
+        save_to_dir=DESCRIPTION_EMBEDDING_OUTPUT_DIR,
+        n_neighbors=NUM_NEIGHS,
+    )
+    annotation["near_synsets"] = {s: d for s, d in zip(near_synsets, distances)}
+
+    for s in synsets_from_text(annotation["category"]):
+        if s not in near_synsets:
+            near_synsets.append(s)
+
+    # Construct the initial prompt message. For the system description, we're using the
+    # default content used in the OpenAI API document.
+    prompt = Text(
+        "You are ChatGPT, a large language model trained by OpenAI, based on the GPT-4 architecture.",
+        role="system",
+    )
+
+    user_messages = [
+        Text(
+            PICK_SINGLE_SYNSET_USING_OBJECT_INFO_TEMPLATE.format(
+                description=annotation["description"],
+                scale=annotation["height"] * 0.01,
+            )
+            + "\n"
+            + "\n\n".join([synset_to_summary_str(s) for s in near_synsets]),
+            role="user",
+        )
+    ]
+
+    dialogue_dict = chat_kwargs
+
+    dialogue_dict["prompt"] = [prompt]
+    dialogue_dict["dialog"] = [ComposedMessage(user_messages)]
+    dialogue_dict["model"] = "gpt-4-1106-preview"
+
+    answer = get_answer(**dialogue_dict).strip().lower()
+
+    if answer.startswith("synset id: "):
+        answer = answer.replace("synset id: ", "").strip()
+
+    assert answer in near_synsets, f"Got answer {answer} not in {near_synsets}"
+
+    return answer
+
+
 def get_initial_annotation(
     uid: str, get_best_synset: bool = True, **describe_kwargs: Any
 ) -> Optional[Tuple[Dict[str, Any], List[str]]]:
@@ -206,32 +285,11 @@ def get_initial_annotation(
 
     annotation = annotation["annotations"]
     annotation["uid"] = uid
+
     if get_best_synset:
-        near_synsets, distances = nearest_synsets_from_annotation(
+        annotation["synset"] = get_best_synset_using_annotations(
             annotation,
-            save_to_dir=DESCRIPTION_EMBEDDING_OUTPUT_DIR,
-            n_neighbors=NUM_NEIGHS,
+            **dialogue_dict,
         )
-        annotation["near_synsets"] = {s: d for s, d in zip(near_synsets, distances)}
-
-        for s in synsets_from_text(annotation["category"]):
-            if s not in near_synsets:
-                near_synsets.append(s)
-
-        dialogue_dict["dialog"][0].content.append(
-            Text(content=json_str, role="assistant")
-        )
-        dialogue_dict["dialog"][0].content.append(
-            Text(content=prompt_for_best_synset(near_synsets), role="user")
-        )
-
-        answer = get_answer(**dialogue_dict).strip().lower()
-
-        if answer.startswith("synset id: "):
-            answer = answer.replace("synset id: ", "").strip()
-
-        assert answer in near_synsets, f"Got answer {answer} not in {near_synsets}"
-
-        annotation["synset"] = answer
 
     return annotation, urls
