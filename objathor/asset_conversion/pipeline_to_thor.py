@@ -1,4 +1,5 @@
 import argparse
+import glob
 import json
 import logging
 import multiprocessing
@@ -458,7 +459,7 @@ def optimize_assets_for_thor(
                     del failed_objects[uid]
 
             if success and not skip_colliders:
-                with Timer(f"[{log_prefix}OBJ to collider ({uid})"):
+                with Timer(f"{log_prefix}OBJ to collider ({uid})"):
                     success = obj_to_colliders(
                         uid=uid,
                         object_out_dir=asset_out_dir,
@@ -473,25 +474,41 @@ def optimize_assets_for_thor(
                     )
 
             if success:
-                print(f"Saving {asset_out_dir} {uid} with extension {extension}")
-                # Save to desired format, compression step
-                save_thor_asset_file(
-                    asset_json=add_default_annotations(
-                        load_existing_thor_asset_file(
-                            out_dir=asset_out_dir, object_name=uid
-                        ),
-                        asset_directory=asset_out_dir,
-                    ),
-                    save_path=get_extension_save_path(
+                with Timer(
+                    f"{log_prefix}Saving {asset_out_dir} {uid} with extension {extension}"
+                ):
+                    # Save to desired format, compression step
+                    save_path = get_extension_save_path(
                         out_dir=asset_out_dir, asset_id=uid, extension=extension
-                    ),
-                )
-                if extension != ".json" and not keep_json_asset:
-                    print("Removing .json asset")
-                    json_asset_path = get_existing_thor_asset_file_path(
-                        out_dir=asset_out_dir, asset_id=uid, force_extension=".json"
                     )
-                    os.remove(json_asset_path)
+                    save_thor_asset_file(
+                        asset_json=add_default_annotations(
+                            load_existing_thor_asset_file(
+                                out_dir=asset_out_dir, object_name=uid
+                            ),
+                            asset_directory=asset_out_dir,
+                        ),
+                        save_path=save_path,
+                    )
+                    if extension != ".json" and not keep_json_asset:
+                        print(f"{log_prefix}Removing .json asset")
+                        json_asset_path = get_existing_thor_asset_file_path(
+                            out_dir=asset_out_dir, asset_id=uid, force_extension=".json"
+                        )
+                        os.remove(json_asset_path)
+
+                    # Get size of GLB asset in MB
+                    glb_size = os.path.getsize(glb_path) / (1024 * 1024)
+                    # Get size of optimized asset in MB
+                    asset_size = os.path.getsize(save_path) / (1024 * 1024)
+                    for p in glob.glob(os.path.join(asset_out_dir, "*.jpg")):
+                        asset_size += os.path.getsize(p) / (1024 * 1024)
+
+                    print(
+                        f"{log_prefix} Original asset size {glb_size:.2f} MB,"
+                        f" new asset size {asset_size:.2f}MB ({100 * (1 - asset_size / glb_size):0.2f}% reduction)",
+                        flush=True,
+                    )
 
             if success and not skip_thor_creation:
                 import ai2thor.controller
@@ -569,16 +586,21 @@ def main(args):
     parser.add_argument(
         "--uids",
         type=str,
-        default="",
-        help="Comma separated list of objaverse object ids to process, overrides number.",
+        default=None,
+        help="Comma separated list of object ids (e.g. from objaverse) to process, overrides number. If this is"
+        " unspecified, then we'll use the name of the glb file (see --glb_paths) as the uid (e.g. if the glb file is 'chair.glb' then the uid will be 'chair').",
+    )
+    parser.add_argument(
+        "--glb_paths",
+        type=str,
+        default=None,
+        help="Comma separated list of paths to .glb files (there should be one path per uid), if the uids passed"
+        " are objaverse uids then this can be left unspecfied and we'll download the objaverse object.",
     )
     parser.add_argument(
         "--annotations",
         type=str,
         default="",
-    )
-    parser.add_argument(
-        "--number", type=int, default=1, help="Number of random objects to take."
     )
     parser.add_argument(
         "--live",
@@ -709,16 +731,29 @@ def main(args):
         logger.setLevel(logging.DEBUG)
 
     uids = args.uids
-    if uids != "":
-        selected_uids = uids.split(",")
-    else:
-        with open(args.annotations, "r") as f:
-            annotations = json.load(f)
-        selected_uids = sorted(random.sample(list(annotations.keys()), args.number))
+    if uids is not None:
+        uids = args.uids.split(",")
 
-    uid_to_glb_path = objaverse.load_objects(
-        uids=selected_uids, download_processes=multiprocessing.cpu_count()
-    )
+    glb_paths = args.glb_paths
+    if glb_paths is not None:
+        glb_paths = args.glb_paths.split(",")
+
+    if uids is not None and glb_paths is not None:
+        assert len(uids) == len(
+            glb_paths
+        ), "If uids and glb_paths are specified, then they must be the same length."
+        uid_to_glb_path = {uid: glb_path for uid, glb_path in zip(uids, glb_paths)}
+    elif uids is not None:
+        uid_to_glb_path = objaverse.load_objects(
+            uids=uids, download_processes=multiprocessing.cpu_count()
+        )
+    elif glb_paths is not None:
+        uid_to_glb_path = {
+            os.path.splitext(os.path.basename(glb_path))[0]: glb_path
+            for glb_path in glb_paths
+        }
+    else:
+        raise ValueError("Must specify either `uids` or `glb_paths`.")
 
     optimize_assets_for_thor(
         output_dir=args.output_dir,

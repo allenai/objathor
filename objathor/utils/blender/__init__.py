@@ -16,6 +16,7 @@ def render_glb_from_angles(
     angles: Sequence[float] = (0, 90, 180, 270),
     timeout: Optional[int] = 2 * 60,
     save_as_jpg: bool = True,
+    verbose: bool = False,
 ) -> Optional[List[str]]:
     try:
         import bpy
@@ -23,6 +24,7 @@ def render_glb_from_angles(
         run_blender_as_module = True
     except ImportError:
         run_blender_as_module = False
+
     if not run_blender_as_module:
         command = (
             f"{get_blender_installation_path()}"
@@ -67,7 +69,8 @@ def render_glb_from_angles(
         print(f"Blender call error: {e.output}")
         out = e.output
 
-    print(out)
+    if verbose:
+        print(out)
 
     print(f"Exited with code {result_code}")
 

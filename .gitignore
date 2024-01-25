@@ -163,3 +163,5 @@ cython_debug/
 TestVHACD
 objathor/asset_conversion/*/LICENSE.txt
 output
+tmp
+*/log.txt

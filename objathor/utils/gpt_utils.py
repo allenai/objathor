@@ -130,7 +130,7 @@ def get_answer(
             pt = completion.usage.prompt_tokens
             ct = completion.usage.completion_tokens
             print(
-                f"Prompt tokens: {pt}. Completion tokens: {ct}. Cost: {(pt * 0.01 + ct * 0.03)/1000}."
+                f"Prompt tokens: {pt}. Completion tokens: {ct}. Cost: ${(pt * 0.01 + ct * 0.03)/1000}."
             )
 
         return res
