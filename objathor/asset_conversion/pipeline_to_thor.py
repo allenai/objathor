@@ -18,6 +18,7 @@ import objaverse
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
+
 # shared library
 from objathor.asset_conversion.util import (
     add_visualize_thor_actions,
