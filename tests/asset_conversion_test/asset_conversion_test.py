@@ -37,7 +37,7 @@ def run_pipeline_main(object_id, out_path, extension, annotation=None):
     return pipeline_main(
         [
             # f"/Users/alvaroh/ai2/objathor/objathor/asset_conversion/pipeline_to_thor.py",
-            f"--object_ids={object_id}",
+            f"--uids={object_id}",
             f"--output_dir={out_path}",
             "--live",
             f"--extension={extension}",
