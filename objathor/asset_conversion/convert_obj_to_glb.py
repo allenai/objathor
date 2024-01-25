@@ -1,14 +1,17 @@
 import argparse
+import os
 
 
 def convert_obj_to_glb(obj_path: str, glb_path: str):
     import bpy
 
-    # Clear existing data
-    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.object.delete(use_global=False)
 
-    # Import the OBJ file
-    bpy.ops.import_scene.obj(filepath=obj_path)
+    bpy.ops.wm.obj_import(
+        filepath=obj_path,
+        directory=os.path.dirname(obj_path),
+        files=[{"name": os.path.basename(obj_path)}],
+    )
 
     # Export to GLB
     bpy.ops.export_scene.gltf(filepath=glb_path)
