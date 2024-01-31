@@ -50,11 +50,11 @@ import trimesh
 import numpy as np
 
 import object_consolidater
-import util
+import objathor.asset_conversion.util as objathor_util
 import imp
 
 imp.reload(object_consolidater)
-imp.reload(util)
+imp.reload(objathor_util)
 
 
 def get_colliders(collider):
@@ -122,7 +122,7 @@ if __name__ == "__main__":
         output_dir, num_colliders=15, **extra_args
     )
 
-    util.add_visualize_thor_actions(
+    objathor_util.add_visualize_thor_actions(
         asset_id=obj_name,
         instance_id=obj_name,
         asset_dir=output_dir,
