@@ -18,7 +18,7 @@ import trimesh
 import numpy as np
 
 import object_consolidater
-import util
+import objathor.asset_conversion.util as objathor_util
 
 logger = logging.getLogger()
 
@@ -124,7 +124,7 @@ if __name__ == "__main__":
         extra_args = dict(resolution=1000000)
         coll.generate_colliders(output_dir, num_colliders=15, **extra_args)
 
-        # util.add_visualize_thor_actions(
+        # objathor_util.add_visualize_thor_actions(
         #     asset_id=obj_name,
         #     asset_dir=output_dir,
         #     instance_id=instance_id,

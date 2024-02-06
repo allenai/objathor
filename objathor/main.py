@@ -18,6 +18,8 @@ from objathor.annotation.objaverse_annotations_utils import (
 )
 from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
 from objathor.asset_conversion.util import get_blender_installation_path
+
+# TODO How to import??
 from objathor.utils.blender import render_glb_from_angles
 
 

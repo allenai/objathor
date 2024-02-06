@@ -30,9 +30,9 @@ if not dir_path in sys.path:
     sys.path.append(dir_path)
 
 import importlib
-import util
+import objathor.asset_conversion.util as objathor_util
 
-importlib.reload(util)
+importlib.reload(objathor_util)
 
 FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
