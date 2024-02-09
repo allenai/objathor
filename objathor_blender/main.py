@@ -26,7 +26,6 @@ def annotate_asset(
     uid: str,
     glb_path: str,
     output_dir: str,
-    render_dir: str,
     render_angles=(0, 90, 180, 270),
     delete_blender_render_dir=False,
     allow_overwrite=False,
