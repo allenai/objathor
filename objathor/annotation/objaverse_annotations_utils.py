@@ -7,7 +7,7 @@ import prior
 def get_objaverse_home_annotations():
     return prior.load_dataset(
         "objaverse-plus",
-        revision="ace12898b451c887bb1dd69ede85d32a75a86ef7"  # Human only
+        revision="ace12898b451c887bb1dd69ede85d32a75a86ef7",  # Human only
         # revision="877a5d636a6c437b894d1f8510bc852e49bb1cc0" # Human + AI
     )["train"].data
 
