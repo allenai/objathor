@@ -3,10 +3,8 @@ import glob
 import os
 import sys
 from importlib import import_module
-from typing import Union, Callable, Any, Dict, Optional, cast
+from typing import Any, Dict, Optional, cast
 
-import compress_json
-import compress_pickle
 import numpy as np
 import objaverse
 from ai2thor.controller import Controller
@@ -16,44 +14,19 @@ from objathor.annotation.objaverse_annotations_utils import (
     get_objaverse_home_annotations,
     get_objaverse_ref_categories,
 )
-from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
+
 from objathor.asset_conversion.util import get_blender_installation_path
+from objathor.annotation.write import write_annotation
 
-# TODO How to import??
-from objathor.utils.blender import render_glb_from_angles
-
-
-def write(
-    anno: Dict[str, Any],
-    output_file: Union[str, Callable[[Dict[str, Any]], Optional[Any]]],
-    **kwargs: Any,
-) -> None:
-    if isinstance(output_file, str):
-        if output_file.endswith(".json.gz"):
-            compress_json.dump(anno, output_file, json_kwargs=dict(indent=2))
-        elif output_file.endswith(".pickle.gz") or output_file.endswith(".pkl.gz"):
-            compress_pickle.dump(anno, output_file)
-        else:
-            try:
-                module_name, function_name = output_file.rsplit(".", 1)
-                getattr(import_module(module_name), function_name)(anno, **kwargs)
-            except Exception as e:
-                print("Error", e)
-                raise NotImplementedError(
-                    "Only .pkl.gz and .json.gz supported, besides appropriate library function identifiers"
-                )
-    elif isinstance(output_file, Callable):
-        output_file(anno)
-    else:
-        raise NotImplementedError(
-            f"Unsupported output_file arg of type {type(output_file).__name__}"
-        )
+from objathor_blender.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
+from objathor_blender.annotation.render_glb_from_angles import render_glb_from_angles
 
 
 def annotate_asset(
     uid: str,
     glb_path: str,
     output_dir: str,
+    render_dir: str,
     render_angles=(0, 90, 180, 270),
     delete_blender_render_dir=False,
     allow_overwrite=False,
@@ -87,7 +60,7 @@ def annotate_asset(
         anno["z_axis_scale"] = True
 
         anno["uid"] = uid
-        write(anno, save_path, **kwargs)
+        write_annotation(anno, save_path, **kwargs)
     finally:
         if delete_blender_render_dir:
             if os.path.exists(render_dir):
@@ -305,7 +278,7 @@ def annotate_and_optimize_asset(
             anno = get_objaverse_home_annotations()[uid]
             if "ref_category" not in anno:
                 anno["ref_category"] = get_objaverse_ref_categories()[uid]
-            write(anno, annotations_path)
+            write_annotation(anno, annotations_path)
 
             render_with_blender()
         else:

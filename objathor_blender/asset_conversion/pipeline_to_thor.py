@@ -494,7 +494,9 @@ def optimize_assets_for_thor(
                         print(f"{log_prefix}Removing .json asset")
                         try:
                             json_asset_path = get_existing_thor_asset_file_path(
-                                out_dir=asset_out_dir, asset_id=uid, force_extension=".json"
+                                out_dir=asset_out_dir,
+                                asset_id=uid,
+                                force_extension=".json",
                             )
                             os.remove(json_asset_path)
                         except RuntimeError:

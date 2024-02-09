@@ -164,7 +164,9 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
             if os.path.exists(path):
                 return path
 
-    raise RuntimeError(f"Could not find existing THOR object file for {asset_id}. Paths searched: {  possible_paths[force_extension] if force_extension else ', '.join(possible_paths.values())}")
+    raise RuntimeError(
+        f"Could not find existing THOR object file for {asset_id}. Paths searched: {  possible_paths[force_extension] if force_extension else ', '.join(possible_paths.values())}"
+    )
 
 
 def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
