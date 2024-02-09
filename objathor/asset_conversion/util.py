@@ -356,9 +356,9 @@ def add_default_annotations(asset, asset_directory, verbose=False):
         asset["annotations"] = {
             "objectType": "Undefined",
             "primaryProperty": "CanPickup",
-            "secondaryProperties": []
-            if asset.get("receptacleCandidate", False)
-            else ["Receptacle"],
+            "secondaryProperties": (
+                [] if asset.get("receptacleCandidate", False) else ["Receptacle"]
+            ),
         }
     else:
         asset["annotations"] = {
