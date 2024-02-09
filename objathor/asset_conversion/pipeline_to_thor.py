@@ -11,6 +11,7 @@ import traceback
 from contextlib import contextmanager
 from time import perf_counter
 from typing import Any, List, Dict, Sequence, Optional
+from tqdm import tqdm
 
 import ai2thor.controller
 import numpy as np
@@ -379,7 +380,7 @@ def optimize_assets_for_thor(
     blender_installation_path: Optional[str] = None,
     controller: ai2thor.controller.Controller = None,
     live: bool = False,
-    save_as_pkl: bool = True,
+    save_as_pkl: bool = False,
     absolute_texture_paths: bool = False,
     delete_objs: bool = False,
     keep_json_asset: bool = False,
@@ -406,7 +407,7 @@ def optimize_assets_for_thor(
 
     given_controller = controller is not None
     try:
-        for uid, glb_path in uid_to_glb_path.items():
+        for uid, glb_path in tqdm(uid_to_glb_path.items()):
             start_obj_time = time.perf_counter()
             asset_out_dir = os.path.join(output_dir, uid)
             metadata_output_file = os.path.join(asset_out_dir, "thor_metadata.json")
@@ -491,10 +492,13 @@ def optimize_assets_for_thor(
                     )
                     if extension != ".json" and not keep_json_asset:
                         print(f"{log_prefix}Removing .json asset")
-                        json_asset_path = get_existing_thor_asset_file_path(
-                            out_dir=asset_out_dir, asset_id=uid, force_extension=".json"
-                        )
-                        os.remove(json_asset_path)
+                        try:
+                            json_asset_path = get_existing_thor_asset_file_path(
+                                out_dir=asset_out_dir, asset_id=uid, force_extension=".json"
+                            )
+                            os.remove(json_asset_path)
+                        except RuntimeError:
+                            pass
 
                     # Get size of GLB asset in MB
                     glb_size = os.path.getsize(glb_path) / (1024 * 1024)
