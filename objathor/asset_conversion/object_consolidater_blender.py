@@ -71,7 +71,9 @@ if __name__ == "__main__":
 
     obj_name = "ffeabdae926d4cf798cd82da55ebd222"
 
-    objaverse_root = "C:/Users/Eli/Desktop/Maya_Projects/2022-10-14 - Blender Optimizations/glbs/4_new_glbs/fire_hydrant"
+    objaverse_root = (
+        "C:/Users/Eli/Desktop/Maya_Projects/2022-10-14 - Blender Optimizations/glbs/4_new_glbs/fire_hydrant"
+    )
     thor_unity_path = "C:/Users/Eli/Documents/GitHub/ai2thor_6/unity"
 
     # objaverse_root = "/Users/alvaroh/.objaverse/hf-objaverse-v1/glbs/000-067"
@@ -81,9 +83,7 @@ if __name__ == "__main__":
     annotations_file = ""
     object_path = os.path.join(objaverse_root, f"{obj_name}.glb")
     output_dir = os.path.join(thor_unity_path, "debug", obj_name)
-    house_output_file = os.path.join(
-        thor_unity_path, "Assets/Resources/rooms", f"{obj_name}.json"
-    )
+    house_output_file = os.path.join(thor_unity_path, "Assets/Resources/rooms", f"{obj_name}.json")
     engine = "CYCLES"
     save_obj = True
 
@@ -118,9 +118,7 @@ if __name__ == "__main__":
     extra_args = dict(
         # resolution=1000000
     )
-    colliders.generate_colliders.generate_colliders(
-        output_dir, num_colliders=15, **extra_args
-    )
+    colliders.generate_colliders.generate_colliders(output_dir, num_colliders=15, **extra_args)
 
     util.add_visualize_thor_actions(
         asset_id=obj_name,

@@ -28,9 +28,7 @@ for i in range(len(decomposed_files)):
             if l[:2] == "f ":
                 line_to_write = l.replace("\n", "").split(" ")[1:]
                 # print(f"line: {line_to_write}")
-                vertex_numbers = [
-                    int(x) - vertices_so_far for x in line_to_write if x != ""
-                ]
+                vertex_numbers = [int(x) - vertices_so_far for x in line_to_write if x != ""]
                 assert len(vertex_numbers) == 3
                 l = f"f {vertex_numbers[0]} {vertex_numbers[1]} {vertex_numbers[2]}\n"
             f.write(l)
