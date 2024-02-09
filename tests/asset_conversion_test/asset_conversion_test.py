@@ -85,7 +85,9 @@ def test_pipeline_to_thor_msgpack_gz():
     object_id = "000074a334c541878360457c672b6c2e"
     out_path = os.path.abspath(os.path.join(".", "test-out"))
     extension = ".msgpack.gz"
-    result = run_pipeline_main(object_id=object_id, out_path=out_path, extension=extension)
+    result = run_pipeline_main(
+        object_id=object_id, out_path=out_path, extension=extension
+    )
 
     assert util.get_existing_thor_asset_file_path(
         out_dir=os.path.join(out_path, object_id), asset_id=object_id
@@ -94,12 +96,16 @@ def test_pipeline_to_thor_msgpack_gz():
 
 
 # Sum of tests make it too slow for CI
-@pytest.mark.skipif(platform == "linux" or platform == "linux2", reason="Too slow for CI")
+@pytest.mark.skipif(
+    platform == "linux" or platform == "linux2", reason="Too slow for CI"
+)
 def test_pipeline_to_thor_msgpack():
     object_id = "000074a334c541878360457c672b6c2e"
     out_path = os.path.abspath(os.path.join(".", "test-out"))
     extension = ".msgpack"
-    result = run_pipeline_main(object_id=object_id, out_path=out_path, extension=extension)
+    result = run_pipeline_main(
+        object_id=object_id, out_path=out_path, extension=extension
+    )
 
     assert util.get_existing_thor_asset_file_path(
         out_dir=os.path.join(out_path, object_id),
@@ -109,12 +115,16 @@ def test_pipeline_to_thor_msgpack():
     shutil.rmtree(out_path)
 
 
-@pytest.mark.skipif(platform == "linux" or platform == "linux2", reason="Too slow for CI")
+@pytest.mark.skipif(
+    platform == "linux" or platform == "linux2", reason="Too slow for CI"
+)
 def test_pipeline_to_thor_gz():
     object_id = "000074a334c541878360457c672b6c2e"
     out_path = os.path.abspath(os.path.join(".", "test-out"))
     extension = ".gz"
-    result = run_pipeline_main(object_id=object_id, out_path=out_path, extension=extension)
+    result = run_pipeline_main(
+        object_id=object_id, out_path=out_path, extension=extension
+    )
 
     assert util.get_existing_thor_asset_file_path(
         out_dir=os.path.join(out_path, object_id), asset_id=object_id
@@ -122,12 +132,16 @@ def test_pipeline_to_thor_gz():
     shutil.rmtree(out_path)
 
 
-@pytest.mark.skipif(platform == "linux" or platform == "linux2", reason="Too slow for CI")
+@pytest.mark.skipif(
+    platform == "linux" or platform == "linux2", reason="Too slow for CI"
+)
 def test_pipeline_to_thor_pkl_gz():
     object_id = "000074a334c541878360457c672b6c2e"
     out_path = os.path.abspath(os.path.join(".", "test-out"))
     extension = ".pkl.gz"
-    result = run_pipeline_main(object_id=object_id, out_path=out_path, extension=extension)
+    result = run_pipeline_main(
+        object_id=object_id, out_path=out_path, extension=extension
+    )
 
     assert util.get_existing_thor_asset_file_path(
         out_dir=os.path.join(out_path, object_id), asset_id=object_id

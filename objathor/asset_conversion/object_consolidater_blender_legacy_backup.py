@@ -81,7 +81,9 @@ if __name__ == "__main__":
     annotations_file = ""
     object_path = os.path.join(objaverse_root, f"{obj_name}.glb")
     output_dir = os.path.join(thor_unity_path, "debug", obj_name)
-    house_output_file = os.path.join(thor_unity_path, "Assets/Resources/rooms", f"{obj_name}.json")
+    house_output_file = os.path.join(
+        thor_unity_path, "Assets/Resources/rooms", f"{obj_name}.json"
+    )
     engine = "CYCLES"
     save_obj = True
 
@@ -113,7 +115,9 @@ if __name__ == "__main__":
     imp.reload(colliders.generate_colliders)
     print("Generating colliders with library....")
     extra_args = dict(resolution=1000000)
-    colliders.generate_colliders.generate_colliders(output_dir, num_colliders=15, **extra_args)
+    colliders.generate_colliders.generate_colliders(
+        output_dir, num_colliders=15, **extra_args
+    )
 
     util.add_visualize_thor_actions(
         asset_id=obj_name,

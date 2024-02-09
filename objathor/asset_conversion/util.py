@@ -156,7 +156,9 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
             if os.path.exists(path):
                 return path
         else:
-            raise Exception(f"Invalid extension `{force_extension}` for {asset_id}. Supported: {possible_paths.keys()}")
+            raise Exception(
+                f"Invalid extension `{force_extension}` for {asset_id}. Supported: {possible_paths.keys()}"
+            )
     else:
         for path in possible_paths.values():
             if os.path.exists(path):
@@ -168,7 +170,9 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
 
 
 def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
-    file_path = get_existing_thor_asset_file_path(out_dir, object_name, force_extension=force_extension)
+    file_path = get_existing_thor_asset_file_path(
+        out_dir, object_name, force_extension=force_extension
+    )
     if file_path.endswith(".pkl.gz"):
         import compress_pickle
 
@@ -235,13 +239,17 @@ def save_thor_asset_file(asset_json, save_path: str):
     elif extension == ".pkl.gz":
         import compress_pickle
 
-        compress_pickle.dump(obj=asset_json, path=save_path, pickler_kwargs={"protocol": 4})
+        compress_pickle.dump(
+            obj=asset_json, path=save_path, pickler_kwargs={"protocol": 4}
+        )
     elif extension.endswith(".json"):
         with open(save_path, "w") as f:
             json.dump(asset_json, f, indent=2)
 
     else:
-        raise NotImplementedError(f"Unsupported file extension for save path: {save_path}")
+        raise NotImplementedError(
+            f"Unsupported file extension for save path: {save_path}"
+        )
 
 
 def get_blender_installation_path():
@@ -299,13 +307,19 @@ def create_runtime_asset_file(
             if os.path.realpath(build_target_dir) != os.path.realpath(asset_directory):
                 os.remove(build_target_dir)
 
-        if (not os.path.exists(build_target_dir)) and (not os.path.islink(build_target_dir)):
+        if (not os.path.exists(build_target_dir)) and (
+            not os.path.islink(build_target_dir)
+        ):
             # Add symlink if it doesn't already exist
             print(f"Symlink from {asset_directory} to {build_target_dir}")
-            os.symlink(os.path.abspath(asset_directory), os.path.abspath(build_target_dir))
+            os.symlink(
+                os.path.abspath(asset_directory), os.path.abspath(build_target_dir)
+            )
 
         if not load_file_in_unity:
-            return load_existing_thor_asset_file(out_dir=build_target_dir, object_name=asset_id)
+            return load_existing_thor_asset_file(
+                out_dir=build_target_dir, object_name=asset_id
+            )
         return None
 
 
@@ -342,7 +356,9 @@ def add_default_annotations(asset, asset_directory, verbose=False):
         asset["annotations"] = {
             "objectType": "Undefined",
             "primaryProperty": "CanPickup",
-            "secondaryProperties": [] if asset.get("receptacleCandidate", False) else ["Receptacle"],
+            "secondaryProperties": []
+            if asset.get("receptacleCandidate", False)
+            else ["Receptacle"],
         }
     else:
         asset["annotations"] = {
@@ -368,10 +384,16 @@ def create_asset(
     asset_path = get_existing_thor_asset_file_path(
         out_dir=asset_directory, asset_id=asset_id, force_extension=extension
     )
-    file_extension = "".join(pathlib.Path(asset_path).suffixes) if extension is None else extension
+    file_extension = (
+        "".join(pathlib.Path(asset_path).suffixes) if extension is None else extension
+    )
     if file_extension not in EXTENSIONS_LOADABLE_IN_UNITY:
         load_file_in_unity = False
-    copy_to_dir = os.path.join(thor_controller._build.base_dir) if copy_to_dir is None else copy_to_dir
+    copy_to_dir = (
+        os.path.join(thor_controller._build.base_dir)
+        if copy_to_dir is None
+        else copy_to_dir
+    )
 
     # save_dir = os.path.join(controller._build.base_dir, "processed_models")
     os.makedirs(copy_to_dir, exist_ok=True)
@@ -389,7 +411,9 @@ def create_asset(
 
     if not load_file_in_unity:
         asset = change_asset_paths(asset=asset, save_dir=copy_to_dir)
-        asset = add_default_annotations(asset=asset, asset_directory=asset_directory, verbose=verbose)
+        asset = add_default_annotations(
+            asset=asset, asset_directory=asset_directory, verbose=verbose
+        )
         create_prefab_action = {"action": "CreateRuntimeAsset", "asset": asset}
     else:
         create_prefab_action = {
@@ -506,7 +530,9 @@ def view_asset_in_thor(
             },
         )
         obj = controller.last_event.metadata["objects"][1]
-        delta = obj_center_arr - np.array(obj["objectOrientedBoundingBox"]["cornerPoints"]).mean(0)
+        delta = obj_center_arr - np.array(
+            obj["objectOrientedBoundingBox"]["cornerPoints"]
+        ).mean(0)
 
         cur_pos = obj["position"]
         target_pos = {
@@ -553,7 +579,9 @@ def add_visualize_thor_actions(
         if isinstance(asset, dict):
             actions = [{"action": "CreateRuntimeAsset", "asset": asset}]
         elif not isinstance(asset, list):
-            raise TypeError(f"Json {asset_json} is not a sequence of actions or a dictionary.")
+            raise TypeError(
+                f"Json {asset_json} is not a sequence of actions or a dictionary."
+            )
 
     new_actions = [
         actions[0],

@@ -43,7 +43,9 @@ def write(
     elif isinstance(output_file, Callable):
         output_file(anno)
     else:
-        raise NotImplementedError(f"Unsupported output_file arg of type {type(output_file).__name__}")
+        raise NotImplementedError(
+            f"Unsupported output_file arg of type {type(output_file).__name__}"
+        )
 
 
 def annotate_asset(
@@ -57,7 +59,9 @@ def annotate_asset(
 ) -> None:
     save_path = os.path.join(output_dir, f"annotations.json.gz")
     if os.path.exists(save_path) and not allow_overwrite:
-        raise ValueError(f"Annotations already exist at {save_path} and allow_overwrite is False")
+        raise ValueError(
+            f"Annotations already exist at {save_path} and allow_overwrite is False"
+        )
     render_dir = os.path.join(output_dir, "blender_renders")
     os.makedirs(render_dir, exist_ok=True)
     try:
@@ -85,7 +89,9 @@ def annotate_asset(
     finally:
         if delete_blender_render_dir:
             if os.path.exists(render_dir):
-                for p in glob.glob(os.path.join(render_dir, "*.png")) + glob.glob(os.path.join(render_dir, "*.jpg")):
+                for p in glob.glob(os.path.join(render_dir, "*.png")) + glob.glob(
+                    os.path.join(render_dir, "*.jpg")
+                ):
                     os.remove(p)
 
                 os.rmdir(render_dir)
@@ -112,7 +118,9 @@ def add_annotation_arguments(
         "--output",
         type=str,
         required=True,
-        help=("The output directory to write to (in particular, data will be saved to `<output>/<uid>/*`."),
+        help=(
+            "The output directory to write to (in particular, data will be saved to `<output>/<uid>/*`."
+        ),
     )
     parser.add_argument(
         "--use_objaversehome",
@@ -161,15 +169,21 @@ def add_optimization_arguments(
         action="store_true",
         help="Adds house creation with single object and look at object center actions to json.",
     )
-    parser.add_argument("--width", type=int, default=300, help="Width of THOR asset visualization.")
-    parser.add_argument("--height", type=int, default=300, help="Height of THOR asset visualization.")
+    parser.add_argument(
+        "--width", type=int, default=300, help="Width of THOR asset visualization."
+    )
+    parser.add_argument(
+        "--height", type=int, default=300, help="Height of THOR asset visualization."
+    )
     parser.add_argument(
         "--skybox_color",
         type=str,
         default="255,255,255",
         help="Comma separated list off r,g,b values for skybox thor images.",
     )
-    parser.add_argument("--save_as_pkl", action="store_true", help="Saves asset as pickle gz.")
+    parser.add_argument(
+        "--save_as_pkl", action="store_true", help="Saves asset as pickle gz."
+    )
     parser.add_argument(
         "--absolute_texture_paths",
         action="store_true",
@@ -281,7 +295,11 @@ def annotate_and_optimize_asset(
         print(f"Annotations already exist at {annotations_path}, will use these.")
         render_with_blender()
     else:
-        if is_objaverse and use_objaversehome and uid in get_objaverse_home_annotations():
+        if (
+            is_objaverse
+            and use_objaversehome
+            and uid in get_objaverse_home_annotations()
+        ):
             anno = get_objaverse_home_annotations()[uid]
             if "ref_category" not in anno:
                 anno["ref_category"] = get_objaverse_ref_categories()[uid]

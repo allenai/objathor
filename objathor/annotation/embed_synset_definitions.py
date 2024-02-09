@@ -147,7 +147,9 @@ def local_smoothing(embs: Dict[str, np.ndarray], synset_str: str):
 
 
 def get_lemmas_definition_embeddings(
-    fname: str = os.path.join(OBJATHOR_DATA_DIR, "synset_lemmas_definitions_embeddings.pkl.gz"),
+    fname: str = os.path.join(
+        OBJATHOR_DATA_DIR, "synset_lemmas_definitions_embeddings.pkl.gz"
+    ),
     max_lemmas: int = 3,
 ) -> Dict[str, np.ndarray]:
     if os.path.isfile(fname):
@@ -183,7 +185,10 @@ def get_lemmas_definition_embeddings(
             hyper = (
                 set(
                     sum(
-                        [synset_lemmas([hyp.name()])[0] for hyp in synset_hypernyms([synset_str])[0]],
+                        [
+                            synset_lemmas([hyp.name()])[0]
+                            for hyp in synset_hypernyms([synset_str])[0]
+                        ],
                         [],
                     )
                 )
@@ -200,7 +205,10 @@ def get_lemmas_definition_embeddings(
             hypo = (
                 set(
                     sum(
-                        [synset_lemmas([hyp.name()])[0] for hyp in synset_hyponyms([synset_str])[0]],
+                        [
+                            synset_lemmas([hyp.name()])[0]
+                            for hyp in synset_hyponyms([synset_str])[0]
+                        ],
                         [],
                     )
                 )
@@ -225,7 +233,9 @@ def get_lemmas_definition_embeddings(
 
             embedding = get_embedding(text)
             data[synset_str] = dict(
-                emb=(np.array(embedding) / np.linalg.norm(embedding)).astype(np.float32),
+                emb=(np.array(embedding) / np.linalg.norm(embedding)).astype(
+                    np.float32
+                ),
                 text=text,
             )
 

@@ -148,7 +148,9 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
         bg_node.file_slots[0].use_node_format = False
 
         # Render and save the final result with only the object's pixels and transparent background
-        bpy.context.scene.render.filepath = os.path.join(output_dir, f"render_{azimuth}.png")
+        bpy.context.scene.render.filepath = os.path.join(
+            output_dir, f"render_{azimuth}.png"
+        )
         bpy.ops.render.render(write_still=True)
 
     print("DONE")
