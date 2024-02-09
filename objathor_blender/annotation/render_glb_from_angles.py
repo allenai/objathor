@@ -50,9 +50,7 @@ def render_glb_from_angles(
 
     process = None
     try:
-        process = subprocess.Popen(
-            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-        )
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         out, _ = process.communicate(timeout=timeout)
         out = out.decode()
         result_code = process.returncode
@@ -78,9 +76,7 @@ def render_glb_from_angles(
 
     if success:
         print(f"---- Command ran successfully for {glb_path}")
-        blender_render_paths = glob.glob(
-            os.path.join(os.path.abspath(save_dir), "*.png")
-        )
+        blender_render_paths = glob.glob(os.path.join(os.path.abspath(save_dir), "*.png"))
         if save_as_jpg:
             for brp in blender_render_paths:
                 compress_image_to_ssim_threshold(

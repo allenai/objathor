@@ -14,9 +14,7 @@ def get_objaverse_home_annotations():
 
 @lru_cache(maxsize=1)
 def get_objaverse_ref_categories():
-    annos = prior.load_dataset(
-        "objaverse-plus", revision="bce68ddc9f9dfbf1566d61dc4f04ac60e2f2d125"
-    )["train"].data
+    annos = prior.load_dataset("objaverse-plus", revision="bce68ddc9f9dfbf1566d61dc4f04ac60e2f2d125")["train"].data
     return {uid: anno["ref_category"] for uid, anno in annos.items()}
 
 

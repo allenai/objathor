@@ -37,9 +37,7 @@ def all_synsets(top_synset_str: Optional[str] = None) -> List[str]:
 
     global _ALL_SYNSETS
     if _ALL_SYNSETS.get(top_synset_str, None) is None:
-        _ALL_SYNSETS[top_synset_str] = sorted(
-            list(set(_gather_synsets(top_synset_str)))
-        )
+        _ALL_SYNSETS[top_synset_str] = sorted(list(set(_gather_synsets(top_synset_str))))
     return _ALL_SYNSETS[top_synset_str]
 
 

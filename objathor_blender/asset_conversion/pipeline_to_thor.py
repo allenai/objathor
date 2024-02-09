@@ -57,9 +57,7 @@ def save_asset_as(asset_id, asset_out_dir, extension, keep_json_asset=False):
             load_existing_thor_asset_file(out_dir=asset_out_dir, object_name=asset_id),
             asset_directory=asset_out_dir,
         ),
-        save_path=get_extension_save_path(
-            out_dir=asset_out_dir, asset_id=asset_id, extension=extension
-        ),
+        save_path=get_extension_save_path(out_dir=asset_out_dir, asset_id=asset_id, extension=extension),
     )
     if extension != ".json" and not keep_json_asset:
         json_asset_path = get_existing_thor_asset_file_path(
@@ -185,9 +183,7 @@ def glb_to_thor(
                 threshold=0.95,
             )
             os.remove(os.path.join(save_dir, f"{k}.png"))
-            asset_json[f"{k}TexturePath"] = asset_json[f"{k}TexturePath"].replace(
-                ".png", ".jpg"
-            )
+            asset_json[f"{k}TexturePath"] = asset_json[f"{k}TexturePath"].replace(".png", ".jpg")
 
         y_rot = compute_thor_rotation_to_obtain_min_bounding_box(
             asset_json["vertices"], max_deg_change=45, increments=91
@@ -234,13 +230,9 @@ def compute_thor_rotation_to_obtain_min_bounding_box(
     :param bias_for_no_rotation: Bias to use no rotation by rescaling no rotation volume by (1-bias_for_no_rotation)
     """
     assert max_deg_change >= 0
-    assert (
-        increments >= 1 and increments % 2 == 1
-    ), "Increments must be non-negative and odd"
+    assert increments >= 1 and increments % 2 == 1, "Increments must be non-negative and odd"
 
-    vertices_arr = np.array(
-        [[v["x"], v["y"], v["z"]] for v in vertices], dtype=np.float32
-    )
+    vertices_arr = np.array([[v["x"], v["y"], v["z"]] for v in vertices], dtype=np.float32)
     vertices_arr = vertices_arr.transpose((1, 0))
 
     def get_rotmat(t):
@@ -256,9 +248,7 @@ def compute_thor_rotation_to_obtain_min_bounding_box(
     thetas = np.linspace(start=-max_rad_change, stop=max_rad_change, num=increments)
     volumes = []
     for theta in thetas:
-        volumes.append(
-            compute_axis_aligned_bbox_volume(np.matmul(get_rotmat(theta), vertices_arr))
-        )
+        volumes.append(compute_axis_aligned_bbox_volume(np.matmul(get_rotmat(theta), vertices_arr)))
 
     volumes[len(volumes) // 2] *= 1 - bias_for_no_rotation
 
@@ -338,9 +328,7 @@ def validate_in_thor(
         asset_metadata = evt.metadata["actionReturn"]
 
         if not skip_images:
-            angles = [
-                n * angle_increment for n in range(0, round(360 / angle_increment))
-            ]
+            angles = [n * angle_increment for n in range(0, round(360 / angle_increment))]
             rotations = [(x, y, z, degrees) for degrees in angles for (x, y, z) in axes]
             evt = view_asset_in_thor(
                 asset_name,
@@ -416,16 +404,10 @@ def optimize_assets_for_thor(
             if os.path.isdir(annotations_path):
                 if os.path.exists(os.path.join(annotations_path, f"{uid}.json")):
                     sub_annotations_path = os.path.join(annotations_path, f"{uid}.json")
-                elif os.path.exists(
-                    os.path.join(annotations_path, uid, f"annotations.json.gz")
-                ):
-                    sub_annotations_path = os.path.join(
-                        annotations_path, uid, f"annotations.json.gz"
-                    )
+                elif os.path.exists(os.path.join(annotations_path, uid, f"annotations.json.gz")):
+                    sub_annotations_path = os.path.join(annotations_path, uid, f"annotations.json.gz")
                 else:
-                    raise RuntimeError(
-                        f"Annotations path {annotations_path} does not contain annotations for {uid}"
-                    )
+                    raise RuntimeError(f"Annotations path {annotations_path} does not contain annotations for {uid}")
             else:
                 sub_annotations_path = annotations_path
 
@@ -475,18 +457,12 @@ def optimize_assets_for_thor(
                     )
 
             if success:
-                with Timer(
-                    f"{log_prefix}Saving {asset_out_dir} {uid} with extension {extension}"
-                ):
+                with Timer(f"{log_prefix}Saving {asset_out_dir} {uid} with extension {extension}"):
                     # Save to desired format, compression step
-                    save_path = get_extension_save_path(
-                        out_dir=asset_out_dir, asset_id=uid, extension=extension
-                    )
+                    save_path = get_extension_save_path(out_dir=asset_out_dir, asset_id=uid, extension=extension)
                     save_thor_asset_file(
                         asset_json=add_default_annotations(
-                            load_existing_thor_asset_file(
-                                out_dir=asset_out_dir, object_name=uid
-                            ),
+                            load_existing_thor_asset_file(out_dir=asset_out_dir, object_name=uid),
                             asset_directory=asset_out_dir,
                         ),
                         save_path=save_path,
@@ -549,18 +525,14 @@ def optimize_assets_for_thor(
                     controller.reset(scene="Procedural")
 
                     if add_visualize_thor_actions:
-                        objathor.asset_conversion.add_visualize_thor_actions(
-                            asset_id=uid, asset_dir=asset_out_dir
-                        )
+                        objathor.asset_conversion.add_visualize_thor_actions(asset_id=uid, asset_dir=asset_out_dir)
 
                 if success and asset_metadata:
                     with open(metadata_output_file, "w") as f:
                         json.dump(asset_metadata, f, indent=2)
 
                 end = time.perf_counter()
-                print(
-                    f"Finished Object '{uid}' success: {success}. Object Runtime: {end-start_obj_time}s"
-                )
+                print(f"Finished Object '{uid}' success: {success}. Object Runtime: {end-start_obj_time}s")
 
         failed_json_str = json.dumps(failed_objects)
 
@@ -621,9 +593,7 @@ def main(args):
         default=4,
         help="Maximum hull colliders for collider extraction with TestVHACD.",
     )
-    parser.add_argument(
-        "--skip_glb", action="store_true", help="Skips glb to json generation."
-    )
+    parser.add_argument("--skip_glb", action="store_true", help="Skips glb to json generation.")
     parser.add_argument(
         "--delete_objs",
         action="store_true",
@@ -651,12 +621,8 @@ def main(args):
         help="Adds house creation with single object and look at object center actions to json.",
     )
 
-    parser.add_argument(
-        "--width", type=int, default=300, help="Width of THOR asset visualization."
-    )
-    parser.add_argument(
-        "--height", type=int, default=300, help="Height of THOR asset visualization."
-    )
+    parser.add_argument("--width", type=int, default=300, help="Width of THOR asset visualization.")
+    parser.add_argument("--height", type=int, default=300, help="Height of THOR asset visualization.")
     parser.add_argument(
         "--skybox_color",
         type=str,
@@ -664,9 +630,7 @@ def main(args):
         help="Comma separated list off r,g,b values for skybox thor images.",
     )
 
-    parser.add_argument(
-        "--save_as_pkl", action="store_true", help="Saves asset as pickle gz."
-    )
+    parser.add_argument("--save_as_pkl", action="store_true", help="Saves asset as pickle gz.")
 
     parser.add_argument(
         "--absolute_texture_paths",
@@ -746,19 +710,12 @@ def main(args):
         glb_paths = args.glb_paths.split(",")
 
     if uids is not None and glb_paths is not None:
-        assert len(uids) == len(
-            glb_paths
-        ), "If uids and glb_paths are specified, then they must be the same length."
+        assert len(uids) == len(glb_paths), "If uids and glb_paths are specified, then they must be the same length."
         uid_to_glb_path = {uid: glb_path for uid, glb_path in zip(uids, glb_paths)}
     elif uids is not None:
-        uid_to_glb_path = objaverse.load_objects(
-            uids=uids, download_processes=multiprocessing.cpu_count()
-        )
+        uid_to_glb_path = objaverse.load_objects(uids=uids, download_processes=multiprocessing.cpu_count())
     elif glb_paths is not None:
-        uid_to_glb_path = {
-            os.path.splitext(os.path.basename(glb_path))[0]: glb_path
-            for glb_path in glb_paths
-        }
+        uid_to_glb_path = {os.path.splitext(os.path.basename(glb_path))[0]: glb_path for glb_path in glb_paths}
     else:
         raise ValueError("Must specify either `uids` or `glb_paths`.")
 

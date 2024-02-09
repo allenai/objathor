@@ -27,6 +27,4 @@ def write(
     elif isinstance(output_file, Callable):
         output_file(anno)
     else:
-        raise NotImplementedError(
-            f"Unsupported output_file arg of type {type(output_file).__name__}"
-        )
+        raise NotImplementedError(f"Unsupported output_file arg of type {type(output_file).__name__}")

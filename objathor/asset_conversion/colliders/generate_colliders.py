@@ -128,17 +128,13 @@ def decompose_obj(
     vertices_so_far = 0
     for i in range(len(decomposed_files)):
         current_file = decomposed_files[i]
-        file_to_write = os.path.join(
-            os.path.dirname(file_path), f"{output_file_prefix}{i}.obj"
-        )
+        file_to_write = os.path.join(os.path.dirname(file_path), f"{output_file_prefix}{i}.obj")
         with open(file_to_write, "w") as f:
             for l in current_file:
                 if l[:2] == "f ":
                     line_to_write = l.replace("\n", "").split(" ")[1:]
                     # print(f"line: {line_to_write}")
-                    vertex_numbers = [
-                        int(x) - vertices_so_far for x in line_to_write if x != ""
-                    ]
+                    vertex_numbers = [int(x) - vertices_so_far for x in line_to_write if x != ""]
                     assert len(vertex_numbers) == 3
                     l = f"f {vertex_numbers[0]} {vertex_numbers[1]} {vertex_numbers[2]}\n"
                 f.write(l)
@@ -190,9 +186,7 @@ def get_colliders(
 
     if not os.path.exists(output_obj_name):
         result_info["failed"] = True
-        result_info[
-            "stderr"
-        ] = f"VHACD did not generate 'decomp.obj'. Unsuccessfull run of command: {command}"
+        result_info["stderr"] = f"VHACD did not generate 'decomp.obj'. Unsuccessfull run of command: {command}"
         return [], result_info
     decompose_obj(output_obj_name)
 
@@ -224,18 +218,14 @@ def get_colliders(
             continue
         out.append(
             {
-                "vertices": [
-                    dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()
-                ],
+                "vertices": [dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()],
                 "triangles": np.array(collider.faces).reshape(-1).tolist(),
             }
         )
     return out, result_info
 
 
-def get_colliders_vhacd41(
-    obj_file: str, num_colliders: int, capture_out: bool, **kwargs
-) -> List[Dict[str, Any]]:
+def get_colliders_vhacd41(obj_file: str, num_colliders: int, capture_out: bool, **kwargs) -> List[Dict[str, Any]]:
     # Using version 4.1 VHACD binary from https://github.com/kmammou/v-hacd
     assert num_colliders < 1000
 
@@ -260,9 +250,7 @@ def get_colliders_vhacd41(
     ]
 
     if capture_out:
-        VHACD_result = subprocess.run(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
+        VHACD_result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
         result_info["stderr"] = VHACD_result.stderr
         result_info["stdout"] = VHACD_result.stdout
@@ -274,9 +262,7 @@ def get_colliders_vhacd41(
     should_exist = obj_file.replace(".obj", "000.obj")
     if not os.path.exists(should_exist):
         result_info["failed"] = True
-        result_info[
-            "stderr"
-        ] = f"VHACD did not generate '{should_exist}'. Unsuccessful run of command: {command}"
+        result_info["stderr"] = f"VHACD did not generate '{should_exist}'. Unsuccessful run of command: {command}"
         return [], result_info
 
     vhacd_outputs = glob.glob(obj_file.replace(".obj", "???.obj"))
@@ -301,24 +287,18 @@ def get_colliders_vhacd41(
             continue
         out.append(
             {
-                "vertices": [
-                    dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()
-                ],
+                "vertices": [dict(x=x, y=y, z=z) for x, y, z in collider.vertices.tolist()],
                 "triangles": np.array(collider.faces).reshape(-1).tolist(),
             }
         )
     return out, result_info
 
 
-def set_colliders(
-    obj_file: str, num_colliders: int = 4, capture_out=False, **kwargs
-) -> Dict[str, Any]:
+def set_colliders(obj_file: str, num_colliders: int = 4, capture_out=False, **kwargs) -> Dict[str, Any]:
     obj_file_dir = os.path.dirname(obj_file)
     uid = os.path.splitext(os.path.basename(obj_file))[0]
 
-    annotations_file = get_existing_thor_asset_file_path(
-        out_dir=obj_file_dir, asset_id=uid
-    )
+    annotations_file = get_existing_thor_asset_file_path(out_dir=obj_file_dir, asset_id=uid)
     if not capture_out:
         print(f"--- setting colliders... {annotations_file}")
 
@@ -328,9 +308,7 @@ def set_colliders(
         msg = f"colliders already exist for {obj_file}"
         print(msg)
         return {"failed": True, "stdout": msg}
-    colliders, result_info = get_colliders(
-        obj_file, num_colliders, capture_out=capture_out, **kwargs
-    )
+    colliders, result_info = get_colliders(obj_file, num_colliders, capture_out=capture_out, **kwargs)
 
     annotations["colliders"] = colliders
 
@@ -338,9 +316,7 @@ def set_colliders(
     return result_info
 
 
-def generate_colliders(
-    source_directory, num_colliders=4, delete_objs=False, capture_out=False, **kwargs
-):
+def generate_colliders(source_directory, num_colliders=4, delete_objs=False, capture_out=False, **kwargs):
     vhacd_init(VHACD_PATH)
 
     obj_files = glob.glob(os.path.join(source_directory, "*.obj"))
