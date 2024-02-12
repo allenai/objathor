@@ -80,6 +80,22 @@ def reset_scene():
     for image in bpy.data.images:
         bpy.data.images.remove(image, do_unlink=True)
 
+def purge_orphan_data():
+    for block in bpy.data.collections:
+        if block.users == 0:
+            bpy.data.collections.remove(block)
+    for block in bpy.data.meshes:
+        if block.users == 0:
+            bpy.data.meshes.remove(block)
+    for block in bpy.data.materials:
+        if block.users == 0:
+            bpy.data.materials.remove(block)
+    for block in bpy.data.textures:
+        if block.users == 0:
+            bpy.data.textures.remove(block)
+    for block in bpy.data.images:
+        if block.users == 0:
+            bpy.data.images.remove(block)
 
 def load_model(model_path: str) -> None:
     assert model_path.endswith(".glb")
@@ -172,6 +188,27 @@ def is_mesh_open(mesh: bpy.types.Object) -> bool:
     bpy.ops.object.editmode_toggle()
     return False
 
+def get_min_decimation(mesh: bpy.ops.object) -> float:
+    bpy.ops.object.select_all(action='DESELECT')
+    mesh.select_set(True)
+    bpy.context.view_layer.objects.active = mesh
+
+    bpy.ops.object.duplicate()
+    dec_test_object = bpy.context.selected_objects[0]
+    bpy.context.view_layer.objects.active = dec_test_object
+
+    dec_mod_name = "Decimate_Test"
+    bpy.ops.object.modifier_add(type="DECIMATE")
+    bpy.context.object.modifiers[-1].name = dec_mod_name
+    bpy.context.object.modifiers[dec_mod_name].ratio = 0
+    bpy.context.object.modifiers[dec_mod_name].use_collapse_triangulate = True
+    bpy.ops.object.modifier_apply(modifier=dec_mod_name)
+    dec_min = len(dec_test_object.data.polygons)
+    bpy.ops.object.delete()
+
+    bpy.ops.object.select_all(action='DESELECT')
+
+    return dec_min
 
 def decimate(mesh: bpy.types.Object, decimation_ratio: float) -> None:
     bpy.ops.object.select_all(action="DESELECT")
@@ -719,11 +756,96 @@ def weld_vertices(vertex_selection: tuple = ("all"), distance_threshold: float =
 
 def regularize_normals():
     bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_mode(type="VERT")
+    bpy.ops.mesh.select_mode(type='VERT')
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.object.mode_set(mode="OBJECT")
 
+
+def disconnect_and_texturify_metallic_connections(obj, cached_connections):
+    for mat_slot_index, mat_slot in enumerate(obj.material_slots):
+        if mat_slot.material and mat_slot.material.use_nodes:
+            node_tree = mat_slot.material.node_tree
+            for node in node_tree.nodes:
+                # Find the Principled BSDF node
+                if node.type == 'BSDF_PRINCIPLED':
+                    bsdf_principled_node = node
+                    metallic_input = bsdf_principled_node.inputs.get("Metallic")
+                    if metallic_input.is_linked:
+                        link = metallic_input.links[0]
+
+                        # Cache Metallic connection info
+                        cached_connections[mat_slot_index] = {
+                            'from_node': link.from_node,
+                            'from_socket': link.from_socket,
+                            'to_node': bsdf_principled_node,
+                            'to_socket': metallic_input
+                        }
+
+                        # Disconnect the link
+                        node_tree.links.remove(link)
+                    else:
+
+                        # Create a Value and set its value to Metallic
+                        metallic_node = node_tree.nodes.new(type="ShaderNodeValue")
+                        metallic_node.outputs[0].default_value = metallic_input.default_value
+
+                        # Cache connection info
+                        cached_connections[mat_slot_index] = {
+                            'from_node': metallic_node,
+                            'from_socket': metallic_node.outputs[0],
+                            'to_node': bsdf_principled_node,
+                            'to_socket': metallic_input
+                        }
+                    
+                    # Set Metallic value to 0 (so Albedo bake works)
+                    metallic_input.default_value = 0
+
+
+def assign_to_mat_output(obj, cached_connections):
+    for mat_slot_index, conn_info in cached_connections.items():
+        mat_slot = obj.material_slots[mat_slot_index] if mat_slot_index < len(obj.material_slots) else None
+        node_tree = mat_slot.material.node_tree
+
+        # Find input and output nodes and sockets
+        from_node = conn_info['from_node']
+        from_socket = conn_info['from_socket']
+
+        to_node = next((node for node in node_tree.nodes if node.type == 'OUTPUT_MATERIAL'), None)
+        to_socket = to_node.inputs['Surface']
+
+        node_tree.links.new(from_socket, to_socket)
+
+
+def reconnect_metallic_connections(obj, cached_connections):
+    for mat_slot_index, conn_info in cached_connections.items():
+        mat_slot = obj.material_slots[mat_slot_index] if mat_slot_index < len(obj.material_slots) else None
+        if mat_slot and mat_slot.material and mat_slot.material.use_nodes:
+            node_tree = mat_slot.material.node_tree
+
+            # Directly use the node and socket references from cached_connections for Metallic connections
+            from_node = conn_info['from_node']
+            from_socket = conn_info['from_socket']
+            to_node = conn_info['to_node']
+            to_socket = conn_info['to_socket']
+
+            # Create the Metallic link if both sockets are valid
+            if from_socket and to_socket:
+                node_tree.links.new(from_socket, to_socket)
+
+            # Directly use the node and socket references from cached_connections for Metallic connections
+            from_node = next((node for node in node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
+            from_socket = from_node.outputs['BSDF']
+            to_node = next((node for node in node_tree.nodes if node.type == 'OUTPUT_MATERIAL'), None)
+            to_socket = to_node.inputs['Surface']
+
+            # Create the Material Output link if both sockets are valid
+            if from_socket and to_socket:
+                node_tree.links.new(from_socket, to_socket)
+            
+
+
+# assign_to_mat_output(obj, socket_connections)
 
 def delete_everything():
     materials = bpy.data.materials
@@ -798,6 +920,7 @@ def glb_to_thor(
 
     # Reset scene
     reset_scene()
+    purge_orphan_data()
 
     logger.debug("Loading model into scene and flattening hierarchy...")
 
@@ -812,13 +935,14 @@ def glb_to_thor(
     delete_nonmesh_objects()
     logger.debug("Consolidating contiguous elements...")
 
-    # Remove any garbage elements
-    bpy.ops.object.select_all(action="SELECT")
-    for obj in bpy.context.selected_objects:
-        if is_element_garbage(obj) == True:
-            bpy.data.objects.remove(obj)
+    # # Remove any garbage elements
+    # bpy.ops.object.select_all(action="SELECT")
+    # for obj in bpy.context.selected_objects:
+    #     if is_element_garbage(obj) == True:
+    #         bpy.data.objects.remove(obj)
 
     # Merge all objects together
+    bpy.ops.object.select_all(action="SELECT")
     bpy.context.view_layer.objects.active = bpy.data.objects[0]
     bpy.ops.object.join()
 
@@ -918,7 +1042,8 @@ def glb_to_thor(
     bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
     bpy.ops.object.join()
     source_object = bpy.context.selected_objects[0]
-
+    purge_orphan_data()
+    
     bpy.ops.object.select_all(action="DESELECT")
     target_object.select_set(True)
     bpy.context.view_layer.objects.active = target_object
@@ -939,6 +1064,7 @@ def glb_to_thor(
     bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
     bpy.ops.object.join()
     target_object = bpy.context.selected_objects[0]
+    purge_orphan_data()
 
     # DECIMATION PROCESS
 
@@ -948,7 +1074,7 @@ def glb_to_thor(
         f"POLYGON COUNT PRE-DECIMATION: {source_poly_count} (Target is {target_poly_count})"
     )
 
-    # Calculate whether decimating it to fulfill the calculated polygon density is necessary
+    # Calculate whether decimating object to fulfill the calculated polygon density is necessary
     if source_poly_count > target_poly_count:
         logger.debug("Poly-count limit exceeded. Now decimating...")
 
@@ -961,18 +1087,7 @@ def glb_to_thor(
             and decimation_iter_current < decimation_iter_max
         ):
             # Find mesh's minimum decimation threshold, to determine whether extra weld is necessary
-            bpy.ops.object.duplicate()
-            dec_test_object = bpy.context.selected_objects[0]
-            bpy.context.view_layer.objects.active = dec_test_object
-
-            dec_mod_name = "Decimate_" + str(decimation_iter_current).zfill(4)
-            bpy.ops.object.modifier_add(type="DECIMATE")
-            bpy.context.object.modifiers[-1].name = dec_mod_name
-            bpy.context.object.modifiers[dec_mod_name].ratio = 0
-            bpy.context.object.modifiers[dec_mod_name].use_collapse_triangulate = True
-            bpy.ops.object.modifier_apply(modifier=dec_mod_name)
-            dec_min = len(dec_test_object.data.polygons)
-            bpy.ops.object.delete()
+            dec_min = get_min_decimation(target_object)
             logger.debug(f"MINIMUM DECIMATION POLY-COUNT: {str(dec_min)}")
 
             target_object.select_set(True)
@@ -980,7 +1095,7 @@ def glb_to_thor(
 
             # FALLBACK: Extra vertex-weld step, if necessary. Check if this mesh is a temperamental diva that won't decimate without a preemptive vertex-merge, and then add some extra buffer
             buffer_coefficient = 1.5
-            if dec_min * buffer_coefficient > target_poly_count:
+            if buffer_coefficient * dec_min > target_poly_count:
                 logger.debug(
                     f"Additional weld required. Pre: {str(len(target_object.data.vertices))}"
                 )
@@ -988,9 +1103,15 @@ def glb_to_thor(
                 logger.debug(f"Post: {str(len(target_object.data.vertices))}")
                 regularize_normals()
 
-                # Adding "squeaky-axle" coefficient to difficult-to-decimate asset, to strike balance between decent quality and some amount of decimation
-                squeaky_axle_coefficient = 1.5
-                target_poly_count = squeaky_axle_coefficient * dec_min
+                # ADD STEP HERE TO REMOVE USELESS TWO-VERTEX ELEMENTS??? IT'D BE VERY TRICKY, SINCE YOU'D NEED TO REMOVE CORRESPONDING SOURCE-ONES...
+
+                # If vertex-merge still doesn't create sufficiently decimatable mesh, then the squeaky axle gets the grease, and we decimate it as much as we can, with some buffer
+                dec_min = get_min_decimation(target_object)
+                if buffer_coefficient * dec_min > target_poly_count:
+                    # Adding "squeaky-axle" coefficient to difficult-to-decimate asset, to strike balance between decent quality and some amount of decimation
+                    squeaky_axle_coefficient = 1.5
+                    target_poly_count = squeaky_axle_coefficient * dec_min
+                logger.debug(f"NEW MINIMUM DECIMATION POLY-COUNT IS {str(target_poly_count)}")
             else:
                 logger.debug(
                     "No additional weld necessary. Proceeding to decimation..."
@@ -1001,6 +1122,9 @@ def glb_to_thor(
             logger.debug(
                 f"DECIMATION RATIO: {str(target_poly_count)} / {str(len(target_object.data.polygons))} = {str(decimation_ratio)}"
             )
+
+            target_object.select_set(True)
+            bpy.context.view_layer.objects.active = target_object
 
             dec_mod_name = "Decimate_" + str(decimation_iter_current).zfill(4)
             bpy.ops.object.modifier_add(type="DECIMATE")
@@ -1015,6 +1139,10 @@ def glb_to_thor(
             decimation_iter_current += 1
     else:
         logger.debug("Poly-count limit subceeded. Skipping decimation...")
+    
+    purge_orphan_data()
+
+    # MATERIAL CREATION
 
     # Create UV map
     bpy.ops.object.select_all(action="DESELECT")
@@ -1022,47 +1150,20 @@ def glb_to_thor(
     logger.debug("Creating new UV layout...")
     create_uv_map(target_object, texture_size)
 
-    # MATERIAL CREATION
-
     # For every material of the source-object, disconnect the Metallic channel, then set it to 0 (this is subject to change once Metallic channels start getting baked)
+
+    # Create metallic slot two-slot array...
+    socket_connections = {}
+    
     if len(source_object.material_slots) > 0:
-        for mat_slot in source_object.material_slots:
-            # check if the material has a node tree
-            if mat_slot.material.node_tree:
-                # get the output node of the node tree
-                output_node = mat_slot.material.node_tree.nodes.get("Material Output")
-                if output_node is not None:
-                    input_surface = output_node.inputs.get("Surface")
-                    if input_surface.is_linked:
-                        for input in output_node.inputs:
-                            bsdf_node = input_surface.links[0].from_node
-                            if bsdf_node.type == "BSDF_PRINCIPLED":
-                                logger.debug(f"BSDF node found in mat {mat_slot.name}")
-                                # bsdf_node = mat_slot.material.node_tree.nodes.get("BSDF_PRINCIPLED")
-                                metallic_input = bsdf_node.inputs["Metallic"]
-                                if metallic_input.is_linked:
-                                    # Iterate over all links to the 'Metallic' input
-                                    for link in metallic_input.links:
-                                        # Disconnect the link
-                                        mat_slot.material.node_tree.links.remove(link)
-                                metallic_input.default_value = 0
-                                break
-                            else:
-                                logger.debug(
-                                    f"BSDF node not found in mat {mat_slot.name}"
-                                )
-                    else:
-                        logger.debug(f"BSDF node not found in mat {mat_slot.name}")
-            else:
-                logger.debug(f"mat {mat_slot.name} doesn't have a node tree")
-    else:
-        logger.debug(f"mat not found")
+        disconnect_and_texturify_metallic_connections(source_object, socket_connections)
 
     # Set up new material for target object
     bake_mat = bpy.data.materials.new(name=object_name + "_mat")
     bake_mat.use_nodes = True
     bake_mat_bsdf = bake_mat.node_tree.nodes["Principled BSDF"]
 
+    # Albedo map setup
     bake_mat_ti_albedo = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
     bake_mat_ti_albedo.image = bpy.data.images.new(
         "Target_Object_Albedo_Bake", texture_size, texture_size
@@ -1075,8 +1176,10 @@ def glb_to_thor(
         bake_mat_ti_albedo.outputs["Color"], bake_mat_bsdf.inputs["Base Color"]
     )
 
+    # Specular reset
     bake_mat_bsdf.inputs["Specular"].default_value = 0
 
+    # Normal map setup
     bake_mat_ti_normal = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
     bake_mat_ti_normal.image = bpy.data.images.new(
         "Target_Object_Normal_Bake", texture_size, texture_size
@@ -1092,6 +1195,27 @@ def glb_to_thor(
         bake_mat_nm.outputs["Normal"], bake_mat_bsdf.inputs["Normal"]
     )
 
+    # Metallic map setup
+    bake_mat_ti_metallic = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
+    bake_mat_ti_metallic.image = bpy.data.images.new(
+        "Target_Object_Metallic_Bake", texture_size, texture_size
+    )
+
+    bake_mat.node_tree.links.new(
+        bake_mat_ti_metallic.outputs["Color"], bake_mat_bsdf.inputs["Metallic"]
+    )
+
+    # Roughness map setup
+    bake_mat_ti_roughness = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
+    bake_mat_ti_roughness.image = bpy.data.images.new(
+        "Target_Object_Roughness_Bake", texture_size, texture_size
+    )
+
+    bake_mat.node_tree.links.new(
+        bake_mat_ti_roughness.outputs["Color"], bake_mat_bsdf.inputs["Roughness"]
+    )
+
+    # Emission map setup
     bake_mat_ti_emission = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
     bake_mat_ti_emission.image = bpy.data.images.new(
         "Target_Object_Emission_Bake", texture_size, texture_size
@@ -1111,7 +1235,7 @@ def glb_to_thor(
     target_object.data.materials[0] = bake_mat
 
     logger.debug(
-        "Source and target objects strung out and remerged. Running bake from source to target..."
+        "Source and target objects strung out, remerged, and target object decimated. Running bake from source to target..."
     )
     logger.debug(f"ATLAS TEXTURE SIZE: {str(texture_size)} x {str(texture_size)}")
     # Set up baking parameters
@@ -1130,12 +1254,13 @@ def glb_to_thor(
     logger.debug("CAGE EXTRUSION: " + str(0.02 * annotation_dict["scale"] + 0.01))
     bpy.context.scene.render.bake.margin = texture_size
 
-    # Execute source-to-target object bake
+    # Execute source-to-target object bakes
     bpy.ops.object.select_all(action="DESELECT")
     source_object.select_set(True)
     target_object.select_set(True)
     bpy.context.view_layer.objects.active = target_object
 
+    # Albedo bake
     bake_mat.node_tree.nodes.active = bake_mat_ti_albedo
     bpy.ops.object.bake(type="DIFFUSE")
 
@@ -1146,8 +1271,8 @@ def glb_to_thor(
     albedo_save_path = os.path.join(output_dir, albedo_map_name)
     data_block.save_render(filepath=albedo_save_path)
 
+    # Normal bake
     bake_mat.node_tree.nodes.active = bake_mat_ti_normal
-
     bpy.ops.object.bake(type="NORMAL")
 
     normal_map_name = "normal.png"
@@ -1157,8 +1282,35 @@ def glb_to_thor(
     normal_save_path = os.path.join(output_dir, normal_map_name)
     data_block.save_render(filepath=normal_save_path)
 
-    bake_mat.node_tree.nodes.active = bake_mat_ti_emission
+    # Metallic bake
+    # assign_to_mat_output(socket_connections, source_object)
+    assign_to_mat_output(obj, socket_connections)
 
+    bake_mat.node_tree.nodes.active = bake_mat_ti_metallic
+    bpy.ops.object.bake(type="EMIT")
+
+    metallic_map_name = "metallic.png"
+    # Save out roughness map texture
+    data_block = bpy.data.images["Target_Object_Metallic_Bake"]
+    logger.debug(f"Saving {metallic_map_name}...")
+    metallic_save_path = os.path.join(output_dir, metallic_map_name)
+    data_block.save_render(filepath=metallic_save_path)
+    
+    reconnect_metallic_connections(obj, socket_connections)
+
+    # Roughness bake
+    bake_mat.node_tree.nodes.active = bake_mat_ti_roughness
+    bpy.ops.object.bake(type="ROUGHNESS")
+
+    roughness_map_name = "roughness.png"
+    # Save out roughness map texture
+    data_block = bpy.data.images["Target_Object_Roughness_Bake"]
+    logger.debug(f"Saving {roughness_map_name}...")
+    roughness_save_path = os.path.join(output_dir, roughness_map_name)
+    data_block.save_render(filepath=roughness_save_path)
+
+    # Emission bake
+    bake_mat.node_tree.nodes.active = bake_mat_ti_emission
     bpy.ops.object.bake(type="EMIT")
 
     emission_map_name = "emission.png"
@@ -1177,6 +1329,16 @@ def glb_to_thor(
         normal_map_name
         if relative_texture_paths
         else os.path.join(output_dir, f"{normal_map_name}")
+    )
+    metallic_path = (
+        metallic_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{metallic_map_name}")
+    )
+    roughness_path = (
+        roughness_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{roughness_map_name}")
     )
     emission_path = (
         emission_map_name
@@ -1205,9 +1367,12 @@ def glb_to_thor(
         )
         source_objects[i].select_set(True)
 
+    # Recombine all source objects into single one
     bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
     bpy.ops.object.join()
     source_object = bpy.context.selected_objects[0]
+    source_object.name = "source_object"
+    purge_orphan_data()
 
     bpy.ops.object.select_all(action="DESELECT")
     target_object.select_set(True)
@@ -1230,15 +1395,15 @@ def glb_to_thor(
             bpy.ops.object.duplicate()
             bpy.context.view_layer.objects.active = bpy.context.selected_objects[-1]
             bpy.ops.object.mode_set(mode="EDIT")
-            bpy.ops.mesh.select_mode(type="FACE")
-            bpy.ops.mesh.select_all(action="SELECT")
+            bpy.ops.mesh.select_mode(type='FACE')
+            bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.mesh.flip_normals()
-            bpy.ops.mesh.select_all(action="DESELECT")
+            bpy.ops.mesh.select_all(action='DESELECT')
             bpy.ops.object.mode_set(mode="OBJECT")
         else:
             logger.debug("MESH-ELEMENT HAS BORDER: FALSE")
 
-    # Recombine all objects into single one
+    # Recombine all target objects into single one
     bpy.ops.object.select_all(action="SELECT")
     source_object.select_set(False)
     bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
@@ -1246,6 +1411,7 @@ def glb_to_thor(
     bpy.ops.object.join()
     target_object = bpy.context.selected_objects[0]
     target_object.name = object_name
+    purge_orphan_data()
 
     # Delete source object (Comment when iterating (to use as reference comparison), uncomment for final rollout)
     bpy.data.objects.remove(source_object)
