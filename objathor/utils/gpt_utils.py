@@ -23,7 +23,9 @@ def client():
     return _OPENAI_CLIENT
 
 
-def access_gpt_with_retries(func: Callable[[], Any], max_attempts: int = DEFAULT_MAX_ATTEMPTS):
+def access_gpt_with_retries(
+    func: Callable[[], Any], max_attempts: int = DEFAULT_MAX_ATTEMPTS
+):
     for _ in range(max_attempts):
         try:
             return func()
@@ -73,12 +75,16 @@ def get_embeddings_from_texts(
                 .data
             ]
 
-        embs.extend(access_gpt_with_retries(func=embedding_create, max_attempts=max_attempts))
+        embs.extend(
+            access_gpt_with_retries(func=embedding_create, max_attempts=max_attempts)
+        )
 
     return embs
 
 
-def get_embedding(text: str, model: str = DEFAULT_EMBED, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> List[float]:
+def get_embedding(
+    text: str, model: str = DEFAULT_EMBED, max_attempts: int = DEFAULT_MAX_ATTEMPTS
+) -> List[float]:
     def embedding_create() -> List[float]:
         return (
             client()
@@ -104,9 +110,9 @@ def get_answer(
     def message_to_content(msg):
         return msg.gpt() if isinstance(msg, ComposedMessage) else [msg.gpt()]
 
-    messages = [dict(role=msg.role, content=message_to_content(msg)) for msg in prompt] + [
-        dict(role=msg.role, content=message_to_content(msg)) for msg in dialog
-    ]
+    messages = [
+        dict(role=msg.role, content=message_to_content(msg)) for msg in prompt
+    ] + [dict(role=msg.role, content=message_to_content(msg)) for msg in dialog]
 
     def chat_completion_create() -> str:
         all_kwargs = dict(
@@ -122,8 +128,12 @@ def get_answer(
         if verbose:
             pt = completion.usage.prompt_tokens
             ct = completion.usage.completion_tokens
-            print(f"Prompt tokens: {pt}. Completion tokens: {ct}. Approx cost: ${(pt * 0.01 + ct * 0.03)/1000:.2g}.")
+            print(
+                f"Prompt tokens: {pt}. Completion tokens: {ct}. Approx cost: ${(pt * 0.01 + ct * 0.03)/1000:.2g}."
+            )
 
         return res
 
-    return access_gpt_with_retries(func=chat_completion_create, max_attempts=max_attempts)
+    return access_gpt_with_retries(
+        func=chat_completion_create, max_attempts=max_attempts
+    )

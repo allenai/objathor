@@ -67,7 +67,9 @@ if __name__ == "__main__":
     # thor_unity_path = "/Users/alvaroh/ai2/ai2thor/unity"
 
     objaverse_root = sys.argv[2]
-    print(f"Running pipeline for object '{object_ids}' and writing to  '{objaverse_root}'")
+    print(
+        f"Running pipeline for object '{object_ids}' and writing to  '{objaverse_root}'"
+    )
 
     for object_id in object_ids:
         # annotations_file = "annotations/objaverse_thor_v0p95.json"

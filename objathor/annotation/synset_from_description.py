@@ -62,7 +62,11 @@ def synset_to_summary_str(synset: str) -> str:
 
 
 def prompt_for_best_synset(synsets: Sequence[str]) -> str:
-    return PICK_SINGLE_SYNSET_TEMPLATE + "\n" + "\n\n".join([synset_to_summary_str(s) for s in synsets])
+    return (
+        PICK_SINGLE_SYNSET_TEMPLATE
+        + "\n"
+        + "\n\n".join([synset_to_summary_str(s) for s in synsets])
+    )
 
 
 def synset_embeddings():
@@ -88,7 +92,9 @@ def nearest_neighbor_synsets() -> NearestNeighbors:
     global _NN
     if _NN is None:
         values = np.stack([synset_embeddings()[key] for key in all_embedded_synset()])
-        print(f"NN data shape {values.shape} ({len(all_embedded_synset())} keys), {NUM_NEIGHS} neighbors")
+        print(
+            f"NN data shape {values.shape} ({len(all_embedded_synset())} keys), {NUM_NEIGHS} neighbors"
+        )
         _NN = NearestNeighbors(n_neighbors=NUM_NEIGHS).fit(values)
     return _NN
 
@@ -97,7 +103,9 @@ def normalize_embedding(emb: Sequence[float]):
     return (np.array(emb) / np.linalg.norm(emb)).astype(np.float16)
 
 
-def save_embedding(emb: Sequence[float], uid: str, dir: str = DESCRIPTION_EMBEDDING_OUTPUT_DIR):
+def save_embedding(
+    emb: Sequence[float], uid: str, dir: str = DESCRIPTION_EMBEDDING_OUTPUT_DIR
+):
     os.makedirs(dir, exist_ok=True)
     compress_pickle.dump(
         normalize_embedding(emb),
@@ -123,7 +131,9 @@ def nearest_synsets_from_annotation(
         try:
             save_embedding(emb=desc_emb, uid=annotation["uid"], dir=save_to_dir)
         except Exception as e:
-            print(f"ERROR saving description embedding {e}. Traceback:\n{traceback.format_exc()}")
+            print(
+                f"ERROR saving description embedding {e}. Traceback:\n{traceback.format_exc()}"
+            )
 
     dists, inds = nearest_neighbor_synsets().kneighbors(
         normalize_embedding(desc_emb).reshape(1, -1),
@@ -139,7 +149,9 @@ def nearest_synsets_from_annotation(
 def synsets_from_text(text: str) -> List[str]:
     is_noun = lambda pos: pos[:2] == "NN"
     tokenized = nltk.word_tokenize(text)
-    nouns = [word.lower().strip() for (word, pos) in nltk.pos_tag(tokenized) if is_noun(pos)]
+    nouns = [
+        word.lower().strip() for (word, pos) in nltk.pos_tag(tokenized) if is_noun(pos)
+    ]
 
     possible_lemmas = ["_".join(text.lower().strip().split(" ")), *nouns]
 

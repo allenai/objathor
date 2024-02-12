@@ -187,7 +187,9 @@ def decimate(mesh: bpy.types.Object, decimation_ratio: float) -> None:
         pass
 
 
-def add_uvmap(mesh: bpy.types.Object, image_height: int, image_width: int, texture_path: str) -> None:
+def add_uvmap(
+    mesh: bpy.types.Object, image_height: int, image_width: int, texture_path: str
+) -> None:
     # select the mesh
     bpy.ops.object.select_all(action="DESELECT")
     mesh.select_set(True)
@@ -210,7 +212,9 @@ def add_uvmap(mesh: bpy.types.Object, image_height: int, image_width: int, textu
     # get the name of the new uv map
     bpy.ops.uv.smart_project(island_margin=0.002, area_weight=0)
     # create a new image of the uv map
-    image = bpy.data.images.new(name=texture_path, height=image_height, width=image_width)
+    image = bpy.data.images.new(
+        name=texture_path, height=image_height, width=image_width
+    )
     return image, new_uv_map_name
 
 
@@ -225,7 +229,9 @@ def create_uv_map(object: bpy.types.Object, texture_size: int) -> None:
     bpy.ops.mesh.select_all(action="SELECT")
 
     # Smart project method
-    bpy.ops.uv.smart_project(angle_limit=math.radians(30), island_margin=island_separation, area_weight=1.0)
+    bpy.ops.uv.smart_project(
+        angle_limit=math.radians(30), island_margin=island_separation, area_weight=1.0
+    )
 
     bpy.ops.object.mode_set(mode="OBJECT")
 
@@ -272,7 +278,9 @@ def set_material_uvs(image: bpy.types.Image) -> None:
             if "Image Texture" in material.node_tree.nodes:
                 image_texture = material.node_tree.nodes["Image Texture"]
                 # connect the image texture to the base color of the principled BSDF node
-                material.node_tree.links.new(image_texture.outputs["Color"], bsdf.inputs["Base Color"])
+                material.node_tree.links.new(
+                    image_texture.outputs["Color"], bsdf.inputs["Base Color"]
+                )
             throw_exception = True
     # if throw_exception:
     #     raise ValueError("Principled BSDF node not found in material")
@@ -294,19 +302,33 @@ def get_visibility_points(
     """
     vertices = mesh.data.vertices
     # convert the vertices to a numpy array
-    vertices = np.array([mesh.matrix_world @ vertex.co for vertex in mesh.data.vertices])
+    vertices = np.array(
+        [mesh.matrix_world @ vertex.co for vertex in mesh.data.vertices]
+    )
     x_max, y_max, z_max = vertices.max(axis=0)
     x_min, y_min, z_min = vertices.min(axis=0)
     # get the voxels in each direction
-    xs = np.linspace(x_min, x_max, max(min_voxels, int((x_max - x_min) / voxel_size)), endpoint=True)
-    ys = np.linspace(y_min, y_max, max(min_voxels, int((y_max - y_min) / voxel_size)), endpoint=True)
-    zs = np.linspace(z_min, z_max, max(min_voxels, int((z_max - z_min) / voxel_size)), endpoint=True)
+    xs = np.linspace(
+        x_min, x_max, max(min_voxels, int((x_max - x_min) / voxel_size)), endpoint=True
+    )
+    ys = np.linspace(
+        y_min, y_max, max(min_voxels, int((y_max - y_min) / voxel_size)), endpoint=True
+    )
+    zs = np.linspace(
+        z_min, z_max, max(min_voxels, int((z_max - z_min) / voxel_size)), endpoint=True
+    )
     if len(xs) > 10:
-        xs = np.linspace(x_min, x_max, int((x_max - x_min) / (voxel_size * 2)), endpoint=True)
+        xs = np.linspace(
+            x_min, x_max, int((x_max - x_min) / (voxel_size * 2)), endpoint=True
+        )
     if len(ys) > 10:
-        ys = np.linspace(y_min, y_max, int((y_max - y_min) / (voxel_size * 2)), endpoint=True)
+        ys = np.linspace(
+            y_min, y_max, int((y_max - y_min) / (voxel_size * 2)), endpoint=True
+        )
     if len(zs) > 10:
-        zs = np.linspace(z_min, z_max, int((z_max - z_min) / (voxel_size * 2)), endpoint=True)
+        zs = np.linspace(
+            z_min, z_max, int((z_max - z_min) / (voxel_size * 2)), endpoint=True
+        )
     x_voxel_size = xs[1] - xs[0]
     y_voxel_size = ys[1] - ys[0]
     z_voxel_size = zs[1] - zs[0]
@@ -332,7 +354,9 @@ def get_visibility_points(
         if len(mesh.data.vertices) == 0:
             return {}
         else:
-            points = np.array([mesh.matrix_world @ vertex.co for vertex in mesh.data.vertices])
+            points = np.array(
+                [mesh.matrix_world @ vertex.co for vertex in mesh.data.vertices]
+            )
             points = [dict(x=x, y=y, z=z) for x, y, z in points.tolist()]
             num_points = len(xs) * len(ys) * len(zs)
             sampled_points = random.choices(
@@ -359,9 +383,14 @@ def get_visibility_points(
         ]
         chosen_lines = random.sample(lines, k=2)
         # get the random point on each line
-        points_on_line = [vert1 + random.uniform(0, 1) * (vert2 - vert1) for vert1, vert2 in chosen_lines]
+        points_on_line = [
+            vert1 + random.uniform(0, 1) * (vert2 - vert1)
+            for vert1, vert2 in chosen_lines
+        ]
         # get a random point between the two points
-        point = points_on_line[0] + random.uniform(0, 1) * (points_on_line[1] - points_on_line[0])
+        point = points_on_line[0] + random.uniform(0, 1) * (
+            points_on_line[1] - points_on_line[0]
+        )
         surface_points.append([point.x, point.y, point.z])
     # NOTE: put each of the points in a voxel
     points_per_voxel = defaultdict(list)
@@ -675,7 +704,9 @@ def weld_vertices(vertex_selection: tuple = ("all"), distance_threshold: float =
         bmesh.update_edit_mesh(obj.data)
 
         # Weld the selected vertices that are within the distance threshold
-        bmesh.ops.remove_doubles(bm, verts=[v for v in bm.verts if v.select], dist=distance_threshold)
+        bmesh.ops.remove_doubles(
+            bm, verts=[v for v in bm.verts if v.select], dist=distance_threshold
+        )
 
         # Write our bmesh back to the original mesh
         bmesh.update_edit_mesh(obj.data)
@@ -740,7 +771,9 @@ def glb_to_thor(
             annotation_dict = json.load(f)
     elif annotations_file:
         with (
-            gzip.open(annotations_file, "rt") if annotations_file.endswith(".gz") else open(annotations_file, "r")
+            gzip.open(annotations_file, "rt")
+            if annotations_file.endswith(".gz")
+            else open(annotations_file, "r")
         ) as f:
             annotation_dict = json.load(f)
 
@@ -759,7 +792,9 @@ def glb_to_thor(
     if "receptacle" in annotation_dict:
         receptacle = annotation_dict["receptacle"]
     else:
-        receptacle = annotation_dict["ref_category"] in util.get_receptacle_object_types()
+        receptacle = (
+            annotation_dict["ref_category"] in util.get_receptacle_object_types()
+        )
 
     # Reset scene
     reset_scene()
@@ -838,7 +873,9 @@ def glb_to_thor(
     min_local_poly_count = 100
     initial_poly_count = 5000
     additional_polys_per_square_meter = 150
-    target_poly_count = initial_poly_count + additional_polys_per_square_meter * source_surface_area
+    target_poly_count = (
+        initial_poly_count + additional_polys_per_square_meter * source_surface_area
+    )
     logger.debug("TARGET POLY-COUNT: " + str(target_poly_count))
     if source_surface_area > 8:
         texture_size = 1024
@@ -907,7 +944,9 @@ def glb_to_thor(
 
     # Get polygon count
     source_poly_count = len(target_object.data.polygons)
-    logger.debug(f"POLYGON COUNT PRE-DECIMATION: {source_poly_count} (Target is {target_poly_count})")
+    logger.debug(
+        f"POLYGON COUNT PRE-DECIMATION: {source_poly_count} (Target is {target_poly_count})"
+    )
 
     # Calculate whether decimating it to fulfill the calculated polygon density is necessary
     if source_poly_count > target_poly_count:
@@ -918,7 +957,8 @@ def glb_to_thor(
 
         # ITERATIVE COLLAPSE DECIMATION
         while (
-            target_poly_count + 10 < len(target_object.data.polygons) and decimation_iter_current < decimation_iter_max
+            target_poly_count + 10 < len(target_object.data.polygons)
+            and decimation_iter_current < decimation_iter_max
         ):
             # Find mesh's minimum decimation threshold, to determine whether extra weld is necessary
             bpy.ops.object.duplicate()
@@ -941,7 +981,9 @@ def glb_to_thor(
             # FALLBACK: Extra vertex-weld step, if necessary. Check if this mesh is a temperamental diva that won't decimate without a preemptive vertex-merge, and then add some extra buffer
             buffer_coefficient = 1.5
             if dec_min * buffer_coefficient > target_poly_count:
-                logger.debug(f"Additional weld required. Pre: {str(len(target_object.data.vertices))}")
+                logger.debug(
+                    f"Additional weld required. Pre: {str(len(target_object.data.vertices))}"
+                )
                 weld_vertices(vertex_selection=("nonborder"), distance_threshold=0.001)
                 logger.debug(f"Post: {str(len(target_object.data.vertices))}")
                 regularize_normals()
@@ -950,7 +992,9 @@ def glb_to_thor(
                 squeaky_axle_coefficient = 1.5
                 target_poly_count = squeaky_axle_coefficient * dec_min
             else:
-                logger.debug("No additional weld necessary. Proceeding to decimation...")
+                logger.debug(
+                    "No additional weld necessary. Proceeding to decimation..."
+                )
 
             decimation_ratio = target_poly_count / len(target_object.data.polygons)
 
@@ -964,7 +1008,9 @@ def glb_to_thor(
             bpy.context.object.modifiers[dec_mod_name].ratio = decimation_ratio
             bpy.context.object.modifiers[dec_mod_name].use_collapse_triangulate = True
             bpy.ops.object.modifier_apply(modifier=dec_mod_name)
-            logger.debug(f"POST-DECIMATION POLY-COUNT: {str(len(target_object.data.polygons))}")
+            logger.debug(
+                f"POST-DECIMATION POLY-COUNT: {str(len(target_object.data.polygons))}"
+            )
 
             decimation_iter_current += 1
     else:
@@ -1002,7 +1048,9 @@ def glb_to_thor(
                                 metallic_input.default_value = 0
                                 break
                             else:
-                                logger.debug(f"BSDF node not found in mat {mat_slot.name}")
+                                logger.debug(
+                                    f"BSDF node not found in mat {mat_slot.name}"
+                                )
                     else:
                         logger.debug(f"BSDF node not found in mat {mat_slot.name}")
             else:
@@ -1016,26 +1064,44 @@ def glb_to_thor(
     bake_mat_bsdf = bake_mat.node_tree.nodes["Principled BSDF"]
 
     bake_mat_ti_albedo = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
-    bake_mat_ti_albedo.image = bpy.data.images.new("Target_Object_Albedo_Bake", texture_size, texture_size)
+    bake_mat_ti_albedo.image = bpy.data.images.new(
+        "Target_Object_Albedo_Bake", texture_size, texture_size
+    )
     # bpy.data.images["Target_Object_Albedo_Bake"].source = 'FILE'
-    albedo_texture = bpy.data.images.new(str(object_name) + "_albedo", width=texture_size, height=texture_size)
-    bake_mat.node_tree.links.new(bake_mat_ti_albedo.outputs["Color"], bake_mat_bsdf.inputs["Base Color"])
+    albedo_texture = bpy.data.images.new(
+        str(object_name) + "_albedo", width=texture_size, height=texture_size
+    )
+    bake_mat.node_tree.links.new(
+        bake_mat_ti_albedo.outputs["Color"], bake_mat_bsdf.inputs["Base Color"]
+    )
 
     bake_mat_bsdf.inputs["Specular"].default_value = 0
 
     bake_mat_ti_normal = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
-    bake_mat_ti_normal.image = bpy.data.images.new("Target_Object_Normal_Bake", texture_size, texture_size)
+    bake_mat_ti_normal.image = bpy.data.images.new(
+        "Target_Object_Normal_Bake", texture_size, texture_size
+    )
     # bpy.data.images["Target_Object_Albedo_Bake"].source = 'FILE'
     bake_mat_ti_normal.image.colorspace_settings.name = "Non-Color"
 
     bake_mat_nm = bake_mat.node_tree.nodes.new(type="ShaderNodeNormalMap")
-    bake_mat.node_tree.links.new(bake_mat_ti_normal.outputs["Color"], bake_mat_nm.inputs["Color"])
-    bake_mat.node_tree.links.new(bake_mat_nm.outputs["Normal"], bake_mat_bsdf.inputs["Normal"])
+    bake_mat.node_tree.links.new(
+        bake_mat_ti_normal.outputs["Color"], bake_mat_nm.inputs["Color"]
+    )
+    bake_mat.node_tree.links.new(
+        bake_mat_nm.outputs["Normal"], bake_mat_bsdf.inputs["Normal"]
+    )
 
     bake_mat_ti_emission = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
-    bake_mat_ti_emission.image = bpy.data.images.new("Target_Object_Emission_Bake", texture_size, texture_size)
-    emission_texture = bpy.data.images.new(str(object_name) + "_emission", width=texture_size, height=texture_size)
-    bake_mat.node_tree.links.new(bake_mat_ti_emission.outputs["Color"], bake_mat_bsdf.inputs["Emission"])
+    bake_mat_ti_emission.image = bpy.data.images.new(
+        "Target_Object_Emission_Bake", texture_size, texture_size
+    )
+    emission_texture = bpy.data.images.new(
+        str(object_name) + "_emission", width=texture_size, height=texture_size
+    )
+    bake_mat.node_tree.links.new(
+        bake_mat_ti_emission.outputs["Color"], bake_mat_bsdf.inputs["Emission"]
+    )
 
     # Apply new material to target object
     bpy.context.view_layer.objects.active = target_object
@@ -1044,7 +1110,9 @@ def glb_to_thor(
     bpy.ops.object.material_slot_add()
     target_object.data.materials[0] = bake_mat
 
-    logger.debug("Source and target objects strung out and remerged. Running bake from source to target...")
+    logger.debug(
+        "Source and target objects strung out and remerged. Running bake from source to target..."
+    )
     logger.debug(f"ATLAS TEXTURE SIZE: {str(texture_size)} x {str(texture_size)}")
     # Set up baking parameters
     bpy.ops.object.select_all(action="DESELECT")
@@ -1056,7 +1124,9 @@ def glb_to_thor(
     bpy.context.scene.render.bake.use_pass_direct = False
     bpy.context.scene.render.bake.use_pass_indirect = False
     bpy.context.scene.render.bake.use_selected_to_active = True
-    bpy.context.scene.render.bake.cage_extrusion = 0.01 * annotation_dict["scale"] + 0.01
+    bpy.context.scene.render.bake.cage_extrusion = (
+        0.01 * annotation_dict["scale"] + 0.01
+    )
     logger.debug("CAGE EXTRUSION: " + str(0.02 * annotation_dict["scale"] + 0.01))
     bpy.context.scene.render.bake.margin = texture_size
 
@@ -1098,9 +1168,21 @@ def glb_to_thor(
     emission_save_path = os.path.join(output_dir, emission_map_name)
     data_block.save_render(filepath=emission_save_path)
 
-    albedo_path = albedo_map_name if relative_texture_paths else os.path.join(output_dir, f"{albedo_map_name}")
-    normal_path = normal_map_name if relative_texture_paths else os.path.join(output_dir, f"{normal_map_name}")
-    emission_path = emission_map_name if relative_texture_paths else os.path.join(output_dir, f"{emission_map_name}")
+    albedo_path = (
+        albedo_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{albedo_map_name}")
+    )
+    normal_path = (
+        normal_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{normal_map_name}")
+    )
+    emission_path = (
+        emission_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{emission_map_name}")
+    )
 
     # save_path = os.path.join(output_dir, f"{object_name}.json")
     json_save_path = get_json_save_path(output_dir, object_name)
@@ -1264,7 +1346,9 @@ if __name__ == "__main__":
         help="Path to the object file",
     )
     parser.add_argument("--output_dir", type=str, required=True)
-    parser.add_argument("--engine", type=str, default="CYCLES", choices=["CYCLES", "BLENDER_EEVEE"])
+    parser.add_argument(
+        "--engine", type=str, default="CYCLES", choices=["CYCLES", "BLENDER_EEVEE"]
+    )
 
     parser.add_argument(
         "--annotations",
@@ -1274,7 +1358,9 @@ if __name__ == "__main__":
         " will assume annotations can be found at os.path.basename(object_path.replace('.glb', '.json.gz')).",
     )
 
-    parser.add_argument("--receptacle", action="store_true", help="Whether the object is a receptacle.")
+    parser.add_argument(
+        "--receptacle", action="store_true", help="Whether the object is a receptacle."
+    )
 
     parser.add_argument(
         "--relative_texture_paths",

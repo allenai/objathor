@@ -196,8 +196,12 @@ def get_best_synset_initial_annotation_message_context(
 
     dialogue_dict = copy.deepcopy(dialogue_dict)
 
-    dialogue_dict["dialog"][0].content.append(Text(content=json_str_of_annotations, role="assistant"))
-    dialogue_dict["dialog"][0].content.append(Text(content=prompt_for_best_synset(near_synsets), role="user"))
+    dialogue_dict["dialog"][0].content.append(
+        Text(content=json_str_of_annotations, role="assistant")
+    )
+    dialogue_dict["dialog"][0].content.append(
+        Text(content=prompt_for_best_synset(near_synsets), role="user")
+    )
 
     answer = get_answer(**dialogue_dict).strip().lower()
 
@@ -273,7 +277,9 @@ def get_initial_annotation(
     except Exception as e:
         new_json_str = clean_up_json(json_str)
         if new_json_str is None:
-            print(f"Failed to clean up response\n{json_str}\nwith urls\n{urls}\nwith error\n{e}")
+            print(
+                f"Failed to clean up response\n{json_str}\nwith urls\n{urls}\nwith error\n{e}"
+            )
             raise
         annotation = json.loads(new_json_str)
 
