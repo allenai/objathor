@@ -4,7 +4,10 @@ import sys
 import argparse
 
 from mathutils import Vector
-import bpy
+try:
+    import bpy
+except ImportError as e:
+    raise ImportError(f"{e}: Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html")
 from typing import Sequence
 
 # blender -b -P /path/to/your/render_script.py -- /path/to/your/model.glb /path/to/output/directory 0,90,180
