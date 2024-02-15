@@ -13,16 +13,16 @@ pip install --extra-index-url https://ai2thor-pypi.allenai.org ai2thor==0+e24aa8
 Install other dependencies:
 
 ```bash
-pip install objathor[annotation,blender]
+pip install objathor[annotation]
 ```
 
-Here the following extras are installed: `annotation` to use openai to generate annotations and `blender` as a python module. Installing  the `blender` extra, requires a python `3.10` environment.
+Here the following extras are installed: `annotation` to use openai to generate annotations. To generate renders and convert 'glb' models in the conversion pipeline you must [Install Blender] (#blender-install-instructions). 
 
 
 From source:
 
 ```bash
-pip install -e ".[annotation,blender]"
+pip install -e ".[annotation]"
 ```
 
 We recommend setting an environment variable with your OpenAI key:
@@ -34,7 +34,17 @@ export OPENAI_API_KEY=[Your key]
 If we're planning to annotate objects for which we don't have pre-generated
 views in S3 (see an example under [Annotation](#annotation) below), we also need to install blender either as an extra (as shown above) or as an application:
 
+#Blender install instructions
+Installing  the `Blender` as a module:
+```bash
+pip install -e bpy"
+```
+Installing  the Blender as a module, requires a python `3.10` environment.
+
+Or installing blender as an application:
 [Blender install instructions](https://docs.blender.org/manual/en/latest/getting_started/installing/index.html)
+
+If application is not in the cannonical directories you may need to pass `blender_installation_path` to scripts that use Blender.
 
 ### Pre-generated synset definition embeddings for Annotation
 
