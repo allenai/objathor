@@ -3,11 +3,13 @@ import os
 
 
 def convert_obj_to_glb(obj_path: str, glb_path: str):
-    
+
     try:
         import bpy
     except ImportError as e:
-        raise ImportError(f"{e}: Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html")
+        raise ImportError(
+            f"{e}: Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html"
+        )
 
     bpy.ops.object.delete(use_global=False)
 

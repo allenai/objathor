@@ -18,7 +18,9 @@ try:
     import bpy
     import bmesh
 except ImportError as e:
-    raise RuntimeError(f"{e}. Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html")
+    raise RuntimeError(
+        f"{e}. Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html"
+    )
 
 import pickle
 

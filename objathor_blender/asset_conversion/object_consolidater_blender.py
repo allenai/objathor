@@ -6,7 +6,9 @@ import platform
 try:
     import bpy
 except ImportError as e:
-    raise ImportError(f"{e}: Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html")
+    raise ImportError(
+        f"{e}: Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html"
+    )
 import subprocess
 
 # copy object_consolidater.py to where blender project file is
