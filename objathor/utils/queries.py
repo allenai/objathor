@@ -1,8 +1,7 @@
-from abc import ABC, abstractmethod
-from typing import Any, Literal
-from io import BytesIO
 import base64
-
+from abc import ABC, abstractmethod
+from io import BytesIO
+from typing import Any, Literal
 
 Role = Literal["system", "user", "assistant"]
 

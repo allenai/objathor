@@ -1,7 +1,7 @@
-import os
-import math
-import sys
 import argparse
+import math
+import os
+import sys
 
 from mathutils import Vector
 
