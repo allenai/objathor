@@ -18,7 +18,6 @@ if __name__ == "__main__":
             ]
 
     REQUIREMENTS = _read_reqs("requirements.txt")
-    REQUIREMENTS_BLENDER = _read_reqs("requirements-blender.txt")
     REQUIREMENTS_ANNOTATION = _read_reqs("requirements-annotation.txt")
 
     setup(
@@ -37,15 +36,14 @@ if __name__ == "__main__":
         keywords=["3D assets", "annotation", ""],
         install_requires=REQUIREMENTS,
         extras_require={
-            "blender": REQUIREMENTS_BLENDER,
             "annotation": REQUIREMENTS_ANNOTATION,
         },
         classifiers=[
             "Development Status :: 4 - Beta",
             "Intended Audience :: Developers",
             "Topic :: Scientific/Engineering :: Artificial Intelligence",
-            "License :: OSI Approved :: MIT License",
-            "Programming Language :: Python :: 3.8",
+            "License :: OSI Approved :: Apache 2.0 License",
+            "Programming Language :: Python :: 3.9",
         ],
         package_data={
             "objathor": ["asset_conversion/data/*.json"],
