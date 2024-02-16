@@ -11,15 +11,14 @@ import traceback
 from contextlib import contextmanager
 from time import perf_counter
 from typing import Any, List, Dict, Sequence, Optional
-from tqdm import tqdm
 
 import ai2thor.controller
 import numpy as np
 import objaverse
+from tqdm import tqdm
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
-
 
 # shared library
 from objathor.asset_conversion.util import (

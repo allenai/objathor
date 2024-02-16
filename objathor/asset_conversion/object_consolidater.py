@@ -6,7 +6,6 @@ import math
 import os
 import random
 import shutil
-import ssl
 import sys
 from collections import defaultdict
 from typing import Dict, List, Optional

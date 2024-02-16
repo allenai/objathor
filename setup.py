@@ -1,8 +1,7 @@
-from setuptools import setup, find_packages
-from pathlib import Path
 import os
+from pathlib import Path
 
-from objathor.asset_conversion.asset_conversion_constants import EMPTY_HOUSE_JSON_PATH
+from setuptools import setup, find_packages
 
 if __name__ == "__main__":
     with Path(Path(__file__).parent, "README.md").open(encoding="utf-8") as file:
@@ -18,7 +17,6 @@ if __name__ == "__main__":
             ]
 
     REQUIREMENTS = _read_reqs("requirements.txt")
-    REQUIREMENTS_BLENDER = _read_reqs("requirements-blender.txt")
     REQUIREMENTS_ANNOTATION = _read_reqs("requirements-annotation.txt")
 
     setup(
@@ -37,7 +35,6 @@ if __name__ == "__main__":
         keywords=["3D assets", "annotation", ""],
         install_requires=REQUIREMENTS,
         extras_require={
-            "blender": REQUIREMENTS_BLENDER,
             "annotation": REQUIREMENTS_ANNOTATION,
         },
         classifiers=[

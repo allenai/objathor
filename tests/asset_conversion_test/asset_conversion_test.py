@@ -1,10 +1,12 @@
-from objathor.asset_conversion.pipeline_to_thor import main as pipeline_main
-import objathor.asset_conversion.util as util
+import json
 import os
 import shutil
 from sys import platform
-import json
+
 import pytest
+
+import objathor.asset_conversion.util as util
+from objathor.asset_conversion.pipeline_to_thor import main as pipeline_main
 
 
 def run_pipeline_main(object_id, out_path, extension, annotation=None):

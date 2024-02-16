@@ -1,7 +1,6 @@
 import os
-import sys
-import json
 import platform
+import sys
 
 try:
     import bpy
@@ -9,7 +8,6 @@ except ImportError as e:
     raise ImportError(
         f"{e}: Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html"
     )
-import subprocess
 
 # copy object_consolidater.py to where blender project file is
 project_dir = os.path.dirname(bpy.data.filepath)
@@ -48,7 +46,6 @@ python_exe = os.path.join(sys.prefix, "bin", python_filename)
 # subprocess.call([python_exe, "-m", "pip", "install", "numpy"])
 # subprocess.call([python_exe, "-m", "pip", "install", "objaverse"])
 
-import trimesh
 import numpy as np
 
 import object_consolidater
