@@ -16,7 +16,7 @@ Install other dependencies:
 pip install objathor[annotation]
 ```
 
-Here the following extras are installed: `annotation` to use openai to generate annotations. To generate renders and convert 'glb' models in the conversion pipeline you must [Install Blender] (#blender-install-instructions). 
+Here the following extras are installed: `annotation` to use openai to generate annotations. To generate renders and convert 'glb' models in the conversion pipeline you must [Install Blender](#blender-install-instructions). 
 
 
 From source:
@@ -34,14 +34,17 @@ export OPENAI_API_KEY=[Your key]
 If we're planning to annotate objects for which we don't have pre-generated
 views in S3 (see an example under [Annotation](#annotation) below), we also need to install blender either as an extra (as shown above) or as an application:
 
-#Blender install instructions
+### Blender install instructions
 Installing  the `Blender` as a module:
 ```bash
 pip install -e bpy"
 ```
 Installing  the Blender as a module, requires a python `3.10` environment.
 
+<br />
+
 Or installing blender as an application:
+
 [Blender install instructions](https://docs.blender.org/manual/en/latest/getting_started/installing/index.html)
 
 If application is not in the cannonical directories you may need to pass `blender_installation_path` to scripts that use Blender.
