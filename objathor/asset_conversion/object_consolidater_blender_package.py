@@ -6,8 +6,10 @@ import logging
 
 try:
     import bpy
-except ImportError:
-    raise
+except ImportError as e:
+    raise ImportError(
+        f"{e}: Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html"
+    )
 import subprocess
 
 # pip install numpy
