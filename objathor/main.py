@@ -2,6 +2,7 @@ import argparse
 import glob
 import os
 import sys
+from functools import lru_cache
 from importlib import import_module
 from typing import Union, Callable, Any, Dict, Optional, cast
 
@@ -19,6 +20,11 @@ from objathor.annotation.objaverse_annotations_utils import (
 from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
 from objathor.asset_conversion.util import get_blender_installation_path
 from objathor.utils.blender import render_glb_from_angles
+
+
+@lru_cache(maxsize=1)
+def base_objaverse_annotations():
+    return objaverse.load_annotations()
 
 
 def write(
@@ -55,6 +61,7 @@ def annotate_asset(
     render_angles=(0, 90, 180, 270),
     delete_blender_render_dir=False,
     allow_overwrite=False,
+    extra_anns: Optional[Dict[str, Any]] = None,
     **kwargs: Any,
 ) -> None:
     save_path = os.path.join(output_dir, f"annotations.json.gz")
@@ -85,7 +92,11 @@ def annotate_asset(
         anno["z_axis_scale"] = True
 
         anno["uid"] = uid
-        write(anno, save_path, **kwargs)
+
+        if extra_anns is None:
+            extra_anns = {}
+
+        write({**anno, **extra_anns}, save_path, **kwargs)
     finally:
         if delete_blender_render_dir:
             if os.path.exists(render_dir):
@@ -275,6 +286,17 @@ def annotate_and_optimize_asset(
     objaverse_uids = objaverse.load_uids()
     is_objaverse = uid in objaverse_uids
 
+    license_info = {}
+    if is_objaverse:
+        anns = base_objaverse_annotations()[uid]
+        license_info["license_info"] = {
+            "license": anns["license"],
+            "uri": anns["asset_uri"],
+            "creator_username": anns["user"]["username"],
+            "creator_display_name": anns["user"]["displayName"],
+            "creator_profile_url": anns["user"]["profileUrl"],
+        }
+
     if glb_path is None:
         assert is_objaverse, "If glb_path is not provided, uid must be an objaverse uid"
         glb_path = objaverse.load_objects([uid])[uid]
@@ -303,7 +325,7 @@ def annotate_and_optimize_asset(
             anno = get_objaverse_home_annotations()[uid]
             if "ref_category" not in anno:
                 anno["ref_category"] = get_objaverse_ref_categories()[uid]
-            write(anno, annotations_path)
+            write({**anno, **license_info}, annotations_path)
 
             render_with_blender()
         else:
@@ -311,6 +333,7 @@ def annotate_and_optimize_asset(
                 uid=uid,
                 glb_path=glb_path,
                 output_dir=output_dir_with_uid,
+                extra_anns=license_info,
             )
 
     # OPTIMIZATION

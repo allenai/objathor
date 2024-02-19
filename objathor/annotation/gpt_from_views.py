@@ -292,4 +292,7 @@ def get_initial_annotation(
             **dialogue_dict,
         )
 
+    if "synset" in annotation:
+        annotation["wn_version"] = "oewn:2022"
+
     return annotation, urls
