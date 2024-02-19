@@ -256,7 +256,7 @@ def add_uvmap(
 
 
 def create_uv_map(object: bpy.types.Object, texture_size: int) -> None:
-    island_separation = 0.0005 / (texture_size / 512)
+    island_separation = 0.001 / (texture_size / 512)
     logger.debug(f"ISLAND SEPARATION: {str(island_separation)}")
 
     object.select_set(True)
@@ -762,7 +762,8 @@ def regularize_normals():
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
-def disconnect_and_texturify_metallic_connections(obj, cached_connections):
+def unlink_and_nodify_connections(obj, cached_connections, channel):
+    cached_connections.clear
     for mat_slot_index, mat_slot in enumerate(obj.material_slots):
         if mat_slot.material and mat_slot.material.use_nodes:
             node_tree = mat_slot.material.node_tree
@@ -770,39 +771,40 @@ def disconnect_and_texturify_metallic_connections(obj, cached_connections):
                 # Find the Principled BSDF node
                 if node.type == 'BSDF_PRINCIPLED':
                     bsdf_principled_node = node
-                    metallic_input = bsdf_principled_node.inputs.get("Metallic")
-                    if metallic_input.is_linked:
-                        link = metallic_input.links[0]
+                    target_input = bsdf_principled_node.inputs.get(channel)
+                    if target_input.is_linked:
+                        link = target_input.links[0]
 
-                        # Cache Metallic connection info
+                        # Cache connection info
                         cached_connections[mat_slot_index] = {
                             'from_node': link.from_node,
                             'from_socket': link.from_socket,
                             'to_node': bsdf_principled_node,
-                            'to_socket': metallic_input
+                            'to_socket': target_input
                         }
 
                         # Disconnect the link
                         node_tree.links.remove(link)
-                    else:
 
-                        # Create a Value and set its value to Metallic
-                        metallic_node = node_tree.nodes.new(type="ShaderNodeValue")
-                        metallic_node.outputs[0].default_value = metallic_input.default_value
+                    else:
+                        # Create a Value node and set its value to material's target-channel's current value
+                        source_node = node_tree.nodes.new(type="ShaderNodeValue")
+                        source_node.outputs[0].default_value = target_input.default_value
 
                         # Cache connection info
                         cached_connections[mat_slot_index] = {
-                            'from_node': metallic_node,
-                            'from_socket': metallic_node.outputs[0],
+                            'from_node': source_node,
+                            'from_socket': source_node.outputs[0],
                             'to_node': bsdf_principled_node,
-                            'to_socket': metallic_input
+                            'to_socket': target_input
                         }
                     
-                    # Set Metallic value to 0 (so Albedo bake works)
-                    metallic_input.default_value = 0
+                    # If channel is Metallic, set target value to 0 (so Albedo bake works)
+                    if channel == "Metallic":
+                        target_input.default_value = 0
 
 
-def assign_to_mat_output(obj, cached_connections):
+def link_to_mat_output(obj, cached_connections):
     for mat_slot_index, conn_info in cached_connections.items():
         mat_slot = obj.material_slots[mat_slot_index] if mat_slot_index < len(obj.material_slots) else None
         node_tree = mat_slot.material.node_tree
@@ -817,23 +819,23 @@ def assign_to_mat_output(obj, cached_connections):
         node_tree.links.new(from_socket, to_socket)
 
 
-def reconnect_metallic_connections(obj, cached_connections):
+def relink_connections(obj, cached_connections, channel):
     for mat_slot_index, conn_info in cached_connections.items():
         mat_slot = obj.material_slots[mat_slot_index] if mat_slot_index < len(obj.material_slots) else None
         if mat_slot and mat_slot.material and mat_slot.material.use_nodes:
             node_tree = mat_slot.material.node_tree
 
-            # Directly use the node and socket references from cached_connections for Metallic connections
+            # Directly use the node and socket references from cached_connections for target-channel connections
             from_node = conn_info['from_node']
             from_socket = conn_info['from_socket']
             to_node = conn_info['to_node']
             to_socket = conn_info['to_socket']
 
-            # Create the Metallic link if both sockets are valid
+            # Create the target-channel link if both sockets are valid
             if from_socket and to_socket:
                 node_tree.links.new(from_socket, to_socket)
 
-            # Directly use the node and socket references from cached_connections for Metallic connections
+            # Directly use the node and socket references from cached_connections for target-channel connections
             from_node = next((node for node in node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
             from_socket = from_node.outputs['BSDF']
             to_node = next((node for node in node_tree.nodes if node.type == 'OUTPUT_MATERIAL'), None)
@@ -842,10 +844,6 @@ def reconnect_metallic_connections(obj, cached_connections):
             # Create the Material Output link if both sockets are valid
             if from_socket and to_socket:
                 node_tree.links.new(from_socket, to_socket)
-            
-
-
-# assign_to_mat_output(obj, socket_connections)
 
 def delete_everything():
     materials = bpy.data.materials
@@ -1006,7 +1004,7 @@ def glb_to_thor(
     elif source_surface_area > 1:
         texture_size = 1024
     else:
-        texture_size = 512
+        texture_size = 1024
 
     logger.debug("Creating target object...")
     # Duplicate source object to create target object
@@ -1150,14 +1148,6 @@ def glb_to_thor(
     logger.debug("Creating new UV layout...")
     create_uv_map(target_object, texture_size)
 
-    # For every material of the source-object, disconnect the Metallic channel, then set it to 0 (this is subject to change once Metallic channels start getting baked)
-
-    # Create metallic slot two-slot array...
-    socket_connections = {}
-    
-    if len(source_object.material_slots) > 0:
-        disconnect_and_texturify_metallic_connections(source_object, socket_connections)
-
     # Set up new material for target object
     bake_mat = bpy.data.materials.new(name=object_name + "_mat")
     bake_mat.use_nodes = True
@@ -1227,6 +1217,18 @@ def glb_to_thor(
         bake_mat_ti_emission.outputs["Color"], bake_mat_bsdf.inputs["Emission"]
     )
 
+    # # Transparency map setup
+    # bake_mat_ti_transparency = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
+    # bake_mat_ti_transparency.image = bpy.data.images.new(
+    #     "Target_Object_Transparency_Bake", texture_size, texture_size
+    # )
+    # transparency_texture = bpy.data.images.new(
+    #     str(object_name) + "_transparency", width=texture_size, height=texture_size
+    # )
+    # bake_mat.node_tree.links.new(
+    #     bake_mat_ti_transparency.outputs["Color"], bake_mat_bsdf.inputs["Alpha"]
+    # )
+
     # Apply new material to target object
     bpy.context.view_layer.objects.active = target_object
     for i in range(0, len(target_object.material_slots)):
@@ -1254,6 +1256,9 @@ def glb_to_thor(
     logger.debug("CAGE EXTRUSION: " + str(0.02 * annotation_dict["scale"] + 0.01))
     bpy.context.scene.render.bake.margin = texture_size
 
+    # Create modular channel two-node and two-slot array...
+    socket_connections = {}
+
     # Execute source-to-target object bakes
     bpy.ops.object.select_all(action="DESELECT")
     source_object.select_set(True)
@@ -1261,6 +1266,11 @@ def glb_to_thor(
     bpy.context.view_layer.objects.active = target_object
 
     # Albedo bake
+
+    # This must be done now because the Metallic channels need to be zeroed out for the Albedo bake to work properly
+    if len(source_object.material_slots) > 0:
+        unlink_and_nodify_connections(source_object, socket_connections, "Metallic")
+
     bake_mat.node_tree.nodes.active = bake_mat_ti_albedo
     bpy.ops.object.bake(type="DIFFUSE")
 
@@ -1283,8 +1293,7 @@ def glb_to_thor(
     data_block.save_render(filepath=normal_save_path)
 
     # Metallic bake
-    # assign_to_mat_output(socket_connections, source_object)
-    assign_to_mat_output(obj, socket_connections)
+    link_to_mat_output(obj, socket_connections)
 
     bake_mat.node_tree.nodes.active = bake_mat_ti_metallic
     bpy.ops.object.bake(type="EMIT")
@@ -1296,7 +1305,7 @@ def glb_to_thor(
     metallic_save_path = os.path.join(output_dir, metallic_map_name)
     data_block.save_render(filepath=metallic_save_path)
     
-    reconnect_metallic_connections(obj, socket_connections)
+    relink_connections(obj, socket_connections, "Metallic")
 
     # Roughness bake
     bake_mat.node_tree.nodes.active = bake_mat_ti_roughness
@@ -1319,6 +1328,23 @@ def glb_to_thor(
     logger.debug(f"Saving {emission_map_name}...")
     emission_save_path = os.path.join(output_dir, emission_map_name)
     data_block.save_render(filepath=emission_save_path)
+
+    # # Transparency bake
+    # if len(source_object.material_slots) > 0:
+    #     unlink_and_nodify_connections(source_object, socket_connections, "Alpha")
+
+    # link_to_mat_output(obj, socket_connections)
+    # bake_mat.node_tree.nodes.active = bake_mat_ti_transparency
+    # bpy.ops.object.bake(type="EMIT")
+
+    # transparency_map_name = "transparency.png"
+    # # Save out transparency map texture
+    # data_block = bpy.data.images["Target_Object_Transparency_Bake"]
+    # logger.debug(f"Saving {transparency_map_name}...")
+    # transparency_save_path = os.path.join(output_dir, transparency_map_name)
+    # data_block.save_render(filepath=transparency_save_path)
+
+    # relink_connections(obj, socket_connections, "Alpha")
 
     albedo_path = (
         albedo_map_name
@@ -1345,6 +1371,11 @@ def glb_to_thor(
         if relative_texture_paths
         else os.path.join(output_dir, f"{emission_map_name}")
     )
+    # transparency_path = (
+    #     transparency_map_name
+    #     if relative_texture_paths
+    #     else os.path.join(output_dir, f"{transparency_map_name}")
+    # )
 
     # save_path = os.path.join(output_dir, f"{object_name}.json")
     json_save_path = get_json_save_path(output_dir, object_name)
