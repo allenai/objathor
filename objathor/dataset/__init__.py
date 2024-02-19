@@ -61,6 +61,7 @@ def download_with_locking(url: str, save_path: str, lock_path: str, desc: str = 
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 download_with_progress_bar(url=url, save_path=save_path, desc=desc)
 
+
 def load_annotations_path(dsc: DatasetSaveConfig = DEFAULT_DSC) -> str:
     annotations_file_name = "annotations.json.gz"
     annotations_path = os.path.join(dsc.VERSIONED_PATH, annotations_file_name)
@@ -72,6 +73,7 @@ def load_annotations_path(dsc: DatasetSaveConfig = DEFAULT_DSC) -> str:
         desc="Downloading annotations.",
     )
     return annotations_path
+
 
 def load_annotations(dsc: DatasetSaveConfig = DEFAULT_DSC) -> Dict[str, Any]:
     return compress_json.load(load_annotations_path(dsc))
@@ -112,4 +114,3 @@ def load_assets_path(
             print(f"Assets saved to {asset_save_path}")
 
     return asset_save_path
-
