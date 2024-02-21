@@ -712,7 +712,7 @@ def is_object_closed(obj):
     return True
 
 
-def delete_transparent_faces_and_materials(obj: bpy.ops.object):
+def delete_transparent_faces_and_materials(obj: bpy.ops.object, alphaThreshold: float = 1):
     transparent_material_indices = []
 
     # Index all transparent materials
@@ -725,7 +725,7 @@ def delete_transparent_faces_and_materials(obj: bpy.ops.object):
                     alpha_input = node.inputs['Alpha']
                     alpha = alpha_input.default_value
                     # Check if the alpha input is linked or alpha is not equal to 1 (fully opaque)
-                    if alpha_input.is_linked or alpha != 1:
+                    if alpha_input.is_linked or alpha < alphaThreshold:
                         transparent_material_indices.append(index)
                         break
 
@@ -1055,7 +1055,7 @@ def glb_to_thor(
 
     # NUCLEAR OPTION
     # Delete all transparent or semi-transparent faces
-    delete_transparent_faces_and_materials(source_object)
+    delete_transparent_faces_and_materials(source_object, 1)
 
     # Run initial weld of close-contact vertices
     logger.debug("Welding close-contact vertices...")
