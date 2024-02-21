@@ -286,11 +286,19 @@ def get_initial_annotation(
     annotation = annotation["annotations"]
     annotation["uid"] = uid
 
-    if get_best_synset:
-        annotation["synset"] = get_best_synset_using_annotations(
-            annotation,
-            **dialogue_dict,
+    try:
+        if get_best_synset:
+            annotation["synset"] = get_best_synset_using_annotations(
+                annotation,
+                **dialogue_dict,
+            )
+    except:
+        print(
+            f"[ERROR] Failed to get best synset using annotations for uid {uid}. Annotations"
+            f" are {annotation}",
+            flush=True,
         )
+        raise
 
     if "synset" in annotation:
         annotation["wn_version"] = "oewn:2022"

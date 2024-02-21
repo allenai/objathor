@@ -72,7 +72,7 @@ def render_glb_from_angles(
     if verbose:
         print(out)
 
-    print(f"Exited with code {result_code}")
+    print(f"Rendering: exited with code {result_code}")
 
     success = result_code == 0
 

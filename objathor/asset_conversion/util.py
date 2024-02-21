@@ -389,6 +389,7 @@ def create_asset(
     )
     if file_extension not in EXTENSIONS_LOADABLE_IN_UNITY:
         load_file_in_unity = False
+
     copy_to_dir = (
         os.path.join(thor_controller._build.base_dir)
         if copy_to_dir is None

@@ -19,12 +19,27 @@ from objathor.annotation.objaverse_annotations_utils import (
 )
 from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
 from objathor.asset_conversion.util import get_blender_installation_path
+from objathor.constants import OBJATHOR_CACHE_PATH
 from objathor.utils.blender import render_glb_from_angles
+from objathor.utils.download_utils import download_with_locking
 
 
 @lru_cache(maxsize=1)
 def base_objaverse_annotations():
     return objaverse.load_annotations()
+
+
+@lru_cache(maxsize=1)
+def objaverse_license_info():
+    save_path = os.path.join(
+        OBJATHOR_CACHE_PATH, "uid_to_objaverse_license_info.json.gz"
+    )
+    download_with_locking(
+        url="https://pub-daedd7738a984186a00f2ab264d06a07.r2.dev/uid_to_objaverse_license_info.json.gz",
+        save_path=save_path,
+        lock_path=save_path + ".lock",
+    )
+    return compress_json.load(save_path)
 
 
 def write(
@@ -288,14 +303,7 @@ def annotate_and_optimize_asset(
 
     license_info = {}
     if is_objaverse:
-        anns = base_objaverse_annotations()[uid]
-        license_info["license_info"] = {
-            "license": anns["license"],
-            "uri": anns["asset_uri"],
-            "creator_username": anns["user"]["username"],
-            "creator_display_name": anns["user"]["displayName"],
-            "creator_profile_url": anns["user"]["profileUrl"],
-        }
+        license_info["license_info"] = objaverse_license_info()[uid]
 
     if glb_path is None:
         assert is_objaverse, "If glb_path is not provided, uid must be an objaverse uid"
