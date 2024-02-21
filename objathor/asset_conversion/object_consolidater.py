@@ -506,6 +506,7 @@ def to_dict(
     asset_name: str,
     visibility_points: Optional[Dict[str, float]] = None,
     albedo_path: str = None,
+    metallic_smoothness_path: str = None,
     normal_path: str = None,
     emission_path: str = None,
     receptacle: bool = False,
@@ -557,6 +558,7 @@ def to_dict(
             "name": asset_name,
             "receptacleCandidate": receptacle,
             "albedoTexturePath": albedo_path,
+            "metallicSmoothnessTexturePath": metallic_smoothness_path,
             "normalTexturePath": normal_path,
             "emissionTexturePath": emission_path,
             "vertices": mesh_data["vertices"],
@@ -572,6 +574,7 @@ def save_json(
     asset_name: str,
     visibility_points: Optional[Dict[str, float]] = None,
     albedo_path: str = None,
+    metallic_smoothness_path: str = None,
     normal_path: str = None,
     emission_path: str = None,
     receptacle: bool = False,
@@ -582,6 +585,7 @@ def save_json(
                 asset_name=asset_name,
                 visibility_points=visibility_points,
                 albedo_path=albedo_path,
+                metallic_smoothness_path=metallic_smoothness_path,
                 normal_path=normal_path,
                 emission_path=emission_path,
                 receptacle=receptacle,
@@ -603,6 +607,7 @@ def save_pickle_gzip(
     save_path: str,
     visibility_points: Optional[List[Dict[str, float]]] = None,
     albedo_path: str = None,
+    metallic_smoothness_path: str = None,
     normal_path: str = None,
     emission_path: str = None,
     receptacle: bool = False,
@@ -614,6 +619,7 @@ def save_pickle_gzip(
                 asset_name=asset_name,
                 visibility_points=visibility_points,
                 albedo_path=albedo_path,
+                metallic_smoothness_path=metallic_smoothness_path,
                 normal_path=normal_path,
                 emission_path=emission_path,
                 receptacle=receptacle,
@@ -706,9 +712,59 @@ def is_object_closed(obj):
     return True
 
 
-def weld_vertices(vertex_selection: tuple = ("all"), distance_threshold: float = 0.001):
+def delete_transparent_faces_and_materials(obj: bpy.ops.object):
+    transparent_material_indices = []
+
+    # Index all transparent materials
+    for index, slot in enumerate(obj.material_slots):
+        mat = slot.material
+        if mat and mat.use_nodes:
+            nodes = mat.node_tree.nodes
+            for node in nodes:
+                if node.type == 'BSDF_PRINCIPLED':
+                    alpha_input = node.inputs['Alpha']
+                    alpha = alpha_input.default_value
+                    # Check if the alpha input is linked or alpha is not equal to 1 (fully opaque)
+                    if alpha_input.is_linked or alpha != 1:
+                        transparent_material_indices.append(index)
+                        break
+
+    # Select all faces that use transparent materials
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='DESELECT')
+    mesh = bmesh.from_edit_mesh(obj.data)
+    mesh.faces.ensure_lookup_table()
+
+    # Select faces based on material index
+    for face in mesh.faces:
+        if face.material_index in transparent_material_indices:
+            face.select = True
+
+    # Update mesh to reflect face selection
+    bmesh.update_edit_mesh(obj.data)
+
+    # Delete selected faces
+    bpy.ops.mesh.delete(type='FACE')
+
+    # Switch back to Object mode
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    # Reverse the list to delete from the end to avoid reindexing issues
+    transparent_material_indices.reverse()
+
+    for index in transparent_material_indices:
+        obj.active_material_index = index
+        bpy.ops.object.material_slot_remove()
+
+    # Remove materials that are no longer used by any object (covers entire scene)
+    for mat in bpy.data.materials:
+        if mat.users == 0:
+            bpy.data.materials.remove(mat)
+
+
+def weld_vertices(obj: bpy.ops.object, vertex_selection: tuple = ("all"), distance_threshold: float = 0.001):
     # Get the active object
-    obj = bpy.context.active_object
+    bpy.context.view_layer.objects.active = obj
 
     # Make sure the active object is a mesh
     if obj.type == "MESH":
@@ -798,7 +854,7 @@ def unlink_and_nodify_connections(obj, cached_connections, channel):
                             'to_node': bsdf_principled_node,
                             'to_socket': target_input
                         }
-                    
+
                     # If channel is Metallic, set target value to 0 (so Albedo bake works)
                     if channel == "Metallic":
                         target_input.default_value = 0
@@ -844,6 +900,56 @@ def relink_connections(obj, cached_connections, channel):
             # Create the Material Output link if both sockets are valid
             if from_socket and to_socket:
                 node_tree.links.new(from_socket, to_socket)
+
+
+def combine_maps_into_RGB_A(image_RGB, image_A, invert_A: bool = True) -> bpy.types.Image:
+    # Create a new compositing node tree
+    bpy.context.scene.use_nodes = True
+    tree = bpy.context.scene.node_tree
+    links = tree.links
+
+    # Clear default nodes
+    for node in tree.nodes:
+        tree.nodes.remove(node)
+
+    # Create image nodes for RGB and alpha images
+    image_RGB_node = tree.nodes.new('CompositorNodeImage')
+    image_RGB_node.image = image_RGB
+
+    image_A_node = tree.nodes.new('CompositorNodeImage')
+    image_A_node.image = image_A
+
+    invert_node = tree.nodes.new("CompositorNodeInvert")
+    converter_node = tree.nodes.new("CompositorNodeConvertColorSpace")
+    converter_node.from_color_space = 'sRGB'
+    converter_node.to_color_space = 'Linear'
+
+    # Output
+    output_node = tree.nodes.new('CompositorNodeComposite')
+    # output_node.use_alpha = True
+
+    # Connect RGB image to Composite node's image input
+    links.new(image_RGB_node.outputs['Image'], output_node.inputs['Image'])
+
+    if (invert_A):
+        # Connect alpha image to Invert node's color input
+        links.new(image_A_node.outputs['Image'], invert_node.inputs['Color'])
+    
+        # Connect Invert node's color output to Composite node's alpha input
+        links.new(invert_node.outputs['Color'], converter_node.inputs['Image'])
+        links.new(converter_node.outputs['Image'], output_node.inputs['Alpha'])
+
+    else:
+        # Connect alpha image to Composite node's alpha input
+        links.new(image_A_node.outputs['Image'], output_node.inputs['Alpha'])
+
+    # Set render resolution
+    bpy.context.scene.render.resolution_x = image_RGB.size[0]
+    bpy.context.scene.render.resolution_y = image_RGB.size[1]
+
+    # Render and return the result
+    bpy.ops.render.render(write_still=True)
+    return bpy.data.images['Render Result']
 
 def delete_everything():
     materials = bpy.data.materials
@@ -944,19 +1050,21 @@ def glb_to_thor(
     bpy.context.view_layer.objects.active = bpy.data.objects[0]
     bpy.ops.object.join()
 
-    obj = bpy.data.objects[0]
-    bpy.context.view_layer.objects.active = obj
+    source_object = bpy.data.objects[0]
+    bpy.context.view_layer.objects.active = source_object
+
+    # NUCLEAR OPTION
+    # Delete all transparent or semi-transparent faces
+    delete_transparent_faces_and_materials(source_object)
 
     # Run initial weld of close-contact vertices
     logger.debug("Welding close-contact vertices...")
-    logger.debug("PRE-BORDER WELD: " + str(len(obj.data.vertices)))
-    weld_vertices(vertex_selection=("border"), distance_threshold=0.0001)
-    logger.debug("POST-BORDER WELD: " + str(len(obj.data.vertices)))
+    logger.debug("PRE-BORDER WELD: " + str(len(source_object.data.vertices)))
+    weld_vertices(obj=source_object, vertex_selection=("border"), distance_threshold=0.0001)
+    logger.debug("POST-BORDER WELD: " + str(len(source_object.data.vertices)))
 
     bpy.ops.mesh.customdata_custom_splitnormals_clear()
     bpy.context.object.data.auto_smooth_angle = math.radians(180)
-
-    source_object = bpy.context.selected_objects[0]
 
     # Check whether mesh is open or not
     open_mesh = is_mesh_open(source_object)
@@ -1041,7 +1149,7 @@ def glb_to_thor(
     bpy.ops.object.join()
     source_object = bpy.context.selected_objects[0]
     purge_orphan_data()
-    
+
     bpy.ops.object.select_all(action="DESELECT")
     target_object.select_set(True)
     bpy.context.view_layer.objects.active = target_object
@@ -1097,7 +1205,7 @@ def glb_to_thor(
                 logger.debug(
                     f"Additional weld required. Pre: {str(len(target_object.data.vertices))}"
                 )
-                weld_vertices(vertex_selection=("nonborder"), distance_threshold=0.001)
+                weld_vertices(obj=source_object, vertex_selection=("nonborder"), distance_threshold=0.001)
                 logger.debug(f"Post: {str(len(target_object.data.vertices))}")
                 regularize_normals()
 
@@ -1137,7 +1245,7 @@ def glb_to_thor(
             decimation_iter_current += 1
     else:
         logger.debug("Poly-count limit subceeded. Skipping decimation...")
-    
+
     purge_orphan_data()
 
     # MATERIAL CREATION
@@ -1185,25 +1293,25 @@ def glb_to_thor(
         bake_mat_nm.outputs["Normal"], bake_mat_bsdf.inputs["Normal"]
     )
 
-    # Metallic map setup
-    bake_mat_ti_metallic = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
-    bake_mat_ti_metallic.image = bpy.data.images.new(
-        "Target_Object_Metallic_Bake", texture_size, texture_size
-    )
+    # # Metallic map setup
+    # bake_mat_ti_metallic = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
+    # bake_mat_ti_metallic.image = bpy.data.images.new(
+    #     "Target_Object_Metallic_Bake", texture_size, texture_size
+    # )
 
-    bake_mat.node_tree.links.new(
-        bake_mat_ti_metallic.outputs["Color"], bake_mat_bsdf.inputs["Metallic"]
-    )
+    # bake_mat.node_tree.links.new(
+    #     bake_mat_ti_metallic.outputs["Color"], bake_mat_bsdf.inputs["Metallic"]
+    # )
 
-    # Roughness map setup
-    bake_mat_ti_roughness = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
-    bake_mat_ti_roughness.image = bpy.data.images.new(
-        "Target_Object_Roughness_Bake", texture_size, texture_size
-    )
+    # # Roughness map setup
+    # bake_mat_ti_roughness = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
+    # bake_mat_ti_roughness.image = bpy.data.images.new(
+    #     "Target_Object_Roughness_Bake", texture_size, texture_size
+    # )
 
-    bake_mat.node_tree.links.new(
-        bake_mat_ti_roughness.outputs["Color"], bake_mat_bsdf.inputs["Roughness"]
-    )
+    # bake_mat.node_tree.links.new(
+    #     bake_mat_ti_roughness.outputs["Color"], bake_mat_bsdf.inputs["Roughness"]
+    # )
 
     # Emission map setup
     bake_mat_ti_emission = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
@@ -1293,7 +1401,7 @@ def glb_to_thor(
     data_block.save_render(filepath=normal_save_path)
 
     # Metallic bake
-    link_to_mat_output(obj, socket_connections)
+    link_to_mat_output(source_object, socket_connections)
 
     bake_mat.node_tree.nodes.active = bake_mat_ti_metallic
     bpy.ops.object.bake(type="EMIT")
@@ -1304,8 +1412,8 @@ def glb_to_thor(
     logger.debug(f"Saving {metallic_map_name}...")
     metallic_save_path = os.path.join(output_dir, metallic_map_name)
     data_block.save_render(filepath=metallic_save_path)
-    
-    relink_connections(obj, socket_connections, "Metallic")
+
+    relink_connections(source_object, socket_connections, "Metallic")
 
     # Roughness bake
     bake_mat.node_tree.nodes.active = bake_mat_ti_roughness
@@ -1317,6 +1425,14 @@ def glb_to_thor(
     logger.debug(f"Saving {roughness_map_name}...")
     roughness_save_path = os.path.join(output_dir, roughness_map_name)
     data_block.save_render(filepath=roughness_save_path)
+
+    # Composite metallic and roughness maps into metallic-smoothness map
+    metallic_smoothness_map_name = "metallic_smoothness.png"
+    # Save out metallic_smoothness map texture
+    data_block = combine_maps_into_RGB_A(bpy.data.images["Target_Object_Metallic_Bake"], bpy.data.images["Target_Object_Roughness_Bake"], True)
+    logger.debug(f"Saving {metallic_smoothness_map_name}...")
+    metallic_smoothness_save_path = os.path.join(output_dir, metallic_smoothness_map_name)
+    data_block.save_render(filepath=metallic_smoothness_save_path)
 
     # Emission bake
     bake_mat.node_tree.nodes.active = bake_mat_ti_emission
@@ -1333,7 +1449,7 @@ def glb_to_thor(
     # if len(source_object.material_slots) > 0:
     #     unlink_and_nodify_connections(source_object, socket_connections, "Alpha")
 
-    # link_to_mat_output(obj, socket_connections)
+    # link_to_mat_output(source_object, socket_connections)
     # bake_mat.node_tree.nodes.active = bake_mat_ti_transparency
     # bpy.ops.object.bake(type="EMIT")
 
@@ -1344,7 +1460,7 @@ def glb_to_thor(
     # transparency_save_path = os.path.join(output_dir, transparency_map_name)
     # data_block.save_render(filepath=transparency_save_path)
 
-    # relink_connections(obj, socket_connections, "Alpha")
+    # relink_connections(source_object, socket_connections, "Alpha")
 
     albedo_path = (
         albedo_map_name
@@ -1355,6 +1471,11 @@ def glb_to_thor(
         normal_map_name
         if relative_texture_paths
         else os.path.join(output_dir, f"{normal_map_name}")
+    )
+    metallic_smoothness_path = (
+        metallic_smoothness_map_name
+        if relative_texture_paths
+        else os.path.join(output_dir, f"{metallic_smoothness_map_name}")
     )
     metallic_path = (
         metallic_map_name
@@ -1445,7 +1566,7 @@ def glb_to_thor(
     purge_orphan_data()
 
     # Delete source object (Comment when iterating (to use as reference comparison), uncomment for final rollout)
-    bpy.data.objects.remove(source_object)
+    # bpy.data.objects.remove(source_object)
 
     target_object.select_set(True)
     bpy.context.view_layer.objects.active = target_object
@@ -1506,6 +1627,7 @@ def glb_to_thor(
             save_path=picklegz_save_path,
             visibility_points=visibility_points,
             albedo_path=albedo_path,
+            metallic_smoothness_path=metallic_smoothness_path,
             normal_path=normal_path,
             emission_path=emission_path,
             receptacle=receptacle,
@@ -1516,6 +1638,7 @@ def glb_to_thor(
             save_path=json_save_path,
             visibility_points=visibility_points,
             albedo_path=albedo_path,
+            metallic_smoothness_path=metallic_smoothness_path,
             normal_path=normal_path,
             emission_path=emission_path,
             receptacle=receptacle,

@@ -178,7 +178,7 @@ def glb_to_thor(
         asset_json = load_existing_thor_asset_file(os.path.abspath(object_out_dir), uid)
 
         save_dir = os.path.dirname(thor_obj_path)
-        for k in ["albedo", "normal", "emission"]:
+        for k in ["albedo", "metallicSmoothness", "normal", "emission"]:
             compress_image_to_ssim_threshold(
                 input_path=os.path.join(save_dir, f"{k}.png"),
                 output_path=os.path.join(save_dir, f"{k}.jpg"),
