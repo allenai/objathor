@@ -1294,25 +1294,25 @@ def glb_to_thor(
         bake_mat_nm.outputs["Normal"], bake_mat_bsdf.inputs["Normal"]
     )
 
-    # # Metallic map setup
-    # bake_mat_ti_metallic = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
-    # bake_mat_ti_metallic.image = bpy.data.images.new(
-    #     "Target_Object_Metallic_Bake", texture_size, texture_size
-    # )
+    # Metallic map setup
+    bake_mat_ti_metallic = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
+    bake_mat_ti_metallic.image = bpy.data.images.new(
+        "Target_Object_Metallic_Bake", texture_size, texture_size
+    )
 
-    # bake_mat.node_tree.links.new(
-    #     bake_mat_ti_metallic.outputs["Color"], bake_mat_bsdf.inputs["Metallic"]
-    # )
+    bake_mat.node_tree.links.new(
+        bake_mat_ti_metallic.outputs["Color"], bake_mat_bsdf.inputs["Metallic"]
+    )
 
-    # # Roughness map setup
-    # bake_mat_ti_roughness = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
-    # bake_mat_ti_roughness.image = bpy.data.images.new(
-    #     "Target_Object_Roughness_Bake", texture_size, texture_size
-    # )
+    # Roughness map setup
+    bake_mat_ti_roughness = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
+    bake_mat_ti_roughness.image = bpy.data.images.new(
+        "Target_Object_Roughness_Bake", texture_size, texture_size
+    )
 
-    # bake_mat.node_tree.links.new(
-    #     bake_mat_ti_roughness.outputs["Color"], bake_mat_bsdf.inputs["Roughness"]
-    # )
+    bake_mat.node_tree.links.new(
+        bake_mat_ti_roughness.outputs["Color"], bake_mat_bsdf.inputs["Roughness"]
+    )
 
     # Emission map setup
     bake_mat_ti_emission = bake_mat.node_tree.nodes.new(type="ShaderNodeTexImage")
@@ -1478,16 +1478,16 @@ def glb_to_thor(
         if relative_texture_paths
         else os.path.join(output_dir, f"{metallic_smoothness_map_name}")
     )
-    metallic_path = (
-        metallic_map_name
-        if relative_texture_paths
-        else os.path.join(output_dir, f"{metallic_map_name}")
-    )
-    roughness_path = (
-        roughness_map_name
-        if relative_texture_paths
-        else os.path.join(output_dir, f"{roughness_map_name}")
-    )
+    # metallic_path = (
+    #     metallic_map_name
+    #     if relative_texture_paths
+    #     else os.path.join(output_dir, f"{metallic_map_name}")
+    # )
+    # roughness_path = (
+    #     roughness_map_name
+    #     if relative_texture_paths
+    #     else os.path.join(output_dir, f"{roughness_map_name}")
+    # )
     emission_path = (
         emission_map_name
         if relative_texture_paths
