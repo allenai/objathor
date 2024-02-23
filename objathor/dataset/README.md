@@ -8,7 +8,7 @@ Objathor datasets (i.e. assets, annotations, and (if available) retrieval featur
 You can download the assets,  annotations, and metadata separately for a specific version of the dataset, for example:
 ```bash
 python -m objathor.dataset.download_annotations --version 2023_07_28
-python -m objathor.dataset.download_dataset --version 2023_07_28
+python -m objathor.dataset.download_assets --version 2023_07_28
 ```
 By default, these will save to `~/.objathor-assets/2023_07_28/annotations.json.gz` and `~/.objathor-assets/2023_07_28/assets/` respectively.
 You can change this the directory by using the `--path` argument.
