@@ -11,6 +11,10 @@ def download_with_progress_bar(url: str, save_path: str, desc: str = ""):
         response = requests.get(url, stream=True)
         total_length = response.headers.get("content-length")
 
+        content_type = response.headers.get("content-type")
+        if content_type.startswith("text/html"):
+            raise ValueError(f"Invalid URL: {url}")
+
         if total_length is None:  # no content length header
             f.write(response.content)
         else:

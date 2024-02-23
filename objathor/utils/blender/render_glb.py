@@ -80,7 +80,9 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
     # Calculate camera position for each azimuth
     for azimuth in azimuths:
         # Calculate camera position
-        radians = math.radians(azimuth)
+        radians = math.radians(
+            -90 + azimuth
+        )  # Needed to render from the front facing angle
         x = math.cos(radians)
         y = math.sin(radians)
 
@@ -97,6 +99,7 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
         camera.rotation_mode = "XYZ"
         look_at = Vector((0, 0, 0))  # Origin coordinates
         direction = look_at - Vector(camera.location)
+
         # point the cameras '-Z' and use its 'Y' as up
         rot_quat = direction.to_track_quat("-Z", "Y")
         camera.rotation_euler = rot_quat.to_euler()

@@ -8,7 +8,7 @@ import random
 import shutil
 import sys
 from collections import defaultdict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 # TODO import shared libs, not sure how to find inside of blender
 # from data_generation.asset_conversion.util import get_json_save_path
@@ -468,6 +468,7 @@ def bake_image(
 # GPT generated so doubt it works
 def to_dict(
     asset_name: str,
+    annotation_dict: Dict[str, Any],
     visibility_points: Optional[Dict[str, float]] = None,
     albedo_path: str = None,
     normal_path: str = None,
@@ -517,7 +518,6 @@ def to_dict(
         )
 
         return {
-            # "action": "CreateRuntimeAsset",
             "name": asset_name,
             "receptacleCandidate": receptacle,
             "albedoTexturePath": albedo_path,
@@ -528,12 +528,20 @@ def to_dict(
             "normals": mesh_data["normals"],
             "visibilityPoints": visibility_points,
             "uvs": mesh_data["uvs"],
+            "physicalProperties": {
+                "mass": annotation_dict.get("mass", 1.0),
+                "drag": annotation_dict.get("drag", 0),
+                "angularDrag": annotation_dict.get("angularDrag", 0.05),
+                "useGravity": annotation_dict.get("useGravity", True),
+                "isKinematic": annotation_dict.get("isKinematic", False),
+            },
         }
 
 
 def save_json(
     save_path: str,
     asset_name: str,
+    annotation_dict: Dict[str, Any],
     visibility_points: Optional[Dict[str, float]] = None,
     albedo_path: str = None,
     normal_path: str = None,
@@ -549,6 +557,7 @@ def save_json(
                 normal_path=normal_path,
                 emission_path=emission_path,
                 receptacle=receptacle,
+                annotation_dict=annotation_dict,
             ),
             f,
             indent=2,
@@ -565,6 +574,7 @@ def compress_file(input_file_path: str, output_file_path: str, compresslevel=2):
 def save_pickle_gzip(
     asset_name: str,
     save_path: str,
+    annotation_dict: Dict[str, Any],
     visibility_points: Optional[List[Dict[str, float]]] = None,
     albedo_path: str = None,
     normal_path: str = None,
@@ -581,6 +591,7 @@ def save_pickle_gzip(
                 normal_path=normal_path,
                 emission_path=emission_path,
                 receptacle=receptacle,
+                annotation_dict=annotation_dict,
             ),
             file=f,
             protocol=4,
@@ -1313,6 +1324,7 @@ def glb_to_thor(
             normal_path=normal_path,
             emission_path=emission_path,
             receptacle=receptacle,
+            annotation_dict=annotation_dict,
         )
     else:
         save_json(
@@ -1323,6 +1335,7 @@ def glb_to_thor(
             normal_path=normal_path,
             emission_path=emission_path,
             receptacle=receptacle,
+            annotation_dict=annotation_dict,
         )
 
     # Re-orient object post-export, for visual feedback

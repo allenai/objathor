@@ -5,6 +5,24 @@ import compress_json
 import tqdm
 
 
+def add_thor_metadata_to_existing_annotations(annotations_path: str, assets_dir: str):
+    annotations = compress_json.load(annotations_path)
+
+    fails = 0
+    for id, ann in tqdm.tqdm(annotations.items()):
+        thor_metadata_path = os.path.join(assets_dir, id, "thor_metadata.json")
+        if os.path.exists(thor_metadata_path):
+            ann["thor_metadata"] = compress_json.load(thor_metadata_path)
+            del ann["thor_metadata"]["objectMetadata"]
+        else:
+            fails += 1
+            print(
+                f"Warning: No THOR metadata found for {id} at path {thor_metadata_path}."
+            )
+
+    compress_json.dump(annotations, annotations_path, json_kwargs={"indent": 2})
+
+
 def prepare_annotations(save_dir: str, assets_dir: str):
     # For each asset in the assets directory, get the annotations, and save them to a file.
 
@@ -20,10 +38,23 @@ def prepare_annotations(save_dir: str, assets_dir: str):
     for dir in tqdm.tqdm(os.scandir(assets_dir)):
         if os.path.isdir(dir):
             annotations_path = os.path.join(dir, "annotations.json.gz")
+            thor_metadata_path = os.path.join(dir, "thor_metadata.json")
+
             if os.path.exists(annotations_path):
                 annotations = compress_json.load(annotations_path)
 
                 assert annotations["uid"] == os.path.basename(dir)
+
+                assert "thor_metadata" not in annotations
+                if os.path.exists(thor_metadata_path):
+                    annotations["thor_metadata"] = compress_json.load(
+                        thor_metadata_path
+                    )
+                else:
+                    print(
+                        f"Warning: No THOR metadata found for {annotations['uid']} at path {thor_metadata_path}."
+                    )
+                    annotations["thor_metadata"] = {}
 
                 all_annotations[annotations["uid"]] = annotations
 

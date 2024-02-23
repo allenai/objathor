@@ -10,7 +10,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from time import perf_counter
-from typing import Any, List, Dict, Sequence, Optional
+from typing import Any, List, Dict, Sequence, Optional, Union
 
 import ai2thor.controller
 import numpy as np
@@ -314,9 +314,12 @@ def validate_in_thor(
     skybox_color=(255, 255, 255),
     load_file_in_unity=False,
     extension=None,
-    angle_increment: int = 90,
-    axes=((0, 1, 0),),  # (1, 0, 0)),
+    angles: Union[int, Sequence[float]] = 90,
+    axes=((0, 1, 0),),
 ):
+    controller.reset(scene="Procedural")
+    controller.step(action="DeleteLRUFromProceduralCache", assetLimit=0)
+
     evt = None
     try:
         evt = create_asset(
@@ -335,11 +338,12 @@ def validate_in_thor(
             return False, None
 
         asset_metadata = evt.metadata["actionReturn"]
+        if asset_metadata is not None:
+            del asset_metadata["objectMetadata"]
 
         if not skip_images:
-            angles = [
-                n * angle_increment for n in range(0, round(360 / angle_increment))
-            ]
+            if isinstance(angles, int):
+                angles = [n * angles for n in range(0, round(360 / angles))]
             rotations = [(x, y, z, degrees) for degrees in angles for (x, y, z) in axes]
             evt = view_asset_in_thor(
                 asset_name,
@@ -515,6 +519,7 @@ def optimize_assets_for_thor(
                         flush=True,
                     )
 
+            asset_metadata: Optional[Dict[str, Any]] = None
             if success and not skip_thor_creation:
                 import ai2thor.controller
                 import ai2thor.fifo_server
@@ -532,8 +537,10 @@ def optimize_assets_for_thor(
                             server_class=ai2thor.fifo_server.FifoServer,
                             antiAliasing=None if skip_thor_visualization else "fxaa",
                             quality="Very Low" if skip_thor_visualization else "Ultra",
+                            makeAgentsVisible=False,
                         )
 
+                    controller.initialization_parameters["makeAgentsVisible"] = False
                     success, asset_metadata = validate_in_thor(
                         controller=controller,
                         asset_dir=asset_out_dir,
@@ -544,15 +551,18 @@ def optimize_assets_for_thor(
                         skybox_color=skybox_color,
                         load_file_in_unity=not send_asset_to_controller,
                         extension=extension,
+                        angles=[0, 45, 90, 180, 270, 360 - 45],
                     )
-                    controller.reset(scene="Procedural")
+
+                    if success:
+                        assert asset_metadata is not None
 
                     if add_visualize_thor_actions:
                         objathor.asset_conversion.add_visualize_thor_actions(
                             asset_id=uid, asset_dir=asset_out_dir
                         )
 
-                if success and asset_metadata:
+                if success and asset_metadata is not None:
                     with open(metadata_output_file, "w") as f:
                         json.dump(asset_metadata, f, indent=2)
 
@@ -571,6 +581,8 @@ def optimize_assets_for_thor(
         end = time.perf_counter()
         print(f"Total Runtime: {end-start_process_time}s")
 
+    except:
+        print(traceback.format_exc())
     finally:
         try:
             if not given_controller:

@@ -101,7 +101,9 @@ def annotate_asset(
                 local_renders=True,
             ),
         )
-        anno["pose_z_rot_angle"] = np.deg2rad(render_angles[anno["frontView"]])
+
+        # -1.0 * ... needed to undo the rotation of the object in the render
+        anno["pose_z_rot_angle"] = -1.0 * np.deg2rad(render_angles[anno["frontView"]])
 
         anno["scale"] = float(anno["height"]) / 100
         anno["z_axis_scale"] = True

@@ -1,7 +1,6 @@
-import copy
 from argparse import ArgumentParser
 
-from objathor.dataset import DEFAULT_DSC, load_annotations_path
+from objathor.dataset import DEFAULT_DSC, load_annotations_path, DatasetSaveConfig
 
 
 def download_parse_args(description: str):
@@ -17,8 +16,8 @@ def download_parse_args(description: str):
     parser.add_argument(
         "--path",
         type=str,
-        default=DEFAULT_DSC.PATH,
-        help=f"The dir to download to (default: {DEFAULT_DSC.PATH}).",
+        default=DEFAULT_DSC.BASE_PATH,
+        help=f"The dir to download to (default: {DEFAULT_DSC.BASE_PATH}).",
     )
     args = parser.parse_args()
     return args
@@ -29,9 +28,10 @@ if __name__ == "__main__":
         description="Download annotations from the dataset repository.",
     )
 
-    dsc = copy.deepcopy(DEFAULT_DSC)
-    dsc.VERSION = args.version
-    dsc.PATH = args.path
+    dsc = DatasetSaveConfig(
+        VERSION=args.version,
+        BASE_PATH=args.path,
+    )
 
     path = load_annotations_path(dsc)
     print(f"Annotations downloaded to {path}")
