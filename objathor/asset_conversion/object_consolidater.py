@@ -726,7 +726,7 @@ def delete_transparent_faces_and_materials(obj: bpy.ops.object, alphaThreshold: 
                     alpha_input = node.inputs['Alpha']
                     alpha = alpha_input.default_value
                     # Check if the alpha input is linked or alpha is not equal to 1 (fully opaque)
-                    if alpha_input.is_linked or alpha < alphaThreshold:
+                    if not alpha_input.is_linked and alpha < alphaThreshold:
                         transparent_material_indices.append(index)
                         break
 
@@ -1567,7 +1567,7 @@ def glb_to_thor(
     purge_orphan_data()
 
     # Delete source object (Comment when iterating (to use as reference comparison), uncomment for final rollout)
-    # bpy.data.objects.remove(source_object)
+    bpy.data.objects.remove(source_object)
 
     target_object.select_set(True)
     bpy.context.view_layer.objects.active = target_object
