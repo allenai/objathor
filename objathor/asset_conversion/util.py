@@ -10,7 +10,7 @@ from typing import Tuple
 
 import numpy as np
 
-from objathor.asset_conversion.asset_conversion_constants import EMPTY_HOUSE_JSON_PATH
+from asset_conversion_constants import EMPTY_HOUSE_JSON_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -324,15 +324,21 @@ def create_runtime_asset_file(
 
 
 def change_asset_paths(asset, save_dir):
-    asset["normalTexturePath"] = os.path.join(
-        save_dir,
-        asset["name"],
-        os.path.basename(asset["normalTexturePath"]),
-    )
     asset["albedoTexturePath"] = os.path.join(
         save_dir,
         asset["name"],
         os.path.basename(asset["albedoTexturePath"]),
+    )
+    if "metallicSmoothnessTexturePath" in asset:
+        asset["metallicSmoothnessTexturePath"] = os.path.join(
+            save_dir,
+            asset["name"],
+            os.path.basename(asset["metallicSmoothnessTexturePath"]),
+        )
+    asset["normalTexturePath"] = os.path.join(
+        save_dir,
+        asset["name"],
+        os.path.basename(asset["normalTexturePath"]),
     )
     if "emissionTexturePath" in asset:
         asset["emissionTexturePath"] = os.path.join(
@@ -444,6 +450,7 @@ def create_asset(
                     "name",
                     "receptacleCandidate",
                     "albedoTexturePath",
+                    "metallicSmoothnessTexturePath",
                     "normalTexturePath",
                 ]
             }
