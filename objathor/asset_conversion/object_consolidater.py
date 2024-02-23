@@ -81,6 +81,7 @@ def reset_scene():
     for image in bpy.data.images:
         bpy.data.images.remove(image, do_unlink=True)
 
+
 def purge_orphan_data():
     for block in bpy.data.collections:
         if block.users == 0:
@@ -97,6 +98,7 @@ def purge_orphan_data():
     for block in bpy.data.images:
         if block.users == 0:
             bpy.data.images.remove(block)
+
 
 def load_model(model_path: str) -> None:
     assert model_path.endswith(".glb")
@@ -189,8 +191,9 @@ def is_mesh_open(mesh: bpy.types.Object) -> bool:
     bpy.ops.object.editmode_toggle()
     return False
 
+
 def get_min_decimation(mesh: bpy.ops.object) -> float:
-    bpy.ops.object.select_all(action='DESELECT')
+    bpy.ops.object.select_all(action="DESELECT")
     mesh.select_set(True)
     bpy.context.view_layer.objects.active = mesh
 
@@ -207,9 +210,10 @@ def get_min_decimation(mesh: bpy.ops.object) -> float:
     dec_min = len(dec_test_object.data.polygons)
     bpy.ops.object.delete()
 
-    bpy.ops.object.select_all(action='DESELECT')
+    bpy.ops.object.select_all(action="DESELECT")
 
     return dec_min
+
 
 def decimate(mesh: bpy.types.Object, decimation_ratio: float) -> None:
     bpy.ops.object.select_all(action="DESELECT")
@@ -724,7 +728,9 @@ def is_object_closed(obj):
     return True
 
 
-def delete_transparent_faces_and_materials(obj: bpy.ops.object, alphaThreshold: float = 1):
+def delete_transparent_faces_and_materials(
+    obj: bpy.ops.object, alphaThreshold: float = 1
+):
     transparent_material_indices = []
 
     # Index all transparent materials
@@ -733,8 +739,8 @@ def delete_transparent_faces_and_materials(obj: bpy.ops.object, alphaThreshold: 
         if mat and mat.use_nodes:
             nodes = mat.node_tree.nodes
             for node in nodes:
-                if node.type == 'BSDF_PRINCIPLED':
-                    alpha_input = node.inputs['Alpha']
+                if node.type == "BSDF_PRINCIPLED":
+                    alpha_input = node.inputs["Alpha"]
                     alpha = alpha_input.default_value
                     # Check if the alpha input is linked or alpha is not equal to 1 (fully opaque)
                     if not alpha_input.is_linked and alpha < alphaThreshold:
@@ -742,8 +748,8 @@ def delete_transparent_faces_and_materials(obj: bpy.ops.object, alphaThreshold: 
                         break
 
     # Select all faces that use transparent materials
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='DESELECT')
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="DESELECT")
     mesh = bmesh.from_edit_mesh(obj.data)
     mesh.faces.ensure_lookup_table()
 
@@ -756,10 +762,10 @@ def delete_transparent_faces_and_materials(obj: bpy.ops.object, alphaThreshold: 
     bmesh.update_edit_mesh(obj.data)
 
     # Delete selected faces
-    bpy.ops.mesh.delete(type='FACE')
+    bpy.ops.mesh.delete(type="FACE")
 
     # Switch back to Object mode
-    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode="OBJECT")
 
     # Reverse the list to delete from the end to avoid reindexing issues
     transparent_material_indices.reverse()
@@ -774,7 +780,11 @@ def delete_transparent_faces_and_materials(obj: bpy.ops.object, alphaThreshold: 
             bpy.data.materials.remove(mat)
 
 
-def weld_vertices(obj: bpy.ops.object, vertex_selection: tuple = ("all"), distance_threshold: float = 0.001):
+def weld_vertices(
+    obj: bpy.ops.object,
+    vertex_selection: tuple = ("all"),
+    distance_threshold: float = 0.001,
+):
     # Get the active object
     bpy.context.view_layer.objects.active = obj
 
@@ -824,7 +834,7 @@ def weld_vertices(obj: bpy.ops.object, vertex_selection: tuple = ("all"), distan
 
 def regularize_normals():
     bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_mode(type='VERT')
+    bpy.ops.mesh.select_mode(type="VERT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.object.mode_set(mode="OBJECT")
@@ -837,7 +847,7 @@ def unlink_and_nodify_connections(obj, cached_connections, channel):
             node_tree = mat_slot.material.node_tree
             for node in node_tree.nodes:
                 # Find the Principled BSDF node
-                if node.type == 'BSDF_PRINCIPLED':
+                if node.type == "BSDF_PRINCIPLED":
                     bsdf_principled_node = node
                     target_input = bsdf_principled_node.inputs.get(channel)
                     if target_input.is_linked:
@@ -845,10 +855,10 @@ def unlink_and_nodify_connections(obj, cached_connections, channel):
 
                         # Cache connection info
                         cached_connections[mat_slot_index] = {
-                            'from_node': link.from_node,
-                            'from_socket': link.from_socket,
-                            'to_node': bsdf_principled_node,
-                            'to_socket': target_input
+                            "from_node": link.from_node,
+                            "from_socket": link.from_socket,
+                            "to_node": bsdf_principled_node,
+                            "to_socket": target_input,
                         }
 
                         # Disconnect the link
@@ -857,14 +867,16 @@ def unlink_and_nodify_connections(obj, cached_connections, channel):
                     else:
                         # Create a Value node and set its value to material's target-channel's current value
                         source_node = node_tree.nodes.new(type="ShaderNodeValue")
-                        source_node.outputs[0].default_value = target_input.default_value
+                        source_node.outputs[0].default_value = (
+                            target_input.default_value
+                        )
 
                         # Cache connection info
                         cached_connections[mat_slot_index] = {
-                            'from_node': source_node,
-                            'from_socket': source_node.outputs[0],
-                            'to_node': bsdf_principled_node,
-                            'to_socket': target_input
+                            "from_node": source_node,
+                            "from_socket": source_node.outputs[0],
+                            "to_node": bsdf_principled_node,
+                            "to_socket": target_input,
                         }
 
                     # If channel is Metallic, set target value to 0 (so Albedo bake works)
@@ -874,47 +886,65 @@ def unlink_and_nodify_connections(obj, cached_connections, channel):
 
 def link_to_mat_output(obj, cached_connections):
     for mat_slot_index, conn_info in cached_connections.items():
-        mat_slot = obj.material_slots[mat_slot_index] if mat_slot_index < len(obj.material_slots) else None
+        mat_slot = (
+            obj.material_slots[mat_slot_index]
+            if mat_slot_index < len(obj.material_slots)
+            else None
+        )
         node_tree = mat_slot.material.node_tree
 
         # Find input and output nodes and sockets
-        from_node = conn_info['from_node']
-        from_socket = conn_info['from_socket']
+        from_node = conn_info["from_node"]
+        from_socket = conn_info["from_socket"]
 
-        to_node = next((node for node in node_tree.nodes if node.type == 'OUTPUT_MATERIAL'), None)
-        to_socket = to_node.inputs['Surface']
+        to_node = next(
+            (node for node in node_tree.nodes if node.type == "OUTPUT_MATERIAL"), None
+        )
+        to_socket = to_node.inputs["Surface"]
 
         node_tree.links.new(from_socket, to_socket)
 
 
 def relink_connections(obj, cached_connections, channel):
     for mat_slot_index, conn_info in cached_connections.items():
-        mat_slot = obj.material_slots[mat_slot_index] if mat_slot_index < len(obj.material_slots) else None
+        mat_slot = (
+            obj.material_slots[mat_slot_index]
+            if mat_slot_index < len(obj.material_slots)
+            else None
+        )
         if mat_slot and mat_slot.material and mat_slot.material.use_nodes:
             node_tree = mat_slot.material.node_tree
 
             # Directly use the node and socket references from cached_connections for target-channel connections
-            from_node = conn_info['from_node']
-            from_socket = conn_info['from_socket']
-            to_node = conn_info['to_node']
-            to_socket = conn_info['to_socket']
+            from_node = conn_info["from_node"]
+            from_socket = conn_info["from_socket"]
+            to_node = conn_info["to_node"]
+            to_socket = conn_info["to_socket"]
 
             # Create the target-channel link if both sockets are valid
             if from_socket and to_socket:
                 node_tree.links.new(from_socket, to_socket)
 
             # Directly use the node and socket references from cached_connections for target-channel connections
-            from_node = next((node for node in node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
-            from_socket = from_node.outputs['BSDF']
-            to_node = next((node for node in node_tree.nodes if node.type == 'OUTPUT_MATERIAL'), None)
-            to_socket = to_node.inputs['Surface']
+            from_node = next(
+                (node for node in node_tree.nodes if node.type == "BSDF_PRINCIPLED"),
+                None,
+            )
+            from_socket = from_node.outputs["BSDF"]
+            to_node = next(
+                (node for node in node_tree.nodes if node.type == "OUTPUT_MATERIAL"),
+                None,
+            )
+            to_socket = to_node.inputs["Surface"]
 
             # Create the Material Output link if both sockets are valid
             if from_socket and to_socket:
                 node_tree.links.new(from_socket, to_socket)
 
 
-def combine_maps_into_RGB_A(image_RGB, image_A, invert_A: bool = True) -> bpy.types.Image:
+def combine_maps_into_RGB_A(
+    image_RGB, image_A, invert_A: bool = True
+) -> bpy.types.Image:
     # Create a new compositing node tree
     bpy.context.scene.use_nodes = True
     tree = bpy.context.scene.node_tree
@@ -925,35 +955,35 @@ def combine_maps_into_RGB_A(image_RGB, image_A, invert_A: bool = True) -> bpy.ty
         tree.nodes.remove(node)
 
     # Create image nodes for RGB and alpha images
-    image_RGB_node = tree.nodes.new('CompositorNodeImage')
+    image_RGB_node = tree.nodes.new("CompositorNodeImage")
     image_RGB_node.image = image_RGB
 
-    image_A_node = tree.nodes.new('CompositorNodeImage')
+    image_A_node = tree.nodes.new("CompositorNodeImage")
     image_A_node.image = image_A
 
     invert_node = tree.nodes.new("CompositorNodeInvert")
     converter_node = tree.nodes.new("CompositorNodeConvertColorSpace")
-    converter_node.from_color_space = 'sRGB'
-    converter_node.to_color_space = 'Linear'
+    converter_node.from_color_space = "sRGB"
+    converter_node.to_color_space = "Linear"
 
     # Output
-    output_node = tree.nodes.new('CompositorNodeComposite')
+    output_node = tree.nodes.new("CompositorNodeComposite")
     # output_node.use_alpha = True
 
     # Connect RGB image to Composite node's image input
-    links.new(image_RGB_node.outputs['Image'], output_node.inputs['Image'])
+    links.new(image_RGB_node.outputs["Image"], output_node.inputs["Image"])
 
-    if (invert_A):
+    if invert_A:
         # Connect alpha image to Invert node's color input
-        links.new(image_A_node.outputs['Image'], invert_node.inputs['Color'])
-    
+        links.new(image_A_node.outputs["Image"], invert_node.inputs["Color"])
+
         # Connect Invert node's color output to Composite node's alpha input
-        links.new(invert_node.outputs['Color'], converter_node.inputs['Image'])
-        links.new(converter_node.outputs['Image'], output_node.inputs['Alpha'])
+        links.new(invert_node.outputs["Color"], converter_node.inputs["Image"])
+        links.new(converter_node.outputs["Image"], output_node.inputs["Alpha"])
 
     else:
         # Connect alpha image to Composite node's alpha input
-        links.new(image_A_node.outputs['Image'], output_node.inputs['Alpha'])
+        links.new(image_A_node.outputs["Image"], output_node.inputs["Alpha"])
 
     # Set render resolution
     bpy.context.scene.render.resolution_x = image_RGB.size[0]
@@ -961,7 +991,8 @@ def combine_maps_into_RGB_A(image_RGB, image_A, invert_A: bool = True) -> bpy.ty
 
     # Render and return the result
     bpy.ops.render.render(write_still=True)
-    return bpy.data.images['Render Result']
+    return bpy.data.images["Render Result"]
+
 
 def delete_everything():
     materials = bpy.data.materials
@@ -1072,7 +1103,9 @@ def glb_to_thor(
     # Run initial weld of close-contact vertices
     logger.debug("Welding close-contact vertices...")
     logger.debug("PRE-BORDER WELD: " + str(len(source_object.data.vertices)))
-    weld_vertices(obj=source_object, vertex_selection=("border"), distance_threshold=0.0001)
+    weld_vertices(
+        obj=source_object, vertex_selection=("border"), distance_threshold=0.0001
+    )
     logger.debug("POST-BORDER WELD: " + str(len(source_object.data.vertices)))
 
     bpy.ops.mesh.customdata_custom_splitnormals_clear()
@@ -1217,7 +1250,11 @@ def glb_to_thor(
                 logger.debug(
                     f"Additional weld required. Pre: {str(len(target_object.data.vertices))}"
                 )
-                weld_vertices(obj=source_object, vertex_selection=("nonborder"), distance_threshold=0.001)
+                weld_vertices(
+                    obj=source_object,
+                    vertex_selection=("nonborder"),
+                    distance_threshold=0.001,
+                )
                 logger.debug(f"Post: {str(len(target_object.data.vertices))}")
                 regularize_normals()
 
@@ -1229,7 +1266,9 @@ def glb_to_thor(
                     # Adding "squeaky-axle" coefficient to difficult-to-decimate asset, to strike balance between decent quality and some amount of decimation
                     squeaky_axle_coefficient = 1.5
                     target_poly_count = squeaky_axle_coefficient * dec_min
-                logger.debug(f"NEW MINIMUM DECIMATION POLY-COUNT IS {str(target_poly_count)}")
+                logger.debug(
+                    f"NEW MINIMUM DECIMATION POLY-COUNT IS {str(target_poly_count)}"
+                )
             else:
                 logger.debug(
                     "No additional weld necessary. Proceeding to decimation..."
@@ -1441,9 +1480,15 @@ def glb_to_thor(
     # Composite metallic and roughness maps into metallic-smoothness map
     metallic_smoothness_map_name = "metallic_smoothness.png"
     # Save out metallic_smoothness map texture
-    data_block = combine_maps_into_RGB_A(bpy.data.images["Target_Object_Metallic_Bake"], bpy.data.images["Target_Object_Roughness_Bake"], True)
+    data_block = combine_maps_into_RGB_A(
+        bpy.data.images["Target_Object_Metallic_Bake"],
+        bpy.data.images["Target_Object_Roughness_Bake"],
+        True,
+    )
     logger.debug(f"Saving {metallic_smoothness_map_name}...")
-    metallic_smoothness_save_path = os.path.join(output_dir, metallic_smoothness_map_name)
+    metallic_smoothness_save_path = os.path.join(
+        output_dir, metallic_smoothness_map_name
+    )
     data_block.save_render(filepath=metallic_smoothness_save_path)
 
     # Emission bake
@@ -1559,10 +1604,10 @@ def glb_to_thor(
             bpy.ops.object.duplicate()
             bpy.context.view_layer.objects.active = bpy.context.selected_objects[-1]
             bpy.ops.object.mode_set(mode="EDIT")
-            bpy.ops.mesh.select_mode(type='FACE')
-            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.select_mode(type="FACE")
+            bpy.ops.mesh.select_all(action="SELECT")
             bpy.ops.mesh.flip_normals()
-            bpy.ops.mesh.select_all(action='DESELECT')
+            bpy.ops.mesh.select_all(action="DESELECT")
             bpy.ops.object.mode_set(mode="OBJECT")
         else:
             logger.debug("MESH-ELEMENT HAS BORDER: FALSE")

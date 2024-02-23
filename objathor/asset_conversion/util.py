@@ -10,7 +10,9 @@ from typing import Tuple
 
 import numpy as np
 
-from asset_conversion_constants import EMPTY_HOUSE_JSON_PATH
+from objathor.asset_conversion.asset_conversion_constants import (
+    EMPTY_HOUSE_JSON_PATH,
+)  # DO NOT CHANGE THIS IMPORT, talk to Luca if something is broken for you
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +69,13 @@ def compress_image_to_ssim_threshold(
     from PIL import Image
 
     # Load the image inside the function
-    original_img_rgba = Image.open(input_path)
-    original_img_rgba_on_white = Image.new("RGBA", original_img_rgba.size, "WHITE")
-    original_img_rgba_on_white.paste(original_img_rgba, (0, 0), original_img_rgba)
-    original_img = original_img_rgba_on_white.convert("RGB")
+    if input_path.lower().endswith(".jpg"):
+        original_img = Image.open(input_path).convert("RGB")
+    else:
+        original_img_rgba = Image.open(input_path)
+        original_img_rgba_on_white = Image.new("RGBA", original_img_rgba.size, "WHITE")
+        original_img_rgba_on_white.paste(original_img_rgba, (0, 0), original_img_rgba)
+        original_img = original_img_rgba_on_white.convert("RGB")
 
     original_img_np = np.array(original_img)
     assert original_img_np.shape[2] == 3
