@@ -41,6 +41,7 @@ FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
 
 BLENDER_PROCESS_FAIL = "blender_process_fail"
+BLENDER_PROCESS_TIMEOUT_FAIL = "blender_process_timeout_fail"
 IMAGE_COMPRESS_FAIL = "png_to_jpg_compression_fail"
 GENERATE_COLLIDERS_FAIL = "vhacd_generate_colliders_fail"
 THOR_CREATE_ASSET_FAIL = "thor_create_asset_fail"
@@ -134,6 +135,8 @@ def glb_to_thor(
         print(f"For {uid}, running command: {command}")
 
     process = None
+    out = None
+    timeout_hit = False
     try:
         process = subprocess.Popen(
             command,
@@ -153,14 +156,21 @@ def glb_to_thor(
             process.wait(timeout=timeout)
         result_code = -1
         out = f"Command timed out, command: {command}"
+        timeout_hit = True
     except subprocess.CalledProcessError as e:
         result_code = e.returncode
-        print(f"Blender call error: {e.output}, {out}")
-        out = f"{out}, Exception: {e.output}"
+        print(f"Blender call error: {out}\n{traceback.format_exc()}")
+        out = f"{out}, Exception: {traceback.format_exc()}"
     except Exception as e:
-        result_code = e.returncode
-        print(f"Blender process error: {e.output}")
-        out = e.output
+        fmted_trace = traceback.format_exc()
+        try:
+            result_code = e.returncode
+            out = f"{e.output}\n{fmted_trace}"
+        except:
+            result_code = -1
+            out = f"Blender process error: {fmted_trace}"
+
+        print(f"Blender process error: {traceback.format_exc()}")
 
     if not capture_stdout:
         print(f"Exited with code {result_code}")
@@ -175,7 +185,11 @@ def glb_to_thor(
             # Blender bug process exits with error due to minor memory leak but object is converted successfully
             success = True
         else:
-            failed_objects[uid]["failure_reason"] = BLENDER_PROCESS_FAIL
+            if timeout_hit:
+                failed_objects[uid]["blender_output"] = BLENDER_PROCESS_TIMEOUT_FAIL
+            else:
+                failed_objects[uid]["failure_reason"] = BLENDER_PROCESS_FAIL
+
             failed_objects[uid]["blender_output"] = out if out else ""
             return False
 
