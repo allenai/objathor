@@ -395,6 +395,7 @@ def create_asset(
     )
     if file_extension not in EXTENSIONS_LOADABLE_IN_UNITY:
         load_file_in_unity = False
+
     copy_to_dir = (
         os.path.join(thor_controller._build.base_dir)
         if copy_to_dir is None
@@ -487,6 +488,61 @@ def make_single_object_house(
 
 
 def view_asset_in_thor(
+    asset_id,
+    controller,
+    output_dir,
+    rotations=tuple(),
+    instance_id="asset_0",
+    house_path=EMPTY_HOUSE_JSON_PATH,
+    skybox_color=(255, 255, 255),
+):
+    from PIL import Image
+
+    assert all(
+        tuple(r[:3]) == (0, 1, 0) for r in rotations
+    ), "Only rotations about z are supported."
+
+    house = make_single_object_house(
+        asset_id=asset_id,
+        instance_id=instance_id,
+        house_path=house_path,
+        skybox_color=skybox_color,
+    )
+    controller.step(action="CreateHouse", house=house)
+    controller.step(
+        "Teleport", position={"x": 0, "y": 1000.0, "z": 0}, forceAction=True
+    )
+
+    angles = [r[-1] for r in rotations]
+
+    frame_shape = controller.last_event.frame.shape
+    controller.step("BBoxDistance", objectId0=instance_id, objectId1=instance_id)
+    evt = controller.step(
+        "RenderObjectFromAngles",
+        objectId=instance_id,
+        renderResolution={"x": frame_shape[1], "y": frame_shape[0]},
+        angles=angles,
+        cameraHeightMultiplier=0.5,
+        raise_for_failure=True,
+    )
+
+    png_bytes_list = evt.metadata["actionReturn"]
+    assert len(png_bytes_list) == len(angles)
+
+    os.makedirs(output_dir, exist_ok=True)
+    for png_bytes, rotation in zip(png_bytes_list, rotations):
+        im = Image.open(BytesIO(png_bytes)).convert("RGB")
+        im.save(
+            os.path.join(
+                output_dir,
+                f"{rotation[0]}_{rotation[1]}_{rotation[2]}_{rotation[3]:0.1f}.jpg",
+            )
+        )
+
+    return controller.last_event
+
+
+def view_asset_in_thor_old(
     asset_id,
     controller,
     output_dir,

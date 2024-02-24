@@ -10,13 +10,12 @@ GPT_TIMEOUT_SECONDS = 10
 GPT_SLEEP_AFTER_ISSUE_SECONDS = 5
 DEFAULT_MAX_ATTEMPTS = 10
 
-DEFAULT_CHAT = "gpt-4"
 DEFAULT_EMBED = "text-embedding-ada-002"
 
 _OPENAI_CLIENT = None
 
 
-def client():
+def client() -> openai.OpenAI:
     global _OPENAI_CLIENT
     if _OPENAI_CLIENT is None:
         _OPENAI_CLIENT = openai.OpenAI(timeout=GPT_TIMEOUT_SECONDS)
@@ -102,7 +101,7 @@ def get_embedding(
 def get_answer(
     prompt: Sequence[Message],
     dialog: Sequence[Message],
-    model: str = DEFAULT_CHAT,
+    model: str,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     verbose: bool = True,
     **chat_completion_cfg: Any,
@@ -129,7 +128,9 @@ def get_answer(
             pt = completion.usage.prompt_tokens
             ct = completion.usage.completion_tokens
             print(
-                f"Prompt tokens: {pt}. Completion tokens: {ct}. Approx cost: ${(pt * 0.01 + ct * 0.03)/1000:.2g}."
+                f"Prompt tokens: {pt}."
+                f" Completion tokens: {ct}."
+                f" Approx cost: ${(pt * 0.01 + ct * 0.03)/1000:.2g}."
             )
 
         return res

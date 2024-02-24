@@ -15,6 +15,7 @@ from objathor.annotation.synset_from_description import (
     PICK_SINGLE_SYNSET_USING_OBJECT_INFO_TEMPLATE,
     synset_to_summary_str,
 )
+from objathor.constants import VISION_LLM, TEXT_LLM
 from objathor.utils.gpt_utils import get_answer
 from objathor.utils.queries import Text, Image, ComposedMessage
 
@@ -146,7 +147,7 @@ def describe_asset_from_views(
     all_gpt_kwargs = GPTDialogue(
         prompt=[prompt],
         dialog=[ComposedMessage(user_messages)],
-        model="gpt-4-vision-preview",
+        model=VISION_LLM,
     )
     all_gpt_kwargs.update(gpt_kwargs)
 
@@ -251,7 +252,7 @@ def get_best_synset_using_annotations(
 
     dialogue_dict["prompt"] = [prompt]
     dialogue_dict["dialog"] = [ComposedMessage(user_messages)]
-    dialogue_dict["model"] = "gpt-4-1106-preview"
+    dialogue_dict["model"] = TEXT_LLM
 
     answer = get_answer(**dialogue_dict).strip().lower()
 
@@ -286,10 +287,21 @@ def get_initial_annotation(
     annotation = annotation["annotations"]
     annotation["uid"] = uid
 
-    if get_best_synset:
-        annotation["synset"] = get_best_synset_using_annotations(
-            annotation,
-            **dialogue_dict,
+    try:
+        if get_best_synset:
+            annotation["synset"] = get_best_synset_using_annotations(
+                annotation,
+                **dialogue_dict,
+            )
+    except:
+        print(
+            f"[ERROR] Failed to get best synset using annotations for uid {uid}. Annotations"
+            f" are {annotation}",
+            flush=True,
         )
+        raise
+
+    if "synset" in annotation:
+        annotation["wn_version"] = "oewn:2022"
 
     return annotation, urls
