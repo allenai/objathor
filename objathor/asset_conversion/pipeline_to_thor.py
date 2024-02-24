@@ -10,7 +10,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from time import perf_counter
-from typing import Any, List, Dict, Sequence, Optional, Union
+from typing import Any, List, Dict, Sequence, Optional, Union, Literal
 
 import PIL.Image
 import ai2thor.controller
@@ -415,25 +415,24 @@ def optimize_assets_for_thor(
     uid_to_glb_path: Dict[str, str],
     annotations_path: str,
     max_colliders: int,
-    skip_glb: bool,
     blender_as_module: bool,
-    extension: str,
+    extension: Literal[".json", "json.gz", ".pkl.gz", ".msgpack", ".msgpack.gz"],
+    skip_conversion: bool,
+    skip_colliders: bool = False,
+    skip_thor_metadata: bool = False,
+    skip_thor_render: bool = False,
     thor_platform: Optional[str] = None,
     blender_installation_path: Optional[str] = None,
     controller: ai2thor.controller.Controller = None,
     live: bool = False,
-    save_as_pkl: bool = False,
     absolute_texture_paths: bool = False,
     delete_objs: bool = False,
     keep_json_asset: bool = False,
-    skip_thor_creation: bool = False,
     width: int = 300,
     height: int = 300,
-    skip_thor_visualization: bool = False,
     skybox_color: Sequence[int] = (255, 255, 255),
     send_asset_to_controller: bool = False,
     add_visualize_thor_actions: bool = False,
-    skip_colliders: bool = False,
     report_out_file_name: Optional[str] = "failed_objects.json",
     log_prefix="",
     timeout: Optional[int] = None,
@@ -471,7 +470,7 @@ def optimize_assets_for_thor(
                 sub_annotations_path = annotations_path
 
             success = True
-            if not skip_glb:
+            if not skip_conversion:
                 with Timer(f"{log_prefix}GLB to THOR ({uid})"):
                     success = glb_to_thor(
                         glb_path=glb_path,
@@ -481,14 +480,13 @@ def optimize_assets_for_thor(
                         failed_objects=failed_objects,
                         capture_stdout=not live,
                         generate_obj=True,
-                        save_as_json=not save_as_pkl,
+                        save_as_json=True,
                         relative_texture_paths=not absolute_texture_paths,
                         run_blender_as_module=blender_as_module,
                         blender_instalation_path=blender_installation_path,
                         timeout=timeout,
                     )
 
-                # print(f"uid in failed {uid in failed_objects} 'Progress: 100.00%' in failed_objects[uid]['blender_output'] {'Progress: 100.00%' in failed_objects[uid]['blender_output']}")
                 # Blender bug process exits with error due to minor memory leak but object is converted successfully
                 if (
                     uid in failed_objects
@@ -552,13 +550,13 @@ def optimize_assets_for_thor(
                         asset_size += os.path.getsize(p) / (1024 * 1024)
 
                     print(
-                        f"{log_prefix} Original asset size {glb_size:.2f} MB,"
+                        f"{log_prefix}Original asset size {glb_size:.2f} MB,"
                         f" new asset size {asset_size:.2f}MB ({100 * (1 - asset_size / glb_size):0.2f}% reduction)",
                         flush=True,
                     )
 
             asset_metadata: Optional[Dict[str, Any]] = None
-            if success and not skip_thor_creation:
+            if success and not skip_thor_metadata:
                 import ai2thor.controller
                 import ai2thor.fifo_server
 
@@ -573,8 +571,8 @@ def optimize_assets_for_thor(
                             width=width,
                             height=height,
                             server_class=ai2thor.fifo_server.FifoServer,
-                            antiAliasing=None if skip_thor_visualization else "fxaa",
-                            quality="Very Low" if skip_thor_visualization else "Ultra",
+                            antiAliasing=None if skip_thor_render else "fxaa",
+                            quality="Very Low" if skip_thor_render else "Ultra",
                             makeAgentsVisible=False,
                         )
 
@@ -585,7 +583,7 @@ def optimize_assets_for_thor(
                         asset_name=uid,
                         output_dir=os.path.join(asset_out_dir, "thor_renders"),
                         failed_objects=failed_objects,
-                        skip_images=skip_thor_visualization,
+                        skip_images=skip_thor_render,
                         skybox_color=skybox_color,
                         load_file_in_unity=not send_asset_to_controller,
                         extension=extension,
@@ -657,6 +655,7 @@ def main(args):
         "--annotations",
         type=str,
         default="",
+        help="Path to the annotations file, if it is a directory then we'll look for the annotations file.",
     )
     parser.add_argument(
         "--live",
@@ -671,12 +670,12 @@ def main(args):
         help="Maximum hull colliders for collider extraction with TestVHACD.",
     )
     parser.add_argument(
-        "--skip_glb", action="store_true", help="Skips glb to json generation."
-    )
-    parser.add_argument(
         "--delete_objs",
         action="store_true",
         help="Deletes objs after generating colliders.",
+    )
+    parser.add_argument(
+        "--skip_conversion", action="store_true", help="Skips glb conversion."
     )
     parser.add_argument(
         "--skip_colliders",
@@ -684,12 +683,12 @@ def main(args):
         help="Skips obj to json collider generation.",
     )
     parser.add_argument(
-        "--skip_thor_creation",
+        "--skip_thor_metadata",
         action="store_true",
         help="Skips THOR asset creation and visualization.",
     )
     parser.add_argument(
-        "--skip_thor_visualization",
+        "--skip_thor_render",
         action="store_true",
         help="Skips THOR asset visualization.",
     )
@@ -714,10 +713,6 @@ def main(args):
     )
 
     parser.add_argument(
-        "--save_as_pkl", action="store_true", help="Saves asset as pickle gz."
-    )
-
-    parser.add_argument(
         "--absolute_texture_paths",
         action="store_true",
         help="Saves textures as absolute paths.",
@@ -725,7 +720,7 @@ def main(args):
 
     parser.add_argument(
         "--extension",
-        choices=[".json", ".pkl.gz", ".msgpack", ".msgpack.gz", ".gz"],
+        choices=[".json", "json.gz", ".pkl.gz", ".msgpack", ".msgpack.gz"],
         default=".json",
     )
 
@@ -744,7 +739,7 @@ def main(args):
     parser.add_argument(
         "--keep_json_asset",
         action="store_true",
-        help="Whether it keeps the intermediate .json asset file when storing in a different format to json.",
+        help="Whether it keeps the intermediate .json asset file when using a non-json `extension`.",
     )
 
     found_blender = False
@@ -758,7 +753,8 @@ def main(args):
         "--blender_installation_path",
         type=str,
         default=None,
-        help="Blender installation path, when blender_as_module = False and we cannot find the installation path automatically.",
+        help="Blender installation path, when blender_as_module = False and"
+        " we cannot find the installation path automatically.",
         required=(not found_blender) and "--blender_as_module" not in args,
     )
 
@@ -811,29 +807,29 @@ def main(args):
     else:
         raise ValueError("Must specify either `uids` or `glb_paths`.")
 
+    # noinspection PyTestUnpassedFixture
     optimize_assets_for_thor(
         output_dir=args.output_dir,
         uid_to_glb_path=uid_to_glb_path,
         annotations_path=args.annotations,
         max_colliders=args.max_colliders,
-        skip_glb=args.skip_glb,
+        skip_conversion=args.skip_conversion,
+        skip_colliders=args.skip_colliders,
+        skip_thor_metadata=args.skip_thor_metadata,
+        skip_thor_render=args.skip_thor_render,
         blender_as_module=args.blender_as_module,
         extension=args.extension,
         thor_platform=args.thor_platform,
         blender_installation_path=args.blender_installation_path,
         live=args.live,
-        save_as_pkl=args.save_as_pkl,
         absolute_texture_paths=args.absolute_texture_paths,
         delete_objs=args.delete_objs,
         keep_json_asset=args.keep_json_asset,
-        skip_thor_creation=args.skip_thor_creation,
         width=args.width,
         height=args.height,
-        skip_thor_visualization=args.skip_thor_visualization,
         skybox_color=tuple(map(int, args.skybox_color.split(","))),
         send_asset_to_controller=args.send_asset_to_controller,
         add_visualize_thor_actions=args.add_visualize_thor_actions,
-        skip_colliders=args.skip_colliders,
     )
 
 
