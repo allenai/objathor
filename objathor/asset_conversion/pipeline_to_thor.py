@@ -85,10 +85,9 @@ def glb_to_thor(
     capture_stdout=False,
     timeout=None,
     generate_obj=True,
-    save_as_json=False,
     relative_texture_paths=True,
     run_blender_as_module=None,
-    blender_instalation_path=None,
+    blender_installation_path=None,
 ):
     os.makedirs(object_out_dir, exist_ok=True)
 
@@ -103,13 +102,10 @@ def glb_to_thor(
 
     if not run_blender_as_module:
         command = (
-            f"{blender_instalation_path if blender_instalation_path is not None else get_blender_installation_path()}"
+            f"{blender_installation_path if blender_installation_path is not None else get_blender_installation_path()}"
             f" --background"
             f" --python {os.path.join(ABS_PATH_OF_OBJATHOR, 'asset_conversion', 'object_consolidater.py')}"
             f" --"
-            f' --object_path="{os.path.abspath(glb_path)}"'
-            f' --output_dir="{os.path.abspath(object_out_dir)}"'
-            f' --annotations="{annotations_path}"'
         )
     else:
         command = (
@@ -122,11 +118,14 @@ def glb_to_thor(
             f' --annotations="{annotations_path}"'
         )
 
+    command += (
+        f' --object_path="{os.path.abspath(glb_path)}"'
+        f' --output_dir="{os.path.abspath(object_out_dir)}"'
+        f' --annotations="{annotations_path}"'
+    )
+
     if generate_obj:
         command = command + " --obj"
-
-    if save_as_json:
-        command = command + " --save_as_json"
 
     if relative_texture_paths:
         command = command + " --relative_texture_paths"
@@ -175,7 +174,9 @@ def glb_to_thor(
     if not capture_stdout:
         print(f"Exited with code {result_code}")
 
-    success = result_code == 0
+    success = result_code == 0 and os.path.exists(
+        os.path.join(object_out_dir, f"{uid}.obj")
+    )
 
     if success:
         if not capture_stdout:
@@ -501,10 +502,9 @@ def optimize_assets_for_thor(
                         failed_objects=failed_objects,
                         capture_stdout=not live,
                         generate_obj=True,
-                        save_as_json=True,
                         relative_texture_paths=not absolute_texture_paths,
                         run_blender_as_module=blender_as_module,
-                        blender_instalation_path=blender_installation_path,
+                        blender_installation_path=blender_installation_path,
                         timeout=timeout,
                     )
 

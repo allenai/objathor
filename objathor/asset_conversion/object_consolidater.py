@@ -1022,7 +1022,6 @@ def glb_to_thor(
     annotations_file: str,
     save_obj: bool,
     engine="CYCLES",
-    save_as_json=False,
     relative_texture_paths=True,
 ):
     logging.basicConfig(level=logging.DEBUG, format=FORMAT)
@@ -1680,30 +1679,17 @@ def glb_to_thor(
 
     visibility_points = get_visibility_points(target_object, visualize=True)
 
-    if not save_as_json:
-        save_pickle_gzip(
-            asset_name=object_name,
-            save_path=picklegz_save_path,
-            visibility_points=visibility_points,
-            albedo_path=albedo_path,
-            metallic_smoothness_path=metallic_smoothness_path,
-            normal_path=normal_path,
-            emission_path=emission_path,
-            receptacle=receptacle,
-            annotation_dict=annotation_dict,
-        )
-    else:
-        save_json(
-            asset_name=object_name,
-            save_path=json_save_path,
-            visibility_points=visibility_points,
-            albedo_path=albedo_path,
-            metallic_smoothness_path=metallic_smoothness_path,
-            normal_path=normal_path,
-            emission_path=emission_path,
-            receptacle=receptacle,
-            annotation_dict=annotation_dict,
-        )
+    save_json(
+        asset_name=object_name,
+        save_path=json_save_path,
+        visibility_points=visibility_points,
+        albedo_path=albedo_path,
+        metallic_smoothness_path=metallic_smoothness_path,
+        normal_path=normal_path,
+        emission_path=emission_path,
+        receptacle=receptacle,
+        annotation_dict=annotation_dict,
+    )
 
     # Re-orient object post-export, for visual feedback
     mirror_object(target_object)
@@ -1751,8 +1737,6 @@ if __name__ == "__main__":
 
     parser.add_argument("--obj", action="store_true")
 
-    parser.add_argument("--save_as_json", action="store_true")
-
     argv = sys.argv[sys.argv.index("--") + 1 :]
     args = parser.parse_args(argv)
     glb_to_thor(
@@ -1761,6 +1745,5 @@ if __name__ == "__main__":
         engine=args.engine,
         annotations_file=args.annotations,
         save_obj=args.obj,
-        save_as_json=args.save_as_json,
         relative_texture_paths=args.relative_texture_paths,
     )
