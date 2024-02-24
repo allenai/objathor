@@ -199,9 +199,9 @@ def get_colliders(
 
         if not os.path.exists(output_obj_path):
             result_info["failed"] = True
-            result_info[
-                "stderr"
-            ] = f"VHACD did not generate 'decomp.obj'. Unsuccessful run of command: {command}"
+            result_info["stderr"] = (
+                f"VHACD did not generate 'decomp.obj'. Unsuccessful run of command: {command}"
+            )
             return [], result_info
 
         decompose_obj(output_obj_path)
@@ -273,9 +273,9 @@ def get_colliders_vhacd41(
     should_exist = obj_file.replace(".obj", "000.obj")
     if not os.path.exists(should_exist):
         result_info["failed"] = True
-        result_info[
-            "stderr"
-        ] = f"VHACD did not generate '{should_exist}'. Unsuccessful run of command: {command}"
+        result_info["stderr"] = (
+            f"VHACD did not generate '{should_exist}'. Unsuccessful run of command: {command}"
+        )
         return [], result_info
 
     vhacd_outputs = glob.glob(obj_file.replace(".obj", "???.obj"))
