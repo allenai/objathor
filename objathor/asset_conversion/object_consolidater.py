@@ -18,20 +18,22 @@ try:
     import bmesh
 except ImportError as e:
     raise ImportError(
-        f"{e}: Blender is not installed, make sure to either run 'pip install bpy' to install it as a module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html"
+        f"{e}: Blender is not installed, make sure to either run 'pip install bpy' to install it as a"
+        f" module or as an application https://docs.blender.org/manual/en/latest/getting_started/installing/index.html"
     )
 
 import pickle
 
 import numpy as np
 
-
-dir_path = os.path.dirname(os.path.realpath(__file__))
+# Need the objathor module to be in the path, this is a hack to ensure this happens even when
+# blender is calling this directly
+dir_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 if not dir_path in sys.path:
     sys.path.append(dir_path)
 
 import importlib
-import util
+import objathor.asset_conversion.util as util
 
 importlib.reload(util)
 
