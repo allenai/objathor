@@ -1457,12 +1457,12 @@ def glb_to_thor(
     bake_mat.node_tree.nodes.active = bake_mat_ti_metallic
     bpy.ops.object.bake(type="EMIT")
 
-    metallic_map_name = "metallic.png"
-    # Save out roughness map texture
-    data_block = bpy.data.images["Target_Object_Metallic_Bake"]
-    logger.debug(f"Saving {metallic_map_name}...")
-    metallic_save_path = os.path.join(output_dir, metallic_map_name)
-    data_block.save_render(filepath=metallic_save_path)
+    # metallic_map_name = "metallic.png"
+    # # Save out roughness map texture
+    # data_block = bpy.data.images["Target_Object_Metallic_Bake"]
+    # logger.debug(f"Saving {metallic_map_name}...")
+    # metallic_save_path = os.path.join(output_dir, metallic_map_name)
+    # data_block.save_render(filepath=metallic_save_path)
 
     relink_connections(source_object, socket_connections, "Metallic")
 
@@ -1470,12 +1470,12 @@ def glb_to_thor(
     bake_mat.node_tree.nodes.active = bake_mat_ti_roughness
     bpy.ops.object.bake(type="ROUGHNESS")
 
-    roughness_map_name = "roughness.png"
-    # Save out roughness map texture
-    data_block = bpy.data.images["Target_Object_Roughness_Bake"]
-    logger.debug(f"Saving {roughness_map_name}...")
-    roughness_save_path = os.path.join(output_dir, roughness_map_name)
-    data_block.save_render(filepath=roughness_save_path)
+    # roughness_map_name = "roughness.png"
+    # # Save out roughness map texture
+    # data_block = bpy.data.images["Target_Object_Roughness_Bake"]
+    # logger.debug(f"Saving {roughness_map_name}...")
+    # roughness_save_path = os.path.join(output_dir, roughness_map_name)
+    # data_block.save_render(filepath=roughness_save_path)
 
     # Composite metallic and roughness maps into metallic-smoothness map
     metallic_smoothness_map_name = "metallic_smoothness.png"

@@ -12,4 +12,4 @@ trimesh>=4.0.1
 msgpack>=1.0.7
 filelock>=3.13.1
 # TODO will be removed once THOR depends on objathor
-ai2thor @ git+https://github.com/allenai/ai2thor@13ef2aba9d0228c30d775cbae0b674f0826a97f2
+# ai2thor @ git+https://github.com/allenai/ai2thor@13ef2aba9d0228c30d775cbae0b674f0826a97f2
