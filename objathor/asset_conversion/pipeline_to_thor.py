@@ -193,7 +193,8 @@ def glb_to_thor(
                 # We don't need these maps as we have `metallic_smoothness`
                 if os.path.exists(png_path):
                     os.remove(png_path)
-                    continue
+
+                continue
 
             input_path = png_path
             if k == "metallic_smoothness":
@@ -239,7 +240,7 @@ def glb_to_thor(
         failed_objects[uid]["image_compress_fail"] = True
         #  Do we want this? confuses failure reason
         # failed_objects[uid]["blender_output"] = out
-        failed_objects[uid]["exception"] = f"{e}"
+        failed_objects[uid]["exception"] = traceback.format_exc()
         success = False
     return success
 
