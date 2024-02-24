@@ -25,7 +25,7 @@ except ImportError:
             save_thor_asset_file,
         )
     except ImportError as e:
-        sys.exit(f"{e} Error impoerint package utils.")
+        sys.exit(f"{e} Error importing utils package.")
 
 HOW_MANY_MESSED_UP_MESH = 0
 

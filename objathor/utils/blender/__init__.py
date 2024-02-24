@@ -17,15 +17,17 @@ def render_glb_from_angles(
     timeout: Optional[int] = 2 * 60,
     save_as_jpg: bool = True,
     verbose: bool = False,
+    blender_as_module: Optional[bool] = None,
 ) -> Optional[List[str]]:
-    try:
-        import bpy
+    if blender_as_module is None:
+        try:
+            import bpy
 
-        run_blender_as_module = True
-    except ImportError:
-        run_blender_as_module = False
+            blender_as_module = True
+        except ImportError:
+            blender_as_module = False
 
-    if not run_blender_as_module:
+    if not blender_as_module:
         command = (
             f"{get_blender_installation_path()}"
             f" --background"

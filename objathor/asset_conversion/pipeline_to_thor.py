@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from time import perf_counter
 from typing import Any, List, Dict, Sequence, Optional, Union
 
+import PIL.Image
 import ai2thor.controller
 import numpy as np
 import objaverse
@@ -19,7 +20,6 @@ from tqdm import tqdm
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
-
 # shared library
 from objathor.asset_conversion.util import (
     add_visualize_thor_actions,
@@ -177,16 +177,52 @@ def glb_to_thor(
         asset_json = load_existing_thor_asset_file(os.path.abspath(object_out_dir), uid)
 
         save_dir = os.path.dirname(thor_obj_path)
-        for k in ["albedo", "metallicSmoothness", "normal", "emission"]:
+        for k in [
+            "albedo",
+            "metallic_smoothness",
+            "normal",
+            "emission",
+            "roughness",
+            "metallic",
+        ]:
+            png_path = os.path.join(save_dir, f"{k}.png")
+            jpg_path = os.path.join(save_dir, f"{k}.jpg")
+
+            if k in ["roughness", "metallic"]:
+                # We don't need these maps as we have `metallic_smoothness`
+                if os.path.exists(png_path):
+                    os.remove(png_path)
+                    continue
+
+            input_path = png_path
+            if k == "metallic_smoothness":
+                # Don't want to convert metallic smoothness to jpg as this would destroy the smoothness
+                # which is encoded in the alpha channel. Instead we move the smoothness to the B channel
+                # (which isn't storing any relevant information) and then convert to jpg.
+                img = np.array(
+                    PIL.Image.open(input_path).convert("RGBA"), dtype=np.uint8
+                )
+                img[:, :, 1] = img[:, :, 0]
+                img[:, :, 2] = img[:, :, 3]
+                img[:, :, 3] = 255
+                PIL.Image.fromarray(img).convert("RGB").save(jpg_path)
+                input_path = jpg_path
+
             compress_image_to_ssim_threshold(
-                input_path=os.path.join(save_dir, f"{k}.png"),
-                output_path=os.path.join(save_dir, f"{k}.jpg"),
+                input_path=input_path,
+                output_path=jpg_path,
                 threshold=0.95,
             )
-            os.remove(os.path.join(save_dir, f"{k}.png"))
-            asset_json[f"{k}TexturePath"] = asset_json[f"{k}TexturePath"].replace(
-                ".png", ".jpg"
-            )
+
+            if k not in ["roughness", "metallic"]:
+                os.remove(png_path)
+
+                if k == "metallic_smoothness":
+                    k = "metallicSmoothness"
+
+                asset_json[f"{k}TexturePath"] = asset_json[f"{k}TexturePath"].replace(
+                    ".png", ".jpg"
+                )
 
         y_rot = compute_thor_rotation_to_obtain_min_bounding_box(
             asset_json["vertices"], max_deg_change=45, increments=91
@@ -558,7 +594,7 @@ def optimize_assets_for_thor(
                         assert asset_metadata is not None
 
                     if add_visualize_thor_actions:
-                        objathor.asset_conversion.add_visualize_thor_actions(
+                        objathor.asset_conversion.util.add_visualize_thor_actions(
                             asset_id=uid, asset_dir=asset_out_dir
                         )
 

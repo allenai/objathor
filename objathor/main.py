@@ -319,7 +319,12 @@ def annotate_and_optimize_asset(
                 glb_path=glb_path,
                 save_dir=blender_render_dir,
                 angles=(0, 90, 180, 270),
+                blender_as_module=blender_as_module,
             )
+            if len(glob.glob(os.path.join(blender_render_dir, "*"))) < 4:
+                raise ValueError(
+                    f"Failed to render the glb at {glb_path} with blender at {blender_render_dir}"
+                )
 
     # ANNOTATION
     annotations_path = os.path.join(output_dir_with_uid, f"annotations.json.gz")
