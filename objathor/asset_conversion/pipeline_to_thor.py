@@ -40,6 +40,13 @@ from objathor.constants import ABS_PATH_OF_OBJATHOR, THOR_COMMIT_ID
 FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
 
+BLENDER_PROCESS_FAIL = "blender_process_fail"
+IMAGE_COMPRESS_FAIL = "png_to_jpg_compression_fail"
+GENERATE_COLLIDERS_FAIL = "vhacd_generate_colliders_fail"
+THOR_CREATE_ASSET_FAIL = "thor_create_asset_fail"
+THOR_VIEW_ASSET_FAIL = "thor_view_asset_in_thor_fail"
+THOR_PROCESS_FAILURE = "thor_process_fail"
+
 
 @contextmanager
 def Timer(s: str, pad_len: int = 70) -> float:
@@ -163,10 +170,14 @@ def glb_to_thor(
     if success:
         if not capture_stdout:
             print(f"---- Command ran successfully for {uid} at path {glb_path}")
-
     else:
-        failed_objects[uid]["blender_process_return_fail"] = True
-        failed_objects[uid]["blender_output"] = out if out else ""
+        if "Progress: 100.00%" in out:
+            # Blender bug process exits with error due to minor memory leak but object is converted successfully
+            success = True
+        else:
+            failed_objects[uid]["failure_reason"] = BLENDER_PROCESS_FAIL
+            failed_objects[uid]["blender_output"] = out if out else ""
+            return False
 
     try:
         # The below compresses textures using the structural similarity metric
@@ -236,12 +247,10 @@ def glb_to_thor(
 
     except Exception as e:
         logger.error(f"Exception: {e}")
-        failed_objects[uid]["blender_process_crash"] = False
-        failed_objects[uid]["image_compress_fail"] = True
-        #  Do we want this? confuses failure reason
-        # failed_objects[uid]["blender_output"] = out
+        failed_objects[uid]["failure_reason"] = IMAGE_COMPRESS_FAIL
         failed_objects[uid]["exception"] = traceback.format_exc()
         success = False
+
     return success
 
 
@@ -324,21 +333,18 @@ def obj_to_colliders(
             **kwargs,
         )
         if "failed" in result_info[uid] and result_info[uid]["failed"]:
-            failed_objects[uid]["failed_generate_colliders"] = True
+            failed_objects[uid]["failure_reason"] = GENERATE_COLLIDERS_FAIL
             failed_objects[uid]["generate_colliders_info"] = result_info[uid]
             return False
         else:
             return True
 
-    except Exception as e:
-        failed_objects[uid]["failded_generate_colliders"] = True
+    except Exception:
         print("Exception while running 'generate_colliders'")
-        if hasattr(e, "message"):
-            print(e.message)
-        else:
-            print(e)
-        failed_objects[uid]["generate_colliders_exception"] = traceback.format_exc()
         print(traceback.format_exc())
+
+        failed_objects[uid]["failure_reason"] = GENERATE_COLLIDERS_FAIL
+        failed_objects[uid]["generate_colliders_exception"] = traceback.format_exc()
         return False
 
 
@@ -369,7 +375,7 @@ def validate_in_thor(
         )
         if not evt.metadata["lastActionSuccess"]:
             failed_objects[asset_name] = {
-                "failed_create_asset_in_thor": True,
+                "failure_reason": THOR_CREATE_ASSET_FAIL,
                 "lastAction": controller.last_action,
                 "errorMessage": evt.metadata["errorMessage"],
             }
@@ -392,18 +398,19 @@ def validate_in_thor(
             )
             if not evt.metadata["lastActionSuccess"]:
                 failed_objects[asset_name] = {
-                    "failed_thor_view_asset_in_thor": True,
+                    "failure_reason": THOR_VIEW_ASSET_FAIL,
                     "lastAction": controller.last_action,
                     "errorMessage": evt.metadata["errorMessage"],
                 }
                 return False, asset_metadata
+
         return True, asset_metadata
-    except Exception as e:
-        print(f"Exception: {e}")
+
+    except Exception:
         print(traceback.format_exc())
         failed_objects[asset_name] = {
-            "failed_thor_validate_in_thor": True,
-            "stderr": traceback.format_exc(),
+            "failure_reason": THOR_PROCESS_FAILURE,
+            "exception": traceback.format_exc(),
             "lastAction": controller.last_action,
             "errorMessage": evt.metadata["errorMessage"] if evt else "",
         }
@@ -486,17 +493,6 @@ def optimize_assets_for_thor(
                         blender_instalation_path=blender_installation_path,
                         timeout=timeout,
                     )
-
-                # Blender bug process exits with error due to minor memory leak but object is converted successfully
-                if (
-                    uid in failed_objects
-                    and "blender_output" in failed_objects[uid]
-                    and "Progress: 100.00%" in failed_objects[uid]["blender_output"]
-                ):
-                    # Do not include this check because sometimes it fails regardless
-                    # and  "Error: Not freed memory blocks" in failed_objects[uid]['blender_output']:
-                    success = True
-                    del failed_objects[uid]
 
             if success and not skip_colliders:
                 with Timer(f"{log_prefix}OBJ to collider ({uid})"):
