@@ -6,6 +6,7 @@ import stat
 import subprocess
 import sys
 from sys import platform
+from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -139,7 +140,7 @@ def decompose_obj(
             for l in current_file:
                 if l[:2] == "f ":
                     line_to_write = l.replace("\n", "").split(" ")[1:]
-                    # print(f"line: {line_to_write}")
+
                     vertex_numbers = [
                         int(x) - vertices_so_far for x in line_to_write if x != ""
                     ]
@@ -160,61 +161,56 @@ def get_colliders(
     result_info = {}
 
     # command for old binary
-    output_obj_name = "decomp.obj"
     extra_args = [f"--{k} {str(v)}" for k, v in kwargs.items()]
 
     if not capture_out:
         print(f"Extra args: {extra_args}")
-    # "--resolution", str(6e6),
-    command = [
-        VHACD_PATH,
-        "--maxhulls",
-        str(num_colliders),
-        "--input",
-        obj_file,
-        "--output",
-        output_obj_name,
-        *extra_args,
-    ]
 
-    if capture_out:
-        VHACD_result = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout,
-        )
+    td_obj = TemporaryDirectory()
+    with td_obj as temp_dir_str:
+        output_obj_path = os.path.join(temp_dir_str, "decomp.obj")
 
-        result_info["stderr"] = VHACD_result.stderr
-        result_info["stdout"] = VHACD_result.stdout
-    else:
-        VHACD_result = subprocess.run(command)
-    result_info["VHACD_returncode"] = VHACD_result.returncode
+        command = [
+            VHACD_PATH,
+            "--maxhulls",
+            str(num_colliders),
+            "--input",
+            obj_file,
+            "--output",
+            output_obj_path,
+            *extra_args,
+        ]
 
-    if not os.path.exists(output_obj_name):
-        result_info["failed"] = True
-        result_info["stderr"] = (
-            f"VHACD did not generate 'decomp.obj'. Unsuccessfull run of command: {command}"
-        )
-        return [], result_info
-    decompose_obj(output_obj_name)
+        if capture_out:
+            VHACD_result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=timeout,
+            )
 
-    # try:
+            result_info["stderr"] = VHACD_result.stderr
+            result_info["stdout"] = VHACD_result.stdout
+        else:
+            VHACD_result = subprocess.run(command)
 
-    # TODO: refine error checking
-    os.remove(output_obj_name)
-    if os.path.exists("decomp.stl"):
-        os.remove("decomp.stl")
+        result_info["VHACD_returncode"] = VHACD_result.returncode
 
-    decomps = glob.glob("decomp_*.obj")
-    colliders = []
+        if not os.path.exists(output_obj_path):
+            result_info["failed"] = True
+            result_info[
+                "stderr"
+            ] = f"VHACD did not generate 'decomp.obj'. Unsuccessful run of command: {command}"
+            return [], result_info
 
-    for decomp in decomps:
-        colliders.append(trimesh.load(decomp))
-        os.remove(decomp)
+        decompose_obj(output_obj_path)
+
+        colliders = []
+        for decomp in glob.glob(os.path.join(temp_dir_str, "decomp_*.obj")):
+            colliders.append(trimesh.load(decomp))
+
     out = []
-
     for collider in colliders:
         try:
             collider.vertices
@@ -223,8 +219,7 @@ def get_colliders(
             global HOW_MANY_MESSED_UP_MESH
             HOW_MANY_MESSED_UP_MESH += 1
             print("HOW_MANY_MESSED_UP_MESH", HOW_MANY_MESSED_UP_MESH)
-            # result_info["failed"] = True
-            # result_info["HOW_MANY_MESSED_UP_MESH"] = HOW_MANY_MESSED_UP_MESH
+
             continue
         out.append(
             {
@@ -278,9 +273,9 @@ def get_colliders_vhacd41(
     should_exist = obj_file.replace(".obj", "000.obj")
     if not os.path.exists(should_exist):
         result_info["failed"] = True
-        result_info["stderr"] = (
-            f"VHACD did not generate '{should_exist}'. Unsuccessful run of command: {command}"
-        )
+        result_info[
+            "stderr"
+        ] = f"VHACD did not generate '{should_exist}'. Unsuccessful run of command: {command}"
         return [], result_info
 
     vhacd_outputs = glob.glob(obj_file.replace(".obj", "???.obj"))
@@ -332,6 +327,7 @@ def set_colliders(
         msg = f"colliders already exist for {obj_file}"
         print(msg)
         return {"failed": True, "stdout": msg}
+
     colliders, result_info = get_colliders(
         obj_file, num_colliders, capture_out=capture_out, **kwargs
     )
