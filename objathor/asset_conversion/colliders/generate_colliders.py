@@ -17,6 +17,10 @@ try:
         load_existing_thor_asset_file,
         save_thor_asset_file,
     )
+
+    print(
+        f"Could not import objathor.asset_conversion.util, current paths are {sys.path}."
+    )
 except ImportError:
     try:
         from util import (
