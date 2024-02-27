@@ -5,7 +5,9 @@ from filelock import FileLock
 from tqdm import tqdm
 
 
-def download_with_progress_bar(url: str, save_path: str, desc: str = "", overwrite: bool = False):
+def download_with_progress_bar(
+    url: str, save_path: str, desc: str = "", overwrite: bool = False
+):
     if os.path.exists(save_path) and not overwrite:
         print(f"File already exists: {save_path}")
         return
