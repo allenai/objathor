@@ -520,7 +520,9 @@ def view_asset_in_thor(
 
     frame_shape = controller.last_event.frame.shape
     controller.step("BBoxDistance", objectId0=instance_id, objectId1=instance_id)
-    controller.step("AdvancePhysicsStep") # This seems necessary for the first frame not to be overexposed
+    controller.step(
+        "AdvancePhysicsStep"
+    )  # This seems necessary for the first frame not to be overexposed
     evt = controller.step(
         "RenderObjectFromAngles",
         objectId=instance_id,
