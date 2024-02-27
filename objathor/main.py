@@ -4,7 +4,7 @@ import os
 import sys
 from functools import lru_cache
 from importlib import import_module
-from typing import Union, Callable, Any, Dict, Optional, cast
+from typing import Union, Callable, Any, Dict, Optional, cast, Literal
 
 import compress_json
 import compress_pickle
@@ -183,12 +183,12 @@ def add_optimization_arguments(
         help="Skips obj to json collider generation.",
     )
     parser.add_argument(
-        "--skip_thor_creation",
+        "--skip_thor_metadata",
         action="store_true",
         help="Skips THOR asset creation and visualization.",
     )
     parser.add_argument(
-        "--skip_thor_visualization",
+        "--skip_thor_render",
         action="store_true",
         help="Skips THOR asset visualization.",
     )
@@ -210,16 +210,13 @@ def add_optimization_arguments(
         help="Comma separated list off r,g,b values for skybox thor images.",
     )
     parser.add_argument(
-        "--save_as_pkl", action="store_true", help="Saves asset as pickle gz."
-    )
-    parser.add_argument(
         "--absolute_texture_paths",
         action="store_true",
         help="Saves textures as absolute paths.",
     )
     parser.add_argument(
         "--extension",
-        choices=[".json", ".pkl.gz", ".msgpack", ".msgpack.gz", ".gz"],
+        choices=[".json", "json.gz", ".pkl.gz", ".msgpack", ".msgpack.gz"],
         default=".json",
     )
     parser.add_argument(
@@ -281,15 +278,14 @@ def annotate_and_optimize_asset(
     use_objaversehome: bool,
     max_colliders: int,
     delete_objs: bool,
-    skip_thor_creation: bool,
-    skip_thor_visualization: bool,
+    skip_thor_metadata: bool,
+    skip_thor_render: bool,
     add_visualize_thor_actions: bool,
     width: int,
     height: int,
     skybox_color: str,
-    save_as_pkl: bool,
     absolute_texture_paths: bool,
-    extension: str,
+    extension: Literal[".json", "json.gz", ".pkl.gz", ".msgpack", ".msgpack.gz"],
     send_asset_to_controller: bool,
     blender_as_module: bool,
     blender_installation_path: str,
@@ -357,20 +353,19 @@ def annotate_and_optimize_asset(
         uid_to_glb_path={uid: glb_path},
         annotations_path=output_dir,
         max_colliders=max_colliders,
-        skip_glb=False,
+        skip_conversion=False,
         blender_as_module=blender_as_module,
         extension=extension,
         thor_platform=thor_platform,
         blender_installation_path=blender_installation_path,
         live=False,
-        save_as_pkl=save_as_pkl,
         absolute_texture_paths=absolute_texture_paths,
         delete_objs=delete_objs,
         keep_json_asset=keep_json_asset,
-        skip_thor_creation=skip_thor_creation,
+        skip_thor_metadata=skip_thor_metadata,
         width=width,
         height=height,
-        skip_thor_visualization=skip_thor_visualization,
+        skip_thor_render=skip_thor_render,
         skybox_color=tuple(map(int, skybox_color.split(","))),
         send_asset_to_controller=send_asset_to_controller,
         add_visualize_thor_actions=add_visualize_thor_actions,
@@ -411,13 +406,12 @@ if __name__ == "__main__":
         use_objaversehome=args.use_objaversehome,
         max_colliders=args.max_colliders,
         delete_objs=args.delete_objs,
-        skip_thor_creation=args.skip_thor_creation,
-        skip_thor_visualization=args.skip_thor_visualization,
+        skip_thor_metadata=args.skip_thor_metadata,
+        skip_thor_render=args.skip_thor_render,
         add_visualize_thor_actions=args.add_visualize_thor_actions,
         width=args.width,
         height=args.height,
         skybox_color=args.skybox_color,
-        save_as_pkl=args.save_as_pkl,
         absolute_texture_paths=args.absolute_texture_paths,
         extension=args.extension,
         send_asset_to_controller=args.send_asset_to_controller,

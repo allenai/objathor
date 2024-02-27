@@ -91,7 +91,6 @@ if __name__ == "__main__":
             engine=engine,
             annotations_file=annotations_file,
             save_obj=save_obj,
-            save_as_json=True,
         )
 
         # from util import load_existing_thor_obj_file

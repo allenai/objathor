@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 EXTENSIONS_LOADABLE_IN_UNITY = {
     ".json",
-    ".msgpack.gz",
+    ".json.gz",
     ".msgpack",
-    ".gz",
+    ".msgpack.gz",
 }
 
 
@@ -147,11 +147,10 @@ def get_existing_thor_asset_file_path(out_dir, asset_id, force_extension=None):
     possible_paths = OrderedDict(
         [
             (".json", get_json_save_path(out_dir, asset_id)),
-            (".msgpack.gz", get_msgpackgz_save_path(out_dir, asset_id)),
-            (".msgpack", get_msgpack_save_path(out_dir, asset_id)),
-            (".pkl.gz", get_picklegz_save_path(out_dir, asset_id)),
-            (".gz", get_gz_save_path(out_dir, asset_id)),
             (".json.gz", get_json_gz_save_path(out_dir, asset_id)),
+            (".msgpack", get_msgpack_save_path(out_dir, asset_id)),
+            (".msgpack.gz", get_msgpackgz_save_path(out_dir, asset_id)),
+            (".pkl.gz", get_picklegz_save_path(out_dir, asset_id)),
         ]
     )
 
@@ -182,6 +181,13 @@ def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
         import compress_pickle
 
         return compress_pickle.load(file_path)
+    elif file_path.endswith(".msgpack"):
+        with open(file_path, "rb") as f:
+            unp = f.read()
+            import msgpack
+
+            unp = msgpack.unpackb(unp)
+            return unp
     elif file_path.endswith(".msgpack.gz"):
         import gzip
 
@@ -191,23 +197,15 @@ def load_existing_thor_asset_file(out_dir, object_name, force_extension=None):
 
             unp = msgpack.unpackb(unp)
             return unp
-            # return json.dumps(unp)
-    elif file_path.endswith(".json.gz") or file_path.endswith(".gz"):
+    elif file_path.endswith(".json"):
+        with open(file_path, "r") as f:
+            return json.load(f)
+    elif file_path.endswith(".json.gz"):
         import gzip
 
         with gzip.open(file_path, "rb") as f:
             unp = f.read()
             return json.dumps(unp)
-    elif file_path.endswith(".msgpack"):
-        with open(file_path, "rb") as f:
-            unp = f.read()
-            import msgpack
-
-            unp = msgpack.unpackb(unp)
-            return unp
-    elif file_path.endswith(".json"):
-        with open(file_path, "r") as f:
-            return json.load(f)
     else:
         raise NotImplementedError(f"Unsupported file extension for path: {file_path}")
 
@@ -236,7 +234,7 @@ def save_thor_asset_file(asset_json, save_path: str):
         packed = msgpack.packb(asset_json)
         with open(save_path, "wb") as outfile:
             outfile.write(packed)
-    elif extension in ["json.gz", ".gz"]:
+    elif extension in ["json.gz"]:
         import gzip
 
         with gzip.open(save_path, "wt") as outfile:
@@ -522,6 +520,9 @@ def view_asset_in_thor(
 
     frame_shape = controller.last_event.frame.shape
     controller.step("BBoxDistance", objectId0=instance_id, objectId1=instance_id)
+    controller.step(
+        "AdvancePhysicsStep"
+    )  # This seems necessary for the first frame not to be overexposed
     evt = controller.step(
         "RenderObjectFromAngles",
         objectId=instance_id,

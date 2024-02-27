@@ -10,7 +10,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from time import perf_counter
-from typing import Any, List, Dict, Sequence, Optional, Union
+from typing import Any, List, Dict, Sequence, Optional, Union, Literal
 
 import PIL.Image
 import ai2thor.controller
@@ -20,7 +20,6 @@ from tqdm import tqdm
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
-
 # shared library
 from objathor.asset_conversion.util import (
     add_visualize_thor_actions,
@@ -39,6 +38,14 @@ from objathor.constants import ABS_PATH_OF_OBJATHOR, THOR_COMMIT_ID
 
 FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
+
+BLENDER_PROCESS_FAIL = "blender_process_fail"
+BLENDER_PROCESS_TIMEOUT_FAIL = "blender_process_timeout_fail"
+IMAGE_COMPRESS_FAIL = "png_to_jpg_compression_fail"
+GENERATE_COLLIDERS_FAIL = "vhacd_generate_colliders_fail"
+THOR_CREATE_ASSET_FAIL = "thor_create_asset_fail"
+THOR_VIEW_ASSET_FAIL = "thor_view_asset_in_thor_fail"
+THOR_PROCESS_FAILURE = "thor_process_fail"
 
 
 @contextmanager
@@ -77,10 +84,9 @@ def glb_to_thor(
     capture_stdout=False,
     timeout=None,
     generate_obj=True,
-    save_as_json=False,
     relative_texture_paths=True,
     run_blender_as_module=None,
-    blender_instalation_path=None,
+    blender_installation_path=None,
 ):
     os.makedirs(object_out_dir, exist_ok=True)
 
@@ -95,13 +101,10 @@ def glb_to_thor(
 
     if not run_blender_as_module:
         command = (
-            f"{blender_instalation_path if blender_instalation_path is not None else get_blender_installation_path()}"
+            f"{blender_installation_path if blender_installation_path is not None else get_blender_installation_path()}"
             f" --background"
             f" --python {os.path.join(ABS_PATH_OF_OBJATHOR, 'asset_conversion', 'object_consolidater.py')}"
             f" --"
-            f' --object_path="{os.path.abspath(glb_path)}"'
-            f' --output_dir="{os.path.abspath(object_out_dir)}"'
-            f' --annotations="{annotations_path}"'
         )
     else:
         command = (
@@ -114,11 +117,14 @@ def glb_to_thor(
             f' --annotations="{annotations_path}"'
         )
 
+    command += (
+        f' --object_path="{os.path.abspath(glb_path)}"'
+        f' --output_dir="{os.path.abspath(object_out_dir)}"'
+        f' --annotations="{annotations_path}"'
+    )
+
     if generate_obj:
         command = command + " --obj"
-
-    if save_as_json:
-        command = command + " --save_as_json"
 
     if relative_texture_paths:
         command = command + " --relative_texture_paths"
@@ -127,6 +133,8 @@ def glb_to_thor(
         print(f"For {uid}, running command: {command}")
 
     process = None
+    out = None
+    timeout_hit = False
     try:
         process = subprocess.Popen(
             command,
@@ -146,27 +154,44 @@ def glb_to_thor(
             process.wait(timeout=timeout)
         result_code = -1
         out = f"Command timed out, command: {command}"
+        timeout_hit = True
     except subprocess.CalledProcessError as e:
         result_code = e.returncode
-        print(f"Blender call error: {e.output}, {out}")
-        out = f"{out}, Exception: {e.output}"
+        print(f"Blender call error: {out}\n{traceback.format_exc()}")
+        out = f"{out}, Exception: {traceback.format_exc()}"
     except Exception as e:
-        result_code = e.returncode
-        print(f"Blender process error: {e.output}")
-        out = e.output
+        fmted_trace = traceback.format_exc()
+        try:
+            result_code = e.returncode
+            out = f"{e.output}\n{fmted_trace}"
+        except:
+            result_code = -1
+            out = f"Blender process error: {fmted_trace}"
+
+        print(f"Blender process error: {traceback.format_exc()}")
 
     if not capture_stdout:
         print(f"Exited with code {result_code}")
 
-    success = result_code == 0
+    success = result_code == 0 and os.path.exists(
+        os.path.join(object_out_dir, f"{uid}.obj")
+    )
 
     if success:
         if not capture_stdout:
             print(f"---- Command ran successfully for {uid} at path {glb_path}")
-
     else:
-        failed_objects[uid]["blender_process_return_fail"] = True
-        failed_objects[uid]["blender_output"] = out if out else ""
+        if "Progress: 100.00%" in out:
+            # Blender bug process exits with error due to minor memory leak but object is converted successfully
+            success = True
+        else:
+            if timeout_hit:
+                failed_objects[uid]["blender_output"] = BLENDER_PROCESS_TIMEOUT_FAIL
+            else:
+                failed_objects[uid]["failure_reason"] = BLENDER_PROCESS_FAIL
+
+            failed_objects[uid]["blender_output"] = out if out else ""
+            return False
 
     try:
         # The below compresses textures using the structural similarity metric
@@ -236,12 +261,10 @@ def glb_to_thor(
 
     except Exception as e:
         logger.error(f"Exception: {e}")
-        failed_objects[uid]["blender_process_crash"] = False
-        failed_objects[uid]["image_compress_fail"] = True
-        #  Do we want this? confuses failure reason
-        # failed_objects[uid]["blender_output"] = out
+        failed_objects[uid]["failure_reason"] = IMAGE_COMPRESS_FAIL
         failed_objects[uid]["exception"] = traceback.format_exc()
         success = False
+
     return success
 
 
@@ -324,21 +347,18 @@ def obj_to_colliders(
             **kwargs,
         )
         if "failed" in result_info[uid] and result_info[uid]["failed"]:
-            failed_objects[uid]["failed_generate_colliders"] = True
+            failed_objects[uid]["failure_reason"] = GENERATE_COLLIDERS_FAIL
             failed_objects[uid]["generate_colliders_info"] = result_info[uid]
             return False
         else:
             return True
 
-    except Exception as e:
-        failed_objects[uid]["failded_generate_colliders"] = True
+    except Exception:
         print("Exception while running 'generate_colliders'")
-        if hasattr(e, "message"):
-            print(e.message)
-        else:
-            print(e)
-        failed_objects[uid]["generate_colliders_exception"] = traceback.format_exc()
         print(traceback.format_exc())
+
+        failed_objects[uid]["failure_reason"] = GENERATE_COLLIDERS_FAIL
+        failed_objects[uid]["generate_colliders_exception"] = traceback.format_exc()
         return False
 
 
@@ -369,7 +389,7 @@ def validate_in_thor(
         )
         if not evt.metadata["lastActionSuccess"]:
             failed_objects[asset_name] = {
-                "failed_create_asset_in_thor": True,
+                "failure_reason": THOR_CREATE_ASSET_FAIL,
                 "lastAction": controller.last_action,
                 "errorMessage": evt.metadata["errorMessage"],
             }
@@ -383,6 +403,7 @@ def validate_in_thor(
             if isinstance(angles, int):
                 angles = [n * angles for n in range(0, round(360 / angles))]
             rotations = [(x, y, z, degrees) for degrees in angles for (x, y, z) in axes]
+
             evt = view_asset_in_thor(
                 asset_name,
                 controller,
@@ -392,18 +413,19 @@ def validate_in_thor(
             )
             if not evt.metadata["lastActionSuccess"]:
                 failed_objects[asset_name] = {
-                    "failed_thor_view_asset_in_thor": True,
+                    "failure_reason": THOR_VIEW_ASSET_FAIL,
                     "lastAction": controller.last_action,
                     "errorMessage": evt.metadata["errorMessage"],
                 }
                 return False, asset_metadata
+
         return True, asset_metadata
-    except Exception as e:
-        print(f"Exception: {e}")
+
+    except Exception:
         print(traceback.format_exc())
         failed_objects[asset_name] = {
-            "failed_thor_validate_in_thor": True,
-            "stderr": traceback.format_exc(),
+            "failure_reason": THOR_PROCESS_FAILURE,
+            "exception": traceback.format_exc(),
             "lastAction": controller.last_action,
             "errorMessage": evt.metadata["errorMessage"] if evt else "",
         }
@@ -415,25 +437,24 @@ def optimize_assets_for_thor(
     uid_to_glb_path: Dict[str, str],
     annotations_path: str,
     max_colliders: int,
-    skip_glb: bool,
     blender_as_module: bool,
-    extension: str,
+    extension: Literal[".json", "json.gz", ".pkl.gz", ".msgpack", ".msgpack.gz"],
+    skip_conversion: bool,
+    skip_colliders: bool = False,
+    skip_thor_metadata: bool = False,
+    skip_thor_render: bool = False,
     thor_platform: Optional[str] = None,
     blender_installation_path: Optional[str] = None,
     controller: ai2thor.controller.Controller = None,
     live: bool = False,
-    save_as_pkl: bool = False,
     absolute_texture_paths: bool = False,
     delete_objs: bool = False,
     keep_json_asset: bool = False,
-    skip_thor_creation: bool = False,
     width: int = 300,
     height: int = 300,
-    skip_thor_visualization: bool = False,
     skybox_color: Sequence[int] = (255, 255, 255),
     send_asset_to_controller: bool = False,
     add_visualize_thor_actions: bool = False,
-    skip_colliders: bool = False,
     report_out_file_name: Optional[str] = "failed_objects.json",
     log_prefix="",
     timeout: Optional[int] = None,
@@ -471,7 +492,7 @@ def optimize_assets_for_thor(
                 sub_annotations_path = annotations_path
 
             success = True
-            if not skip_glb:
+            if not skip_conversion:
                 with Timer(f"{log_prefix}GLB to THOR ({uid})"):
                     success = glb_to_thor(
                         glb_path=glb_path,
@@ -481,24 +502,11 @@ def optimize_assets_for_thor(
                         failed_objects=failed_objects,
                         capture_stdout=not live,
                         generate_obj=True,
-                        save_as_json=not save_as_pkl,
                         relative_texture_paths=not absolute_texture_paths,
                         run_blender_as_module=blender_as_module,
-                        blender_instalation_path=blender_installation_path,
+                        blender_installation_path=blender_installation_path,
                         timeout=timeout,
                     )
-
-                # print(f"uid in failed {uid in failed_objects} 'Progress: 100.00%' in failed_objects[uid]['blender_output'] {'Progress: 100.00%' in failed_objects[uid]['blender_output']}")
-                # Blender bug process exits with error due to minor memory leak but object is converted successfully
-                if (
-                    uid in failed_objects
-                    and "blender_output" in failed_objects[uid]
-                    and "Progress: 100.00%" in failed_objects[uid]["blender_output"]
-                ):
-                    # Do not include this check because sometimes it fails regardless
-                    # and  "Error: Not freed memory blocks" in failed_objects[uid]['blender_output']:
-                    success = True
-                    del failed_objects[uid]
 
             if success and not skip_colliders:
                 with Timer(f"{log_prefix}OBJ to collider ({uid})"):
@@ -515,7 +523,7 @@ def optimize_assets_for_thor(
                         },
                     )
 
-            if success:
+            if success and (not skip_conversion) and (not skip_colliders):
                 with Timer(
                     f"{log_prefix}Saving {asset_out_dir} {uid} with extension {extension}"
                 ):
@@ -552,13 +560,13 @@ def optimize_assets_for_thor(
                         asset_size += os.path.getsize(p) / (1024 * 1024)
 
                     print(
-                        f"{log_prefix} Original asset size {glb_size:.2f} MB,"
+                        f"{log_prefix}Original asset size {glb_size:.2f} MB,"
                         f" new asset size {asset_size:.2f}MB ({100 * (1 - asset_size / glb_size):0.2f}% reduction)",
                         flush=True,
                     )
 
             asset_metadata: Optional[Dict[str, Any]] = None
-            if success and not skip_thor_creation:
+            if success and not skip_thor_metadata:
                 import ai2thor.controller
                 import ai2thor.fifo_server
 
@@ -573,8 +581,8 @@ def optimize_assets_for_thor(
                             width=width,
                             height=height,
                             server_class=ai2thor.fifo_server.FifoServer,
-                            antiAliasing=None if skip_thor_visualization else "fxaa",
-                            quality="Very Low" if skip_thor_visualization else "Ultra",
+                            antiAliasing=None if skip_thor_render else "fxaa",
+                            quality="Very Low" if skip_thor_render else "Ultra",
                             makeAgentsVisible=False,
                         )
 
@@ -585,7 +593,7 @@ def optimize_assets_for_thor(
                         asset_name=uid,
                         output_dir=os.path.join(asset_out_dir, "thor_renders"),
                         failed_objects=failed_objects,
-                        skip_images=skip_thor_visualization,
+                        skip_images=skip_thor_render,
                         skybox_color=skybox_color,
                         load_file_in_unity=not send_asset_to_controller,
                         extension=extension,
@@ -657,6 +665,7 @@ def main(args):
         "--annotations",
         type=str,
         default="",
+        help="Path to the annotations file, if it is a directory then we'll look for the annotations file.",
     )
     parser.add_argument(
         "--live",
@@ -671,12 +680,12 @@ def main(args):
         help="Maximum hull colliders for collider extraction with TestVHACD.",
     )
     parser.add_argument(
-        "--skip_glb", action="store_true", help="Skips glb to json generation."
-    )
-    parser.add_argument(
         "--delete_objs",
         action="store_true",
         help="Deletes objs after generating colliders.",
+    )
+    parser.add_argument(
+        "--skip_conversion", action="store_true", help="Skips glb conversion."
     )
     parser.add_argument(
         "--skip_colliders",
@@ -684,12 +693,12 @@ def main(args):
         help="Skips obj to json collider generation.",
     )
     parser.add_argument(
-        "--skip_thor_creation",
+        "--skip_thor_metadata",
         action="store_true",
         help="Skips THOR asset creation and visualization.",
     )
     parser.add_argument(
-        "--skip_thor_visualization",
+        "--skip_thor_render",
         action="store_true",
         help="Skips THOR asset visualization.",
     )
@@ -714,10 +723,6 @@ def main(args):
     )
 
     parser.add_argument(
-        "--save_as_pkl", action="store_true", help="Saves asset as pickle gz."
-    )
-
-    parser.add_argument(
         "--absolute_texture_paths",
         action="store_true",
         help="Saves textures as absolute paths.",
@@ -725,7 +730,7 @@ def main(args):
 
     parser.add_argument(
         "--extension",
-        choices=[".json", ".pkl.gz", ".msgpack", ".msgpack.gz", ".gz"],
+        choices=[".json", "json.gz", ".pkl.gz", ".msgpack", ".msgpack.gz"],
         default=".json",
     )
 
@@ -744,7 +749,7 @@ def main(args):
     parser.add_argument(
         "--keep_json_asset",
         action="store_true",
-        help="Whether it keeps the intermediate .json asset file when storing in a different format to json.",
+        help="Whether it keeps the intermediate .json asset file when using a non-json `extension`.",
     )
 
     found_blender = False
@@ -758,7 +763,8 @@ def main(args):
         "--blender_installation_path",
         type=str,
         default=None,
-        help="Blender installation path, when blender_as_module = False and we cannot find the installation path automatically.",
+        help="Blender installation path, when blender_as_module = False and"
+        " we cannot find the installation path automatically.",
         required=(not found_blender) and "--blender_as_module" not in args,
     )
 
@@ -811,29 +817,29 @@ def main(args):
     else:
         raise ValueError("Must specify either `uids` or `glb_paths`.")
 
+    # noinspection PyTestUnpassedFixture
     optimize_assets_for_thor(
         output_dir=args.output_dir,
         uid_to_glb_path=uid_to_glb_path,
         annotations_path=args.annotations,
         max_colliders=args.max_colliders,
-        skip_glb=args.skip_glb,
+        skip_conversion=args.skip_conversion,
+        skip_colliders=args.skip_colliders,
+        skip_thor_metadata=args.skip_thor_metadata,
+        skip_thor_render=args.skip_thor_render,
         blender_as_module=args.blender_as_module,
         extension=args.extension,
         thor_platform=args.thor_platform,
         blender_installation_path=args.blender_installation_path,
         live=args.live,
-        save_as_pkl=args.save_as_pkl,
         absolute_texture_paths=args.absolute_texture_paths,
         delete_objs=args.delete_objs,
         keep_json_asset=args.keep_json_asset,
-        skip_thor_creation=args.skip_thor_creation,
         width=args.width,
         height=args.height,
-        skip_thor_visualization=args.skip_thor_visualization,
         skybox_color=tuple(map(int, args.skybox_color.split(","))),
         send_asset_to_controller=args.send_asset_to_controller,
         add_visualize_thor_actions=args.add_visualize_thor_actions,
-        skip_colliders=args.skip_colliders,
     )
 
 
