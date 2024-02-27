@@ -5,6 +5,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import warnings
 from sys import platform
 from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional, Tuple
@@ -19,8 +20,9 @@ try:
         save_thor_asset_file,
     )
 
-    print(
+    warnings.warn(
         f"Could not import objathor.asset_conversion.util, current paths are {sys.path}."
+        f" Will try to import it from a relative path."
     )
 except ImportError:
     try:

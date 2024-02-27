@@ -95,23 +95,6 @@
       }
    },
    "objects":[
-      {
-         "assetId":"a5b1ce163f8a4821abc0fb2b0fcf8796",
-         "id":"asset_0",
-         "kinematic":true,
-         "position":{
-            "x":0,
-            "y":0,
-            "z":0
-         },
-         "rotation":{
-            "x":0,
-            "y":0,
-            "z":0
-         },
-         "layer":"Procedural2",
-         "material":null
-      }
    ],
    "proceduralParameters":{
       "ceilingColor":{
@@ -130,13 +113,13 @@
       "floorColliderThickness":1.0,
       "lights":[
          {
-            "id":"DirectionalLight",
+            "id":"DirectionalLight0",
             "indirectMultiplier":1.0,
-            "intensity":1,
+            "intensity":1.0,
             "position":{
                "x":0,
-               "y":0.5,
-               "z":-1.0
+               "y":0,
+               "z":0
             },
             "rgb":{
                "r":1.0,
@@ -144,13 +127,13 @@
                "b":1.0
             },
             "rotation":{
-               "x":66,
-               "y":75,
+               "x":0,
+               "y":0,
                "z":0
             },
             "shadow":{
                "type":"Soft",
-               "strength":1,
+               "strength":1.0,
                "normalBias":0,
                "bias":0,
                "nearPlane":0.2,
@@ -159,34 +142,149 @@
             "type":"directional"
          },
          {
-            "id":"light_2",
-            "intensity":0.45,
+            "id":"DirectionalLight1",
+            "indirectMultiplier":1.0,
+            "intensity":1.0,
             "position":{
                "x":0,
                "y":0,
-               "z":1
+               "z":0
             },
-            "range":15,
             "rgb":{
                "r":1.0,
-               "g":0.855,
-               "b":0.722
+               "g":1.0,
+               "b":1.0
+            },
+            "rotation":{
+               "x":0,
+               "y":90,
+               "z":0
             },
             "shadow":{
                "type":"Soft",
-               "strength":1,
+               "strength":1.0,
                "normalBias":0,
-               "bias":0.05,
-               "resolution":"FromQualitySettings",
-               "nearPlane":8.0
+               "bias":0,
+               "nearPlane":0.2,
+               "resolution":"FromQualitySettings"
             },
-            "type":"point",
-            "layer":"Procedural2",
-            "cullingMaskOff":[
-               "Procedural0",
-               "Procedural1",
-               "Procedural3"
-            ]
+            "type":"directional"
+         },
+         {
+            "id":"DirectionalLight2",
+            "indirectMultiplier":1.0,
+            "intensity":0.0,
+            "position":{
+               "x":0,
+               "y":0,
+               "z":0
+            },
+            "rgb":{
+               "r":1.0,
+               "g":1.0,
+               "b":1.0
+            },
+            "rotation":{
+               "x":0,
+               "y":180,
+               "z":0
+            },
+            "shadow":{
+               "type":"Soft",
+               "strength":1.0,
+               "normalBias":0,
+               "bias":0,
+               "nearPlane":0.2,
+               "resolution":"FromQualitySettings"
+            },
+            "type":"directional"
+         },
+         {
+            "id":"DirectionalLight3",
+            "indirectMultiplier":1.0,
+            "intensity":1.0,
+            "position":{
+               "x":0,
+               "y":0,
+               "z":0
+            },
+            "rgb":{
+               "r":1.0,
+               "g":1.0,
+               "b":1.0
+            },
+            "rotation":{
+               "x":0,
+               "y":270,
+               "z":0
+            },
+            "shadow":{
+               "type":"Soft",
+               "strength":1.0,
+               "normalBias":0,
+               "bias":0,
+               "nearPlane":0.2,
+               "resolution":"FromQualitySettings"
+            },
+            "type":"directional"
+         },
+         {
+            "id":"DirectionalLight4",
+            "indirectMultiplier":1.0,
+            "intensity":1.0,
+            "position":{
+               "x":0,
+               "y":0,
+               "z":0
+            },
+            "rgb":{
+               "r":1.0,
+               "g":1.0,
+               "b":1.0
+            },
+            "rotation":{
+               "x":90,
+               "y":0,
+               "z":0
+            },
+            "shadow":{
+               "type":"Soft",
+               "strength":1.0,
+               "normalBias":0,
+               "bias":0,
+               "nearPlane":0.2,
+               "resolution":"FromQualitySettings"
+            },
+            "type":"directional"
+         },
+         {
+            "id":"DirectionalLight5",
+            "indirectMultiplier":1.0,
+            "intensity":1.0,
+            "position":{
+               "x":0,
+               "y":0,
+               "z":0
+            },
+            "rgb":{
+               "r":1.0,
+               "g":1.0,
+               "b":1.0
+            },
+            "rotation":{
+               "x":270,
+               "y":0,
+               "z":0
+            },
+            "shadow":{
+               "type":"Soft",
+               "strength":1.0,
+               "normalBias":0,
+               "bias":0,
+               "nearPlane":0.2,
+               "resolution":"FromQualitySettings"
+            },
+            "type":"directional"
          }
       ],
       "receptacleHeight":0.7,
@@ -194,9 +292,9 @@
          
       ],
       "skyboxColor": {
-        "b": 0.0,
-        "g": 0.0,
-        "r": 0.0
+        "b": 1.0,
+        "g": 1.0,
+        "r": 1.0
       }
    },
    "rooms":[

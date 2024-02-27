@@ -404,6 +404,7 @@ def validate_in_thor(
             if isinstance(angles, int):
                 angles = [n * angles for n in range(0, round(360 / angles))]
             rotations = [(x, y, z, degrees) for degrees in angles for (x, y, z) in axes]
+
             evt = view_asset_in_thor(
                 asset_name,
                 controller,
@@ -523,7 +524,7 @@ def optimize_assets_for_thor(
                         },
                     )
 
-            if success:
+            if success and (not skip_conversion) and (not skip_colliders):
                 with Timer(
                     f"{log_prefix}Saving {asset_out_dir} {uid} with extension {extension}"
                 ):
