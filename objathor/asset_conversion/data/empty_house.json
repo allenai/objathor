@@ -173,7 +173,7 @@
          {
             "id":"DirectionalLight2",
             "indirectMultiplier":1.0,
-            "intensity":0.0,
+            "intensity":1.0,
             "position":{
                "x":0,
                "y":0,

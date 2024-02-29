@@ -575,6 +575,7 @@ def optimize_assets_for_thor(
                     if not controller:
                         controller = ai2thor.controller.Controller(
                             commit_id=THOR_COMMIT_ID,
+                            fieldOfView=46,
                             platform=thor_platform,
                             start_unity=True,
                             scene="Procedural",
