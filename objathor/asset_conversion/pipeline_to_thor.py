@@ -187,7 +187,7 @@ def glb_to_thor(
             success = True
         else:
             if timeout_hit:
-                failed_objects[uid]["blender_output"] = BLENDER_PROCESS_TIMEOUT_FAIL
+                failed_objects[uid]["failure_reason"] = BLENDER_PROCESS_TIMEOUT_FAIL
             else:
                 failed_objects[uid]["failure_reason"] = BLENDER_PROCESS_FAIL
 
