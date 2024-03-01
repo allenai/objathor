@@ -616,7 +616,7 @@ def optimize_assets_for_thor(
 
                 end = time.perf_counter()
                 print(
-                    f"Finished Object '{uid}' success: {success}. Object Runtime: {end-start_obj_time}s"
+                    f"{log_prefix}Finished Object '{uid}' success: {success}. Object Runtime: {end-start_obj_time:0.2f}s"
                 )
 
         failed_json_str = json.dumps(failed_objects)
@@ -625,9 +625,9 @@ def optimize_assets_for_thor(
             with open(report_out_path, "w") as f:
                 f.write(failed_json_str)
 
-        print(f"Failed objects: {failed_json_str}")
+        print(f"{log_prefix}Failed objects: {failed_json_str}")
         end = time.perf_counter()
-        print(f"Total Runtime: {end-start_process_time}s")
+        print(f"{log_prefix}Total Runtime: {end-start_process_time:0.2f}s")
 
     except:
         print(traceback.format_exc())
@@ -643,8 +643,7 @@ def optimize_assets_for_thor(
 
 def main(args):
     parser = argparse.ArgumentParser()
-    print("--------- argv")
-    print(args)
+    print(f"Running pipeline_to_thor with args {args}")
     orig_args = args[:]
 
     parser.add_argument("--output_dir", type=str, default="./output", required=True)

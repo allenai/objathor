@@ -437,26 +437,27 @@ def create_asset(
         )
 
     evt = thor_controller.step(**create_prefab_action)
-    print(f"Last Action: {thor_controller.last_action['action']}")
+    logger.debug(f"Last Action: {thor_controller.last_action['action']}")
     if not evt.metadata["lastActionSuccess"]:
-        logger.info(f"Last Action: {thor_controller.last_action['action']}")
-        logger.info(f"Action success: {evt.metadata['lastActionSuccess']}")
-        logger.info(f'Error: {evt.metadata["errorMessage"]}')
-
-        logger.info(
-            {
-                k: v
-                for k, v in create_prefab_action.items()
-                if k
-                in [
-                    "action",
-                    "name",
-                    "receptacleCandidate",
-                    "albedoTexturePath",
-                    "metallicSmoothnessTexturePath",
-                    "normalTexturePath",
-                ]
-            }
+        logger.error(
+            f'Error: {evt.metadata["errorMessage"]}'
+            f"\nLast Action: {thor_controller.last_action['action']}"
+            f"\nAction success: {evt.metadata['lastActionSuccess']}"
+            + str(
+                {
+                    k: v
+                    for k, v in create_prefab_action.items()
+                    if k
+                    in [
+                        "action",
+                        "name",
+                        "receptacleCandidate",
+                        "albedoTexturePath",
+                        "metallicSmoothnessTexturePath",
+                        "normalTexturePath",
+                    ]
+                }
+            )
         )
 
     return evt

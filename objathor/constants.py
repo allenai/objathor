@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 ABS_PATH_OF_OBJATHOR = os.path.abspath(os.path.dirname(Path(__file__)))
-THOR_COMMIT_ID = "00e0357e622766437e9c2119eaa1aaabe016f07b"
+THOR_COMMIT_ID = "40679c517859e09c1f2a5e39b65ee7f33fcfdd48"
 
 OBJATHOR_CACHE_PATH = os.path.join(os.path.expanduser("~"), ".objathor-assets")
 
