@@ -508,6 +508,7 @@ def optimize_assets_for_thor(
                         blender_installation_path=blender_installation_path,
                         timeout=timeout,
                     )
+                assert success == (uid not in failed_objects)
 
             if success and not skip_colliders:
                 with Timer(f"{log_prefix}OBJ to collider ({uid})"):
@@ -523,6 +524,7 @@ def optimize_assets_for_thor(
                             **extra_collider_kwargs,
                         },
                     )
+                assert success == (uid not in failed_objects)
 
             if success and (not skip_conversion) and (not skip_colliders):
                 with Timer(
@@ -601,18 +603,17 @@ def optimize_assets_for_thor(
                         extension=extension,
                         angles=[0, 45, 90, 180, 270, 360 - 45],
                     )
+                    assert success == asset_metadata is not None
 
                     if success:
-                        assert asset_metadata is not None
+                        with open(metadata_output_file, "w") as f:
+                            json.dump(asset_metadata, f, indent=2)
 
                     if add_visualize_thor_actions:
                         objathor.asset_conversion.util.add_visualize_thor_actions(
                             asset_id=uid, asset_dir=asset_out_dir
                         )
-
-                if success and asset_metadata is not None:
-                    with open(metadata_output_file, "w") as f:
-                        json.dump(asset_metadata, f, indent=2)
+                assert success == (uid not in failed_objects)
 
                 end = time.perf_counter()
                 print(
