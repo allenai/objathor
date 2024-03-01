@@ -16,6 +16,7 @@ from ai2thor.hooks.procedural_asset_hook import (
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
+from objathor.constants import THOR_COMMIT_ID
 from objathor.dataset import DatasetSaveConfig
 from objathor.utils.download_utils import (
     download_with_progress_bar,
@@ -106,7 +107,7 @@ if __name__ == "__main__":
         agentMode="stretch",
         renderDepthImage=False,
         cameraNearPlane=0.01,
-        commit_id="00e0357e622766437e9c2119eaa1aaabe016f07b",
+        commit_id=THOR_COMMIT_ID,
         server_timeout=300,
         snapToGrid=False,
         fastActionEmit=True,
