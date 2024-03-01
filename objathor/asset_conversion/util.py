@@ -1,3 +1,4 @@
+import glob
 import json
 import logging
 import os
@@ -256,15 +257,20 @@ def save_thor_asset_file(asset_json, save_path: str):
 
 
 def get_blender_installation_path():
+    env_blender_path = os.environ.get("BLENDER_PATH", "/ENV/BLENDER/PATH/NOT/SET")
     paths = {
         "darwin": [
+            env_blender_path,
             "/Applications/Blender.app/Contents/MacOS/blender",
             "/Applications/Blender.app/Contents/MacOS/Blender",
         ],
         "linux": [
             # TODO: Add docker path
-            os.path.join(os.path.expanduser("~"), "blender-3.2.2-linux-x64/blender"),
-            os.path.join(os.getcwd(), "blender-3.2.2-linux-x64/blender"),
+            env_blender_path,
+            *glob.glob(
+                os.path.join(os.path.expanduser("~"), "blender-3.*-linux-x64/blender")
+            ),
+            *glob.glob(os.path.join(os.getcwd(), "blender-3.*-linux-x64/blender")),
         ],
     }
     paths["linux2"] = paths["linux"]
