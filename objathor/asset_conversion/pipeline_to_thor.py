@@ -20,7 +20,6 @@ from tqdm import tqdm
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
-
 # shared library
 from objathor.asset_conversion.util import (
     add_visualize_thor_actions,
@@ -392,13 +391,31 @@ def validate_in_thor(
             failed_objects[asset_name] = {
                 "failure_reason": THOR_CREATE_ASSET_FAIL,
                 "lastAction": controller.last_action,
+                "info": {
+                    "asset_dir": asset_dir,
+                    "asset_name": asset_name,
+                    "extension": extension,
+                },
                 "errorMessage": evt.metadata["errorMessage"],
             }
             return False, None
 
         asset_metadata = evt.metadata["actionReturn"]
-        if asset_metadata is not None:
-            del asset_metadata["objectMetadata"]
+
+        if asset_metadata is None:
+            failed_objects[asset_name] = {
+                "failure_reason": THOR_CREATE_ASSET_FAIL,
+                "lastAction": controller.last_action,
+                "info": {
+                    "asset_dir": asset_dir,
+                    "asset_name": asset_name,
+                    "extension": extension,
+                },
+                "errorMessage": evt.metadata["errorMessage"],
+            }
+            return False, None
+
+        del asset_metadata["objectMetadata"]
 
         if not skip_images:
             if isinstance(angles, int):
@@ -603,7 +620,7 @@ def optimize_assets_for_thor(
                         extension=extension,
                         angles=[0, 45, 90, 180, 270, 360 - 45],
                     )
-                    assert success == asset_metadata is not None
+                    assert success == (asset_metadata is not None)
 
                     if success:
                         with open(metadata_output_file, "w") as f:
