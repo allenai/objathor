@@ -20,6 +20,7 @@ from tqdm import tqdm
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
+
 # shared library
 from objathor.asset_conversion.util import (
     add_visualize_thor_actions,
@@ -159,6 +160,8 @@ def glb_to_thor(
         result_code = e.returncode
         print(f"Blender call error: {out}\n{traceback.format_exc()}")
         out = f"{out}, Exception: {traceback.format_exc()}"
+    except (SystemExit, KeyboardInterrupt):
+        raise
     except Exception as e:
         fmted_trace = traceback.format_exc()
         try:
@@ -258,7 +261,8 @@ def glb_to_thor(
         print(f"Pose adjusted by {y_rot:.2f} degrees ({uid})")
 
         save_thor_asset_file(asset_json, thor_obj_path)
-
+    except (SystemExit, KeyboardInterrupt):
+        raise
     except Exception as e:
         logger.error(f"Exception: {e}")
         failed_objects[uid]["failure_reason"] = IMAGE_COMPRESS_FAIL
@@ -353,7 +357,9 @@ def obj_to_colliders(
         else:
             return True
 
-    except Exception:
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except:
         print("Exception while running 'generate_colliders'")
         print(traceback.format_exc())
 
@@ -438,7 +444,8 @@ def validate_in_thor(
                 return False, asset_metadata
 
         return True, asset_metadata
-
+    except (SystemExit, KeyboardInterrupt):
+        raise
     except Exception:
         print(traceback.format_exc())
         failed_objects[asset_name] = {
@@ -647,6 +654,8 @@ def optimize_assets_for_thor(
         end = time.perf_counter()
         print(f"{log_prefix}Total Runtime: {end-start_process_time:0.2f}s")
 
+    except (SystemExit, KeyboardInterrupt):
+        raise
     except:
         print(traceback.format_exc())
     finally:
@@ -775,7 +784,7 @@ def main(args):
     try:
         get_blender_installation_path()
         found_blender = True
-    except:
+    except IOError:
         pass
 
     parser.add_argument(

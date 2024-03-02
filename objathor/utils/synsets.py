@@ -2,7 +2,7 @@ from typing import List, Optional, Sequence
 
 try:
     from nltk.corpus import wordnet2022 as wn
-except:
+except ImportError:
     import nltk
 
     nltk.download("wordnet2022")

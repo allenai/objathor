@@ -130,6 +130,8 @@ def nearest_synsets_from_annotation(
     if save_to_dir is not None:
         try:
             save_embedding(emb=desc_emb, uid=annotation["uid"], dir=save_to_dir)
+        except (SystemExit, KeyboardInterrupt):
+            raise
         except Exception as e:
             print(
                 f"ERROR saving description embedding {e}. Traceback:\n{traceback.format_exc()}"

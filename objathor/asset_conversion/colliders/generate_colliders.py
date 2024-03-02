@@ -5,6 +5,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import traceback
 import warnings
 from sys import platform
 from tempfile import TemporaryDirectory
@@ -95,9 +96,9 @@ def download_vhacd(out_path):
         with urlopen(url) as zipresp:
             with ZipFile(BytesIO(zipresp.read())) as zfile:
                 zfile.extractall(os.path.abspath(out_path))
-    except Exception as e:
+    except:
         print(
-            f"Error downloading and unziping VHACD. {e}. If you can't reach `{url}` make sure to download the VHACD binary and place in `{VHACD_PATH}`."
+            f"Error downloading and unziping VHACD.\n {traceback.format_exc()}. If you can't reach `{url}` make sure to download the VHACD binary and place in `{VHACD_PATH}`."
         )
 
 
@@ -216,7 +217,9 @@ def get_colliders(
     for collider in colliders:
         try:
             collider.vertices
-        except Exception:
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except:
             print("Collider failed", collider)
             global HOW_MANY_MESSED_UP_MESH
             HOW_MANY_MESSED_UP_MESH += 1

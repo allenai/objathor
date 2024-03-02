@@ -278,9 +278,9 @@ def get_blender_installation_path():
         for path in paths[platform]:
             if os.path.exists(path):
                 return path
-        raise Exception("Blender not found.")
+        raise IOError("Blender not found.")
     else:
-        raise Exception(f'Unsupported platform "{platform}"')
+        raise IOError(f'Unsupported platform "{platform}"')
 
 
 def get_runtime_asset_filelock(save_dir, asset_id):

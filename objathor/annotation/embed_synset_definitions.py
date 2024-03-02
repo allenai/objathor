@@ -96,6 +96,8 @@ def get_embeddings_single(
     if not os.path.isfile(fname):
         try:
             download_embeddings()
+        except (SystemExit, KeyboardInterrupt):
+            raise
         except:
             data = get_embeddings()
             for key, value in data.items():

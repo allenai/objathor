@@ -2,6 +2,7 @@ import copy
 import json
 import os.path
 from io import BytesIO
+from json import JSONDecodeError
 from typing import List, Tuple, Sequence, Any, Optional, Dict, TypedDict
 
 import requests
@@ -175,7 +176,7 @@ def clean_up_json(json_string):
     try:
         json.loads(json_string)
         return json_string
-    except:
+    except JSONDecodeError:
         return None
 
 
@@ -275,7 +276,7 @@ def get_initial_annotation(
     try:
         annotation = json.loads(json_str)
         assert "annotations" in annotation, f"Got annotation: {annotation}"
-    except Exception as e:
+    except JSONDecodeError:
         new_json_str = clean_up_json(json_str)
         if new_json_str is None:
             print(
@@ -293,6 +294,8 @@ def get_initial_annotation(
                 annotation,
                 **dialogue_dict,
             )
+    except (SystemExit, KeyboardInterrupt):
+        raise
     except:
         print(
             f"[ERROR] Failed to get best synset using annotations for uid {uid}. Annotations"

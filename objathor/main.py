@@ -56,6 +56,8 @@ def write(
             try:
                 module_name, function_name = output_file.rsplit(".", 1)
                 getattr(import_module(module_name), function_name)(anno, **kwargs)
+            except (SystemExit, KeyboardInterrupt):
+                raise
             except Exception as e:
                 print("Error", e)
                 raise NotImplementedError(
@@ -239,6 +241,8 @@ def add_optimization_arguments(
     try:
         get_blender_installation_path()
         found_blender = True
+    except (SystemExit, KeyboardInterrupt):
+        raise
     except:
         pass
 
