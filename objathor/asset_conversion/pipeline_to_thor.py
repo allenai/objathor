@@ -640,7 +640,7 @@ def optimize_assets_for_thor(
         failed_json_str = json.dumps(failed_objects)
 
         if report_out_path is not None and len(failed_objects):
-            with open(report_out_path, "w") as f:
+            with open(report_out_path, "a") as f:
                 f.write(failed_json_str)
 
         print(f"{log_prefix}Failed objects: {failed_json_str}")
