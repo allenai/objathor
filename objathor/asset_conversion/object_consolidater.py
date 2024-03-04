@@ -869,9 +869,9 @@ def unlink_and_nodify_connections(obj, cached_connections, channel):
                     else:
                         # Create a Value node and set its value to material's target-channel's current value
                         source_node = node_tree.nodes.new(type="ShaderNodeValue")
-                        source_node.outputs[
-                            0
-                        ].default_value = target_input.default_value
+                        source_node.outputs[0].default_value = (
+                            target_input.default_value
+                        )
 
                         # Cache connection info
                         cached_connections[mat_slot_index] = {
