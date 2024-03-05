@@ -15,7 +15,7 @@ def import_install_nltk_commit(
         )
         # if install_if_import_fails:
 
-        # does not work when subprocess
+        # does not work when subprocess.
         # errors: fatal: fetch-pack: invalid index-pack output; error: subprocess-exited-with-error
         # command = (
         #     f"pip"
