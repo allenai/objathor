@@ -45,16 +45,6 @@ Or installing blender as an application:
 
 If application is not in the cannonical directories you may need to pass `blender_installation_path` to scripts that use Blender.
 
-### Pre-generated synset definition embeddings for Annotation
-
-For automatic annotation to assign likely synsets given the automatically generated asset description, we can
-pre-install pre-generated embeddings for all synset definitions (this can be useful if we cannot write into our home
-directory at run time):
-
-```bash
-mkdir ~/.objathor_data
-curl https://prior-datasets.s3.us-east-2.amazonaws.com/vida-synset-embeddings/synset_definition_embeddings_single.pkl.gz -o ~/.objathor_data/synset_definition_embeddings_single.pkl.gz
-```
 
 ### NLTK dependencies
 
@@ -70,6 +60,17 @@ During the first run, NLTK dependencies are automatically installed, but we can 
 python -c "import nltk; nltk.download('punkt'); nltk.download('wordnet2022'); nltk.download('brown'); nltk.download('averaged_perceptron_tagger')"
 ```
 
+
+### Pre-generated synset definition embeddings for Annotation
+
+For automatic annotation to assign likely synsets given the automatically generated asset description, we can
+pre-install pre-generated embeddings for all synset definitions (this can be useful if we cannot write into our home
+directory at run time):
+
+```bash
+mkdir ~/.objathor_data
+curl https://prior-datasets.s3.us-east-2.amazonaws.com/vida-synset-embeddings/synset_definition_embeddings_single.pkl.gz -o ~/.objathor_data/synset_definition_embeddings_single.pkl.gz
+```
 
 ### AI2-THOR binary pre-downloading
 
