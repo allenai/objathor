@@ -3,8 +3,12 @@ import traceback
 from typing import Sequence, Optional, Dict, List, Tuple
 
 import compress_pickle
-import nltk
 import numpy as np
+
+from objathor.utils.synsets import import_install_nltk_commit
+
+# import nltk
+import_install_nltk_commit()
 from nltk.corpus import wordnet2022 as wn
 from sklearn.neighbors import NearestNeighbors
 

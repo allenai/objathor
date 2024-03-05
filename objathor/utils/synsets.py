@@ -1,9 +1,43 @@
+import os
+import subprocess
 from typing import List, Optional, Sequence
+
+
+def import_install_nltk_commit(
+    commit_id="582e6e35f0e6c984b44ec49dcb8846d9c011d0a8", install_if_import_fails=True
+):
+    try:
+        import nltk
+    except ImportError as e:
+        # print(f"Coululd not import `nltk` please install it by running `pip install git+https://github.com/nltk/nltk@{commit_id}`.")
+        raise ValueError(
+            f"\nCoululd not import `nltk` please install it by running `pip install git+https://github.com/nltk/nltk@{commit_id}`."
+        )
+        # if install_if_import_fails:
+
+        # does not work when subprocess
+        # errors: fatal: fetch-pack: invalid index-pack output; error: subprocess-exited-with-error
+        # command = (
+        #     f"pip"
+        #     f" install"
+        #     f" git+https://github.com/nltk/nltk@{commit_id}"
+        # )
+        # try:
+        #     print(f"Installing nltk commit_id={commit_id}, running: `{command}`")
+        #     subprocess.check_call(command, shell=True)
+        # except Exception as e:
+        #     result_code = e.returncode
+        #     print(f"`pip install` process error: {e.output}")
+        #     out = e.output
+        # else:
+        # print(f"Coululd not import `nltk` please install it by running `pip install git+https://github.com/nltk/nltk@{commit_id}`.")
+
 
 try:
     from nltk.corpus import wordnet2022 as wn
 except ImportError:
-    import nltk
+    # import nltk
+    import_install_nltk_commit()
 
     nltk.download("wordnet2022")
     nltk.download("punkt")

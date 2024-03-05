@@ -1,7 +1,9 @@
 import os
 from pathlib import Path
-
+import subprocess
 from setuptools import setup, find_packages
+from setuptools.command.install import install
+
 
 if __name__ == "__main__":
     with Path(Path(__file__).parent, "README.md").open(encoding="utf-8") as file:
@@ -47,4 +49,8 @@ if __name__ == "__main__":
         package_data={
             "objathor": ["asset_conversion/data/*.json"],
         },
+        # DOES NOT WORK...
+        # cmdclass={
+        #     'install': PostInstallCommand,
+        # },
     )
