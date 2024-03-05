@@ -16,8 +16,7 @@ Install other dependencies:
 pip install objathor[annotation]
 ```
 
-Here the following extras are installed: `annotation` to use openai to generate annotations. To generate renders and convert 'glb' models in the conversion pipeline you must [Install Blender](#blender-install-instructions) . 
-
+Here the following extras are installed: `annotation` to use openai to generate annotations. Also for annotation functionality you must install `nltk` [Install nltk](#nltk-dependencies). To generate renders and convert 'glb' models in the conversion pipeline you must [Install Blender](#blender-install-instructions) .
 
 From source:
 
@@ -58,6 +57,12 @@ curl https://prior-datasets.s3.us-east-2.amazonaws.com/vida-synset-embeddings/sy
 ```
 
 ### NLTK dependencies
+
+Install `nltk` on this commit by running:
+
+```bash
+pip install git+https://github.com/nltk/nltk@582e6e35f0e6c984b44ec49dcb8846d9c011d0a8
+```
 
 During the first run, NLTK dependencies are automatically installed, but we can also install them ahead:
 
