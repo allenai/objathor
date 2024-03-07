@@ -52,6 +52,7 @@ class ObjectDataset(Dataset):
         self.uids = sorted(
             [k for k, v in self.annotations.items() if v.get("thor_metadata")]
         )
+        assert len(self.uids) > 0, "No valid uids found in the annotations."
 
         if self.image_preprocessor is not None:
             assert len(img_angles) > 0, "At least one angle must be provided."
@@ -148,7 +149,7 @@ def generate_features(
                     )
 
                 clip_img_features.append(
-                    torch.stack(clip_img_features_per_angle, dim=0).cpu()
+                    torch.stack(clip_img_features_per_angle, dim=1).cpu()
                 )
 
                 clip_text_features.append(
