@@ -1,6 +1,7 @@
 import fnmatch
 import os
 import tarfile
+from argparse import ArgumentParser
 
 import torch.cuda
 import tqdm
@@ -36,9 +37,8 @@ def create_tar_of_assets(assets_dir: str, save_dir: str):
     save_path = os.path.abspath(os.path.join(save_dir, "assets.tar"))
 
     if os.path.exists(save_path):
-        raise FileExistsError(
-            f"{save_path} already exists. Please remove it before creating a new tar file."
-        )
+        print(f"{save_path} already exists. Skipping...")
+        return
 
     cur_dir = os.getcwd()
     try:
@@ -71,8 +71,21 @@ def postprocess_assets(dataset_dir: str):
     print("Generating holodeck features...")
     generate_features(
         base_dir=dataset_dir,
+        assets_dir=assets_dir,
         annotations_path=os.path.join(dataset_dir, "annotations.json.gz"),
         device=DEFAULT_DEVICE,
         batch_size=32 if torch.cuda.is_available() else 8,
         num_workers=8,
     )
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser(description="Script to postprocess assets.")
+    parser.add_argument(
+        "--base_dir",
+        type=str,
+        required=True,
+        help="Base directory for datasets.",
+    )
+    args = parser.parse_args()
+    postprocess_assets(args.base_dir)

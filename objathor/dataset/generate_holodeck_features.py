@@ -105,6 +105,7 @@ class ObjectDataset(Dataset):
 
 def generate_features(
     base_dir: str,
+    assets_dir: str,
     annotations_path: str,
     device: str,
     batch_size: int,
@@ -186,7 +187,7 @@ def generate_features(
     )
 
 
-if __name__ == "__main__":
+def main():
     parser = ArgumentParser(
         description="Script to process annotated assets for use in Holodeck."
     )
@@ -237,8 +238,13 @@ if __name__ == "__main__":
 
     generate_features(
         base_dir=args.base_dir,
+        assets_dir=assets_dir,
         annotations_path=annotations_path,
         device=args.device,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
     )
+
+
+if __name__ == "__main__":
+    main()
