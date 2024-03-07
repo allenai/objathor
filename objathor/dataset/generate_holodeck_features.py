@@ -28,6 +28,13 @@ except ImportError:
 
 from torch.utils.data import Dataset, DataLoader
 
+if torch.cuda.is_available():
+    DEFAULT_DEVICE = "cuda"
+elif torch.backends.mps.is_available():
+    DEFAULT_DEVICE = "mps"
+else:
+    DEFAULT_DEVICE = "cpu"
+
 
 class ObjectDataset(Dataset):
     def __init__(
@@ -96,65 +103,15 @@ class ObjectDataset(Dataset):
         return item
 
 
-if __name__ == "__main__":
-    parser = ArgumentParser(
-        description="Script to process annotated assets for use in Holodeck."
-    )
-    parser.add_argument(
-        "--base_dir",
-        type=str,
-        default=os.path.abspath(
-            os.path.join(ABS_PATH_OF_OBJATHOR, "output", "dataset")
-        ),
-        help="Base directory for datasets.",
-    )
-    parser.add_argument(
-        "--assets_dir",
-        type=str,
-        help="Assets directory, will default to <base_dir>/assets if not specified.",
-    )
-
-    if torch.cuda.is_available():
-        default_device = "cuda"
-    elif torch.backends.mps.is_available():
-        default_device = "mps"
-    else:
-        default_device = "cpu"
-
-    parser.add_argument(
-        "--device",
-        type=str,
-        default=default_device,
-        help="Torch device to be used by the models.",
-    )
-    parser.add_argument(
-        "--batch_size", type=int, default=8, help="Batch size for DataLoader."
-    )
-    parser.add_argument(
-        "--num_workers", type=int, default=8, help="Number of workers for DataLoader."
-    )
-    parser.add_argument(
-        "--annotations_path",
-        type=str,
-        default="",
-        help="Path to the annotations file for all objects. See the aggregate_asset_annotations.py script."
-        "Defaults to <base_dir>/annotations.json.gz if not specified.",
-    )
-    args = parser.parse_args()
-
-    # Setting up save / loading paths
-    base_dir = args.base_dir
-    assets_dir = (
-        args.assets_dir if args.assets_dir else os.path.join(base_dir, "assets")
-    )
-    annotations_path = (
-        args.annotations_path
-        if args.annotations_path
-        else os.path.join(base_dir, "annotations.json.gz")
-    )
-
+def generate_features(
+    base_dir: str,
+    annotations_path: str,
+    device: str,
+    batch_size: int,
+    num_workers: int,
+):
     # CLIP
-    device = torch.device(args.device)
+    device = torch.device(device)
     clip_model_name = "ViT-L-14"
     pretrained = "laion2b_s32b_b82k"
     clip_model, _, clip_img_preprocessor = open_clip.create_model_and_transforms(
@@ -170,10 +127,9 @@ if __name__ == "__main__":
         asset_dir=assets_dir,
         image_preprocessor=clip_img_preprocessor,
     )
-    idx_to_uid = dataset.uids
 
     dataloader = DataLoader(
-        dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers
+        dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
 
     uids = []
@@ -227,4 +183,62 @@ if __name__ == "__main__":
             "text_features": sbert_text_features,
         },
         os.path.join(base_dir, "sbert_features.pkl"),
+    )
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        description="Script to process annotated assets for use in Holodeck."
+    )
+    parser.add_argument(
+        "--base_dir",
+        type=str,
+        default=os.path.abspath(
+            os.path.join(ABS_PATH_OF_OBJATHOR, "output", "dataset")
+        ),
+        help="Base directory for datasets.",
+    )
+    parser.add_argument(
+        "--assets_dir",
+        type=str,
+        help="Assets directory, will default to <base_dir>/assets if not specified.",
+    )
+
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=DEFAULT_DEVICE,
+        help="Torch device to be used by the models.",
+    )
+    parser.add_argument(
+        "--batch_size", type=int, default=8, help="Batch size for DataLoader."
+    )
+    parser.add_argument(
+        "--num_workers", type=int, default=8, help="Number of workers for DataLoader."
+    )
+    parser.add_argument(
+        "--annotations_path",
+        type=str,
+        default="",
+        help="Path to the annotations file for all objects. See the aggregate_asset_annotations.py script."
+        "Defaults to <base_dir>/annotations.json.gz if not specified.",
+    )
+    args = parser.parse_args()
+
+    # Setting up save / loading paths
+    assets_dir = (
+        args.assets_dir if args.assets_dir else os.path.join(args.base_dir, "assets")
+    )
+    annotations_path = (
+        args.annotations_path
+        if args.annotations_path != ""
+        else os.path.join(args.base_dir, "annotations.json.gz")
+    )
+
+    generate_features(
+        base_dir=args.base_dir,
+        annotations_path=annotations_path,
+        device=args.device,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
     )

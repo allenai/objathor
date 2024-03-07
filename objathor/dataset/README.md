@@ -66,3 +66,15 @@ Download and set up `rclone` from [here](https://rclone.org/downloads/) (also av
 rclone copy -P /PATH/TO/YOUR_DATASET_UID/assets.tar r2:your-bucket/YOUR_DATASET_UID/
 ```
 and similarly for other files.
+
+For a large asset.tar file, the above command might be quite slow, you can potentially speed it up by changing a few flags:
+```bash
+rclone copy -P \
+--s3-chunk-size 50M \
+--transfers 300 \
+--s3-upload-concurrency 300 \
+--s3-chunk-size 50M \
+--ignore-checksum \
+--s3-disable-checksum \
+/PATH/TO/YOUR_DATASET_UID/assets.tar r2:your-bucket/YOUR_DATASET_UID/
+```
