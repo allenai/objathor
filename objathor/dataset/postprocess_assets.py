@@ -33,8 +33,11 @@ def filter_func(tarinfo):
     return tarinfo
 
 
-def create_tar_of_assets(assets_dir: str, save_dir: str):
-    save_path = os.path.abspath(os.path.join(save_dir, "assets.tar"))
+def create_tar_of_directory_with_exclusions(dir_to_tar: str, save_dir: str):
+    dir_to_tar = os.path.abspath(dir_to_tar)
+    save_path = os.path.abspath(
+        os.path.join(save_dir, f"{os.path.basename(dir_to_tar)}.tar")
+    )
 
     if os.path.exists(save_path):
         print(f"{save_path} already exists. Skipping...")
@@ -42,7 +45,7 @@ def create_tar_of_assets(assets_dir: str, save_dir: str):
 
     cur_dir = os.getcwd()
     try:
-        os.chdir(assets_dir)  # Change to the directory where the assets are located
+        os.chdir(dir_to_tar)  # Change to the directory where the assets are located
         with tarfile.open(save_path, "w") as tar:
             for root, dirs, files in tqdm.tqdm(os.walk(".")):
                 for file in files:
@@ -65,7 +68,7 @@ def postprocess_assets(dataset_dir: str, batch_size: int, num_workers: int):
 
     # Create assets.tar
     print("Creating assets.tar...")
-    create_tar_of_assets(assets_dir=assets_dir, save_dir=dataset_dir)
+    create_tar_of_directory_with_exclusions(dir_to_tar=assets_dir, save_dir=dataset_dir)
 
     # Generating holodeck features
     print("Generating holodeck features...")
@@ -76,6 +79,9 @@ def postprocess_assets(dataset_dir: str, batch_size: int, num_workers: int):
         device=DEFAULT_DEVICE,
         batch_size=batch_size if torch.cuda.is_available() else 8,
         num_workers=num_workers,
+    )
+    create_tar_of_directory_with_exclusions(
+        dir_to_tar=os.path.join(dataset_dir, "features"), save_dir=dataset_dir
     )
 
 

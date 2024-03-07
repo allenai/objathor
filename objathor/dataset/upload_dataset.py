@@ -70,8 +70,7 @@ def upload_dataset(dataset_dir: str, bucket_path: str):
         for name in [
             "annotations.json.gz",
             "assets.tar",
-            "clip_features.pkl",
-            "sbert_features.pkl",
+            "features.tar",
         ]
     ]
 

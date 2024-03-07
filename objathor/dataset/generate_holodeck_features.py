@@ -111,6 +111,9 @@ def generate_features(
     batch_size: int,
     num_workers: int,
 ):
+    base_dir = os.path.join(base_dir, "features")
+    os.makedirs(base_dir, exist_ok=True)
+
     # CLIP
     device = torch.device(device)
     clip_model_name = "ViT-L-14"
@@ -165,9 +168,11 @@ def generate_features(
 
                 pbar.update(len(batch["uid"]))
 
-    clip_img_features = torch.cat(clip_img_features, dim=0).numpy()
-    clip_text_features = torch.cat(clip_text_features, dim=0).numpy()
-    sbert_text_features = torch.cat(sbert_text_features, dim=0).numpy()
+    clip_img_features = torch.cat(clip_img_features, dim=0).numpy().astype("float16")
+    clip_text_features = torch.cat(clip_text_features, dim=0).numpy().astype("float16")
+    sbert_text_features = (
+        torch.cat(sbert_text_features, dim=0).numpy().astype("float16")
+    )
 
     compress_pickle.dump(
         {
