@@ -56,27 +56,23 @@ class ObjectDataset(Dataset):
         if self.image_preprocessor is not None:
             assert len(img_angles) > 0, "At least one angle must be provided."
 
-            print("Globbing to find all thor renders...")
-            render_paths = glob.glob(
-                os.path.join(
-                    self.asset_dir, f"*/thor_renders/0_1_0_{img_angles[0]:.1f}.*"
-                )
-            )
+            for uid in tqdm.tqdm(
+                self.uids,
+                desc="Checking renders exist for all successfully processed objects.",
+            ):
+                for angle in img_angles:
+                    rp = os.path.join(
+                        self.asset_dir,
+                        uid,
+                        "thor_renders",
+                        f"0_1_0_{img_angles[0]:.1f}.jpg",
+                    )
+                    if not os.path.exists(rp):
+                        rp = rp.replace(".jpg", ".png")
 
-            for rp in tqdm.tqdm(render_paths):
-                for angle in img_angles[1:]:
                     assert os.path.exists(
-                        rp.replace(f"0_1_0_{img_angles[0]:.1f}", f"0_1_0_{angle:.1f}")
+                        rp
                     ), f"Missing render for {os.path.dirname(rp)} at angle {angle}."
-
-            render_uids = set(
-                os.path.basename(os.path.dirname(os.path.dirname(p)))
-                for p in render_paths
-            )
-
-            assert (
-                len(set(self.uids) - render_uids) == 0
-            ), f"Some objects with annotations are missing renders: {set(self.uids) - render_uids}."
 
     def __len__(self) -> int:
         return len(self.uids)
