@@ -75,8 +75,8 @@ class ObjectDataset(Dataset):
             )
 
             assert (
-                len(set(self.annotations.keys()) - render_uids) == 0
-            ), f"Some objects with annotations are missing renders: {set(self.annotations.keys()) - render_uids}."
+                len(set(self.uids) - render_uids) == 0
+            ), f"Some objects with annotations are missing renders: {set(self.uids) - render_uids}."
 
     def __len__(self) -> int:
         return len(self.uids)
