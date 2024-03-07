@@ -5,6 +5,17 @@ from filelock import FileLock
 from tqdm import tqdm
 
 
+def does_file_at_url_exist(url: str) -> bool:
+    response = requests.get(url, stream=True)
+
+    if response.status_code != 200:
+        return False
+
+    content_type = response.headers.get("content-type")
+
+    return not content_type.startswith("text/html")
+
+
 def download_with_progress_bar(
     url: str, save_path: str, desc: str = "", overwrite: bool = False
 ):

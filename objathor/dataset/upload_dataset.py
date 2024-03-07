@@ -3,9 +3,37 @@ import subprocess
 from argparse import ArgumentParser
 
 
+def rclone_check_file_exists(bucket_path: str, file_name: str) -> bool:
+    assert "/" not in file_name, "file_name should not contain '/'"
+
+    rclone_command = [
+        "rclone",
+        "lsf",
+        bucket_path,
+        f"--include={file_name}",
+    ]
+    result = subprocess.run(rclone_command, capture_output=True)
+
+    return file_name in [f.strip() for f in result.stdout.decode("utf-8").split("\n")]
+
+
 def rlcone_upload(
-    path_to_upload: str, bucket_path: str, less_safe_more_fast: bool = False
+    path_to_upload: str,
+    bucket_path: str,
+    less_safe_more_fast: bool = False,
+    overwrite: bool = False,
 ):
+    if rclone_check_file_exists(
+        bucket_path=bucket_path, file_name=os.path.basename(path_to_upload)
+    ):
+        if overwrite:
+            print(f"{path_to_upload} already exists in {bucket_path}. Overwriting...")
+        else:
+            print(
+                f"{path_to_upload} already exists in {bucket_path}. Skipping upload..."
+            )
+            return
+
     rclone_command = [
         "rclone",
         "copy",
@@ -26,6 +54,10 @@ def rlcone_upload(
                 "--s3-disable-checksum",
             ]
         )
+
+    if not overwrite:
+        rclone_command.append("--ignore-existing")
+
     rclone_command.extend([path_to_upload, bucket_path])
 
     subprocess.run(rclone_command, check=True)
@@ -78,8 +110,10 @@ if __name__ == "__main__":
         help="Bucket to upload the data to.",
     )
     args = parser.parse_args()
-    assert (
-        os.path.dirname(args.base_dir) == args.bucket_path.split("/")[-1]
-    ), f"The base_dir should be the parent directory of the bucket_path. base_dir={args.base_dir}, bucket_path={args.bucket_path}"
+    args.base_dir = os.path.abspath(args.base_dir)
+    assert os.path.basename(args.base_dir) == args.bucket_path.split("/")[-1], (
+        f"The base_dir should have the same name as the bucket path dir."
+        f" base dir name={os.path.basename(args.base_dir)}, bucket path dir name={args.bucket_path.split('/')[-1]}"
+    )
 
     upload_dataset(dataset_dir=args.base_dir, bucket_path=args.bucket_path)
