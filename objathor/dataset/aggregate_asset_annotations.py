@@ -30,7 +30,7 @@ def prepare_annotations(save_dir: str, assets_dir: str):
     all_annotations_save_path = os.path.join(save_dir, "annotations.json.gz")
 
     if os.path.exists(all_annotations_save_path):
-        print(f"Annotations already exist at {all_annotations_save_path}. Skipping.")
+        print(f"Annotations already exist at {all_annotations_save_path}. Skipping...")
         return
 
     # Walk along the assets dir

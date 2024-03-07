@@ -49,18 +49,21 @@ class ObjectDataset(Dataset):
         self.image_preprocessor = image_preprocessor
         self.img_angles = img_angles
 
-        self.uids = sorted(self.annotations.keys())
+        self.uids = sorted(
+            [k for k, v in self.annotations.items() if v.get("thor_metadata")]
+        )
 
         if self.image_preprocessor is not None:
             assert len(img_angles) > 0, "At least one angle must be provided."
 
+            print("Globbing to find all thor renders...")
             render_paths = glob.glob(
                 os.path.join(
                     self.asset_dir, f"*/thor_renders/0_1_0_{img_angles[0]:.1f}.*"
                 )
             )
 
-            for rp in render_paths:
+            for rp in tqdm.tqdm(render_paths):
                 for angle in img_angles[1:]:
                     assert os.path.exists(
                         rp.replace(f"0_1_0_{img_angles[0]:.1f}", f"0_1_0_{angle:.1f}")
@@ -72,7 +75,7 @@ class ObjectDataset(Dataset):
             )
 
             assert (
-                set(self.annotations.keys()) - render_uids
+                len(set(self.annotations.keys()) - render_uids) == 0
             ), f"Some objects with annotations are missing renders: {set(self.annotations.keys()) - render_uids}."
 
     def __len__(self) -> int:
