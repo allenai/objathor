@@ -56,7 +56,7 @@ def create_tar_of_assets(assets_dir: str, save_dir: str):
         os.chdir(cur_dir)
 
 
-def postprocess_assets(dataset_dir: str):
+def postprocess_assets(dataset_dir: str, batch_size: int, num_workers: int):
     assets_dir = os.path.join(dataset_dir, "assets")
 
     # Prepare annotations
@@ -74,8 +74,8 @@ def postprocess_assets(dataset_dir: str):
         assets_dir=assets_dir,
         annotations_path=os.path.join(dataset_dir, "annotations.json.gz"),
         device=DEFAULT_DEVICE,
-        batch_size=32 if torch.cuda.is_available() else 8,
-        num_workers=8,
+        batch_size=batch_size if torch.cuda.is_available() else 8,
+        num_workers=num_workers,
     )
 
 
@@ -87,5 +87,16 @@ if __name__ == "__main__":
         required=True,
         help="Base directory for datasets.",
     )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=(128 if torch.cuda.is_available() else 8),
+        help="Batch size for DataLoader.",
+    )
+    parser.add_argument(
+        "--num_workers", type=int, default=8, help="Number of workers for DataLoader."
+    )
     args = parser.parse_args()
-    postprocess_assets(args.base_dir)
+    postprocess_assets(
+        args.base_dir, batch_size=args.batch_size, num_workers=args.num_workers
+    )
