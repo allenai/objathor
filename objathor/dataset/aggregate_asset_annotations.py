@@ -1,4 +1,5 @@
 import os
+import warnings
 from argparse import ArgumentParser
 
 import compress_json
@@ -45,7 +46,12 @@ def prepare_annotations(save_dir: str, assets_dir: str):
 
                 assert annotations["uid"] == os.path.basename(dir)
 
-                assert "thor_metadata" not in annotations
+                if "thor_metadata" in annotations:
+                    warnings.warn(
+                        f"Warning: THOR metadata already exists for {annotations['uid']}, replacing..."
+                    )
+                    annotations["thor_metadata"] = {}
+
                 if os.path.exists(thor_metadata_path):
                     annotations["thor_metadata"] = compress_json.load(
                         thor_metadata_path
