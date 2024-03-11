@@ -13,7 +13,7 @@ def does_file_at_url_exist(url: str) -> bool:
 
     content_type = response.headers.get("content-type")
 
-    return not content_type.startswith("text/html")
+    return content_type is None or (not content_type.startswith("text/html"))
 
 
 def download_with_progress_bar(
@@ -29,7 +29,7 @@ def download_with_progress_bar(
         total_length = response.headers.get("content-length")
 
         content_type = response.headers.get("content-type")
-        if content_type.startswith("text/html"):
+        if content_type is not None and content_type.startswith("text/html"):
             raise ValueError(f"Invalid URL: {url}")
 
         if total_length is None:  # no content length header

@@ -50,7 +50,15 @@ class ObjectDataset(Dataset):
         self.img_angles = img_angles
 
         self.uids = sorted(
-            [k for k, v in self.annotations.items() if v.get("thor_metadata")]
+            [
+                k
+                for k, v in self.annotations.items()
+                if v.get("thor_metadata")
+                and (
+                    v.get("description") is not None
+                    or v.get("description_auto") is not None
+                )
+            ]
         )
         assert len(self.uids) > 0, "No valid uids found in the annotations."
 
@@ -85,7 +93,9 @@ class ObjectDataset(Dataset):
         item = {
             "idx": idx,
             "uid": uid,
-            "text": ann["description"],
+            "text": ann["description"]
+            if ann.get("description") is not None
+            else ann["description_auto"],
         }
 
         if self.image_preprocessor is not None:
