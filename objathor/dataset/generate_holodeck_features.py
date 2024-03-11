@@ -93,9 +93,11 @@ class ObjectDataset(Dataset):
         item = {
             "idx": idx,
             "uid": uid,
-            "text": ann["description"]
-            if ann.get("description") is not None
-            else ann["description_auto"],
+            "text": (
+                ann["description"]
+                if ann.get("description") is not None
+                else ann["description_auto"]
+            ),
         }
 
         if self.image_preprocessor is not None:
