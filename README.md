@@ -30,7 +30,7 @@ We recommend setting an environment variable with your OpenAI key:
 export OPENAI_API_KEY=[Your key]
 ```
 
-If we're planning to annotate objects for which we don't have pre-generated
+If you're planning to annotate objects for which we don't have pre-generated
 views in S3 (see an example under [Annotation](#annotation) below), we also need to install blender either as an extra (as shown above) or as an application:
 
 ### Blender install instructions
