@@ -392,7 +392,7 @@ def create_asset(
     verbose=False,
     load_file_in_unity=False,
     extension=None,
-    raise_for_failure=True
+    raise_for_failure=True,
 ):
     # Verifies the file exists
     create_prefab_action = {}
@@ -434,7 +434,7 @@ def create_asset(
         create_prefab_action = {
             "action": "CreateRuntimeAsset",
             "asset": asset,
-            "raise_for_failure": raise_for_failure
+            "raise_for_failure": raise_for_failure,
         }
     else:
         create_prefab_action = {
