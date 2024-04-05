@@ -36,7 +36,7 @@ views in S3 (see an example under [Annotation](#annotation) below), we also need
 ### Blender install instructions
 Installing  the `Blender` as a module:
 ```bash
-pip install -e bpy"
+pip install bpy
 ```
 Installing  the Blender as a module, requires a python `3.10` environment.
 

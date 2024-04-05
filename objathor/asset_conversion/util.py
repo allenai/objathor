@@ -392,6 +392,7 @@ def create_asset(
     verbose=False,
     load_file_in_unity=False,
     extension=None,
+    raise_for_failure=True
 ):
     # Verifies the file exists
     create_prefab_action = {}
@@ -430,13 +431,18 @@ def create_asset(
         asset = add_default_annotations(
             asset=asset, asset_directory=asset_directory, verbose=verbose
         )
-        create_prefab_action = {"action": "CreateRuntimeAsset", "asset": asset}
+        create_prefab_action = {
+            "action": "CreateRuntimeAsset",
+            "asset": asset,
+            "raise_for_failure": raise_for_failure
+        }
     else:
         create_prefab_action = {
             "action": "CreateRuntimeAsset",
             "id": asset_id,
             "dir": copy_to_dir,
             "extension": file_extension,
+            "raise_for_failure": raise_for_failure,
         }
         create_prefab_action = add_default_annotations(
             asset=create_prefab_action, asset_directory=asset_directory, verbose=verbose
