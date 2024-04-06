@@ -5,10 +5,10 @@ from typing import Sequence, Optional, Dict, List, Tuple
 import compress_pickle
 import numpy as np
 
-from objathor.utils.synsets import import_install_nltk_commit
+from objathor.utils.synsets import _ensure_nltk
 
-# import nltk
-import_install_nltk_commit()
+_ensure_nltk()  # Running this by itself will not import anything, but will raise an error if nltk is not installed
+import nltk
 from nltk.corpus import wordnet2022 as wn
 from sklearn.neighbors import NearestNeighbors
 
