@@ -320,7 +320,8 @@ def create_runtime_asset_file(
             not os.path.islink(build_target_dir)
         ):
             # Add symlink if it doesn't already exist
-            logger.debug(f"Symlink from {asset_directory} to {build_target_dir}")
+            if verbose:
+                logger.info(f"Symlink from {asset_directory} to {build_target_dir}")
             os.symlink(
                 os.path.abspath(asset_directory), os.path.abspath(build_target_dir)
             )
