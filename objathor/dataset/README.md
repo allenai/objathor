@@ -23,7 +23,7 @@ python -m objathor.dataset.download_features --version 2023_09_23
 
 Finally, if you're planning to use Holodeck, you'll also want to run
 ```bash
-python -m objathor.dataset.download_holodeck_metadata --version 2023_09_23
+python -m objathor.dataset.download_holodeck_base_data --version 2023_09_23
 ```
 which collects other metadata/annotations/features neeed when generating Holodeck houses (this data is
 saved to `~/.objathor-assets/holodeck/2023_09_23/`).
