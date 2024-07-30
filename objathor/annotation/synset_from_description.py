@@ -39,7 +39,7 @@ This object is approximately {scale:0.3g} meters tall.
 
 Below are a list of synsets from WordNet2022 along with their definitions, lemmas, hypernyms, and hyponyms.\
  Pick exactly one synset that best describes the above object's type and respond with that synset's ID. Include\
- no other text in your response.
+ no other text in your response. If no synset is a good match, respond with the word none and no other text.
 """
 
 

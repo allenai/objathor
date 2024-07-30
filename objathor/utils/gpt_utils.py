@@ -4,6 +4,7 @@ from typing import List, Any, Callable, Sequence
 import openai
 from tqdm import tqdm
 
+from objathor.annotation.annotation_utils import compute_llm_cost
 from objathor.utils.queries import Message, ComposedMessage
 
 GPT_TIMEOUT_SECONDS = 10
@@ -130,7 +131,7 @@ def get_answer(
             print(
                 f"Prompt tokens: {pt}."
                 f" Completion tokens: {ct}."
-                f" Approx cost: ${(pt * 0.01 + ct * 0.03)/1000:.2g}."
+                f" Approx cost: ${compute_llm_cost(input_tokens=pt, output_tokens=ct, model=model):.2g}."
             )
 
         return res

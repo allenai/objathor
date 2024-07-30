@@ -27,12 +27,12 @@ DEFAULT_VIEW_INDICES = ("0", "3", "6", "9")
 
 DEFAULT_QUESTION_NO_SYNSET = """Please annotate this 3D asset, corresponding to an object that can be found in a home, with the following values (output valid JSON, without additional comments):
 "annotations": {
-    "description": a 1-2 sentence rich visual description of the object (don't use the term "3D asset" or similar here and don't comment on the object's orientation),
+    "description_long": a very detailed visual description of the object that is no more than 6 sentences. Don't use the term "3D asset" or similar here and don't comment on the object's orientation. Do use proper nouns when appropriate.,
+    "description": a 1-2 summary of description_long, keep the description rich and visual,
     "category": a category such as "chair", "table", "building", "person", "airplane", "car", "seashell", "fish", "toy", etc. Be concise but specific, e.g. do not say "furniture" when "eames chair" would be more specific,
     "width": approximate width in cm. For a human being this could be "45",
     "depth": approximate depth in cm. For a human being this could be "25",
     "height": approximate height in cm. For a human being this could be "175",
-    "volume": approximate volume in l. For a human being this could be "62",
     "materials": a Python list of the materials that the object appears to be made of, taking into account the visible exterior and also likely interior (roughly in order of most used material to least used; include "air" if the object interior doesn't seem completely solid),
     "composition": a Python list with the apparent volume mixture of the materials above (make the list sum to 1),
     "mass": approximate mass in kilogram considering typical densities for the materials. For a human being this could be "72",
@@ -55,9 +55,15 @@ DEFAULT_QUESTION = "\n".join(
     + _lines[3:]
 )
 
-DEFAULT_OPENAI_VISION_PROMPT_2023_03_05 = (
-    "You are ChatGPT, a large language model trained by OpenAI capable of looking at images."
-    "\nCurrent date: 2023-03-05\nKnowledge cutoff: 2022-02\nImage Capabilities: Enabled"
+DEFAULT_OPENAI_VISION_PROMPT = (
+    "You are an expert in 3D asset annotation. When providing annotations for 3D assets,"
+    " you always treat the object as if it were real and in front of you."
+)
+
+
+DEFAULT_OPENAI_SYNSET_PROMPT = (
+    "You are an expert in lexical categorization and on the WordNet database. When asked, provide expert"
+    " feedback on the most appropriate synset for a given description."
 )
 
 
@@ -111,7 +117,7 @@ def describe_asset_from_views(
     # Construct the initial prompt message. For the system description, we're using the
     # default content used in the OpenAI API document.
     prompt = Text(
-        DEFAULT_OPENAI_VISION_PROMPT_2023_03_05,
+        DEFAULT_OPENAI_VISION_PROMPT,
         role="system",
     )
 
@@ -169,7 +175,7 @@ def clean_up_json(json_string):
         " containing all relevant data",
     )
     params = {
-        "model": "gpt-4",
+        "model": TEXT_LLM,
         "max_tokens": 2000,
     }
     json_string = get_answer([prompt], [Text(json_string)], **params)
@@ -185,6 +191,7 @@ def get_best_synset_initial_annotation_message_context(
     json_str_of_annotations: str,
     dialogue_dict: GPTDialogue,
 ):
+    # This function is not actually used, see `get_best_synset_using_annotations` below
     near_synsets, distances = nearest_synsets_from_annotation(
         annotation,
         save_to_dir=DESCRIPTION_EMBEDDING_OUTPUT_DIR,
@@ -217,12 +224,14 @@ def get_best_synset_initial_annotation_message_context(
 
 def get_best_synset_using_annotations(
     annotation: Dict[str, Any],
+    n_neighbors: int = NUM_NEIGHS,
+    retry: bool = False,
     **chat_kwargs,
 ) -> str:
     near_synsets, distances = nearest_synsets_from_annotation(
         annotation,
         save_to_dir=DESCRIPTION_EMBEDDING_OUTPUT_DIR,
-        n_neighbors=NUM_NEIGHS,
+        n_neighbors=n_neighbors,
     )
     annotation["near_synsets"] = {s: d for s, d in zip(near_synsets, distances)}
 
@@ -233,7 +242,7 @@ def get_best_synset_using_annotations(
     # Construct the initial prompt message. For the system description, we're using the
     # default content used in the OpenAI API document.
     prompt = Text(
-        "You are ChatGPT, a large language model trained by OpenAI, based on the GPT-4 architecture.",
+        DEFAULT_OPENAI_SYNSET_PROMPT,
         role="system",
     )
 
@@ -260,6 +269,18 @@ def get_best_synset_using_annotations(
     if answer.startswith("synset id: "):
         answer = answer.replace("synset id: ", "").strip()
 
+    if retry and (answer not in near_synsets):
+        print(
+            f"Got answer {answer} not in {near_synsets}. Retrying with n_neighbors = {n_neighbors * 2}",
+            flush=True,
+        )
+        return get_best_synset_using_annotations(
+            annotation=annotation,
+            n_neighbors=n_neighbors * 2,
+            retry=False,
+            **chat_kwargs,
+        )
+
     assert answer in near_synsets, f"Got answer {answer} not in {near_synsets}"
 
     return answer
@@ -276,7 +297,7 @@ def get_initial_annotation(
     try:
         annotation = json.loads(json_str)
         assert "annotations" in annotation, f"Got annotation: {annotation}"
-    except JSONDecodeError:
+    except JSONDecodeError as e:
         new_json_str = clean_up_json(json_str)
         if new_json_str is None:
             print(

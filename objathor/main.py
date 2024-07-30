@@ -2,6 +2,7 @@ import argparse
 import glob
 import os
 import sys
+import traceback
 from functools import lru_cache
 from importlib import import_module
 from typing import Union, Callable, Any, Dict, Optional, cast, Literal
@@ -16,6 +17,7 @@ from objathor.annotation.gpt_from_views import get_initial_annotation
 from objathor.annotation.objaverse_annotations_utils import (
     get_objaverse_home_annotations,
     get_objaverse_ref_categories,
+    compute_clip_vit_l_similarity,
 )
 from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
 from objathor.asset_conversion.util import get_blender_installation_path
@@ -157,6 +159,11 @@ def add_annotation_arguments(
         action="store_true",
         help="If annotations already exist for this asset in Objaverse-Home, use them instead of generating new ones.",
     )
+    parser.add_argument(
+        "--compute_similarity",
+        action="store_true",
+        help="Compute the cosine similarity between the blender and THOR renders and store it in the annotations.",
+    )
     # parser.add_argument(
     #     "--local_render",
     #     action="store_true",
@@ -296,6 +303,7 @@ def annotate_and_optimize_asset(
     thor_platform: str,
     keep_json_asset: bool,
     controller: Optional[Controller] = None,
+    compute_blender_thor_similarity: bool = False,
 ) -> None:
     output_dir_with_uid = cast(str, os.path.join(output_dir, uid))
     os.makedirs(output_dir_with_uid, exist_ok=True)
@@ -376,29 +384,40 @@ def annotate_and_optimize_asset(
         controller=controller,
     )
 
-    # TODO: Should we use CLIP to validate that the assets still look like the blender renders? Example below
-    # import clip
-    # import torch
-    # import numpy as np
-    # from PIL import Image
-    #
-    # annotations = compress_json.load(annotations_path)
-    # blender_render_path = os.path.join(output_dir_with_uid, "blender_renders", f"render_{-annotations['pose_z_rot_angle']:0.1f}.png")
-    #
-    # blender_img = np.array(Image.open(blender_render_path).convert("RGBA"), dtype=np.uint8)
-    # blender_img[blender_img[:, :, 3] == 0] = 255
-    # blender_img = blender_img[:,:,:3]
-    #
-    # thor_img = np.array(Image.open(os.path.join(output_dir_with_uid, "thor_renders", f"0_1_0_90.jpg")).convert("RGB"), dtype=np.uint8
-    #
-    # model, preprocess = clip.load("RN50", device="cpu")
-    # model.eval()
-    #
-    # with torch.no_grad():
-    #     blender_features = model.encode_image(preprocess(Image.fromarray(blender_img)).unsqueeze(0))
-    #     thor_features = model.encode_image(preprocess(Image.fromarray(thor_img)).unsqueeze(0))
-    #
-    #     print(torch.cosine_similarity(blender_features, thor_features))
+    if compute_blender_thor_similarity:
+        print("Computing similarity between blender and THOR renders.")
+        try:
+            import torch
+
+            if controller is not None and controller.gpu_device is not None:
+                device = torch.device(controller.gpu_device)
+            else:
+                device = torch.device("cpu")
+
+            annotations = compress_json.load(annotations_path)
+            blender_render_path = os.path.join(
+                output_dir_with_uid,
+                "blender_renders",
+                f"render_{-np.rad2deg(annotations['pose_z_rot_angle']):0.1f}.jpg",
+            )
+            thor_render_path = os.path.join(
+                output_dir_with_uid, "thor_renders", f"0_1_0_0.0.jpg"
+            )
+            sim = compute_clip_vit_l_similarity(
+                img_path0=blender_render_path,
+                img_path1=thor_render_path,
+                device=device,
+            )
+            annotations["blender_thor_similarity"] = sim
+            compress_json.dump(
+                obj=annotations, path=annotations_path, json_kwargs=dict(indent=2)
+            )
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except:
+            print(
+                f"Failed to compute similarity, will not store in annotations, traceback:\n{traceback.format_exc()}"
+            )
 
 
 if __name__ == "__main__":
@@ -423,4 +442,5 @@ if __name__ == "__main__":
         blender_installation_path=args.blender_installation_path,
         thor_platform=args.thor_platform,
         keep_json_asset=args.keep_json_asset,
+        compute_blender_thor_similarity=args.compute_similarity,
     )

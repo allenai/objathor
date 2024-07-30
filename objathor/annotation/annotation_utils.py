@@ -1,5 +1,23 @@
 from typing import TypedDict, List, Dict
 
+MODEL_STR_TO_PRICE_PER_1M_INPUT_TOKENS = {
+    # OpenAI models
+    "gpt-3.5-turbo-0301": 1.5,
+    "gpt-3.5-turbo-0125": 1.5,
+    "gpt-4-1106-preview": 10.0,
+    "gpt-4o-2024-05-13": 5.0,
+    "gpt-4o-mini-2024-07-18": 0.15,
+}
+
+MODEL_STR_TO_PRICE_PER_1M_OUTPUT_TOKENS = {
+    # OpenAI models
+    "gpt-3.5-turbo-0301": 2.0,
+    "gpt-3.5-turbo-0125": 2.0,
+    "gpt-4-1106-preview": 30.0,
+    "gpt-4o-2024-05-13": 15.0,
+    "gpt-4o-mini-2024-07-18": 0.6,
+}
+
 
 class LicenseInfo(TypedDict):
     """
@@ -114,3 +132,18 @@ class ObjectAnnotation(TypedDict):
     scale: float
     z_axis_scale: bool
     license_info: LicenseInfo
+
+
+def compute_llm_cost(input_tokens: int, output_tokens: int, model: str):
+    assert (
+        model in MODEL_STR_TO_PRICE_PER_1M_INPUT_TOKENS
+        and model in MODEL_STR_TO_PRICE_PER_1M_OUTPUT_TOKENS
+    ), f"model [{model}] must be in both MODEL_STR_TO_PRICE_PER_1M_INPUT_TOKENS and MODEL_STR_TO_PRICE_PER_1M_OUTPUT_TOKENS"
+
+    input_token_cost_per_1m = MODEL_STR_TO_PRICE_PER_1M_INPUT_TOKENS[model]
+    output_token_cost_per_1m = MODEL_STR_TO_PRICE_PER_1M_OUTPUT_TOKENS[model]
+
+    return (
+        input_tokens * input_token_cost_per_1m
+        + output_tokens * output_token_cost_per_1m
+    ) / 1e6
