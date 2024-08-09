@@ -1,6 +1,7 @@
-import copy
+import ast
 import json
 import os.path
+import traceback
 from io import BytesIO
 from json import JSONDecodeError
 from typing import List, Tuple, Sequence, Any, Optional, Dict, TypedDict
@@ -10,7 +11,6 @@ import requests
 from objathor.annotation.synset_from_description import (
     nearest_synsets_from_annotation,
     DESCRIPTION_EMBEDDING_OUTPUT_DIR,
-    prompt_for_best_synset,
     NUM_NEIGHS,
     synsets_from_text,
     PICK_SINGLE_SYNSET_USING_OBJECT_INFO_TEMPLATE,
@@ -18,21 +18,23 @@ from objathor.annotation.synset_from_description import (
 )
 from objathor.constants import VISION_LLM, TEXT_LLM
 from objathor.utils.gpt_utils import get_answer
-from objathor.utils.queries import Text, Image, ComposedMessage
+from objathor.utils.queries import (
+    Text,
+    Image,
+    ComposedMessage,
+)
 
 # Attribution: code adapted and extended from original by Yue Yang, developed during an internship at AI2
 
 DEFAULT_THUMBNAIL_SOURCE_URL = "https://objaverse-im.s3.us-west-2.amazonaws.com"
 DEFAULT_VIEW_INDICES = ("0", "3", "6", "9")
 
-DEFAULT_QUESTION_NO_SYNSET = """Please annotate this 3D asset, corresponding to an object that can be found in a home, with the following values (output valid JSON, without additional comments):
+DEFAULT_QUESTION_NO_SYNSET = """Annotate this 3D asset assuming it can be found in an indoor environment (ie a home, a garage, an office, etc), with the following values:
 "annotations": {
     "description_long": a very detailed visual description of the object that is no more than 6 sentences. Don't use the term "3D asset" or similar here and don't comment on the object's orientation. Do use proper nouns when appropriate.,
     "description": a 1-2 summary of description_long, keep the description rich and visual,
     "category": a category such as "chair", "table", "building", "person", "airplane", "car", "seashell", "fish", "toy", etc. Be concise but specific, e.g. do not say "furniture" when "eames chair" would be more specific,
-    "width": approximate width in cm. For a human being this could be "45",
-    "depth": approximate depth in cm. For a human being this could be "25",
-    "height": approximate height in cm. For a human being this could be "175",
+    "height": approximate height of the object in cm. Report the height for the object's orientation as shown in the images. For a standing human male this could be "175",
     "materials": a Python list of the materials that the object appears to be made of, taking into account the visible exterior and also likely interior (roughly in order of most used material to least used; include "air" if the object interior doesn't seem completely solid),
     "composition": a Python list with the apparent volume mixture of the materials above (make the list sum to 1),
     "mass": approximate mass in kilogram considering typical densities for the materials. For a human being this could be "72",
@@ -42,8 +44,9 @@ DEFAULT_QUESTION_NO_SYNSET = """Please annotate this 3D asset, corresponding to 
     "onWall": whether this object can appear on the wall; return true or false with no explanations. This would be true for a painting but false for a table,
     "onFloor": whether this object can appear on the floor; return true or false with no explanations. This would be true for a piano but false for a curtain,
     "onObject": whether this object can appear on another object; return true or false with no explanations. This would be true for a table lamp but not for a sofa,
+    "quality": a number, 0-10, indicating the quality of the object. 0 is very low quality (amateurish, confusing, missing textures, a 3D scan with many holes, etc), 10 is very high quality (professional, detailed, etc).,
 }
-Please output your answer in the above JSON format.
+Output your answer in the above JSON format with NO OTHER TEXT.
 """
 
 _lines = DEFAULT_QUESTION_NO_SYNSET.split("\n")
@@ -53,6 +56,29 @@ DEFAULT_QUESTION = "\n".join(
         """    "synset": the synset of the object that is most closely related. Try to be as specific as possible. This could be "cat.n.01", "glass.n.03", "bank.n.02", "straight_chair.n.01", etc,"""
     ]
     + _lines[3:]
+)
+
+DEFAULT_QUESTION_THOR_ASSET_NO_MASS = """You are an expert in object annotation. Given images corresponding to an object that can be found in a home, you should annotate it by outputting the following JSON (without additional comments):
+"annotations": {{
+    "description_long": a very detailed visual description of the object that is no more than 6 sentences. Don't use the term "3D asset" or similar here and don't comment on the object's orientation. Do use proper nouns when appropriate.,
+    "description": a 1-2 summary of description_long, keep the description rich and visual,
+    "materials": a Python list of the materials that the object appears to be made of, taking into account the visible exterior and also likely interior (roughly in order of most used material to least used; include "air" if the object interior doesn't seem completely solid),
+    "composition": a Python list with the apparent volume mixture of the materials above (make the list sum to 1),
+    "onCeiling": whether this object can appear on the ceiling; return true or false with no explanations. This would be true for a ceiling fan but false for a chair,
+    "onWall": whether this object can appear on the wall; return true or false with no explanations. This would be true for a painting but false for a table,
+    "onFloor": whether this object can appear on the floor; return true or false with no explanations. This would be true for a piano but false for a curtain,
+    "onObject": whether this object can appear on another object; return true or false with no explanations. This would be true for a table lamp but not for a sofa,
+}}
+Output your answer in the above JSON format WITH NO OTHER TEXT.
+"""
+
+_lines = DEFAULT_QUESTION_THOR_ASSET_NO_MASS.split("\n")
+DEFAULT_QUESTION_THOR_ASSET = "\n".join(
+    _lines[:5]
+    + [
+        """    "mass": approximate mass in kilogram considering typical densities for the materials. For a human being this could be "72","""
+    ]
+    + _lines[5:]
 )
 
 DEFAULT_OPENAI_VISION_PROMPT = (
@@ -102,17 +128,23 @@ class GPTDialogue(TypedDict):
     model: str
 
 
-def describe_asset_from_views(
+def get_gpt_dialogue_to_describe_asset_from_views(
     uid: str,
     question: str = DEFAULT_QUESTION_NO_SYNSET,
     thumbnail_urls_cfg: Dict[str, Any] = None,
+    thumbnail_urls: List[Tuple[int, str]] = None,
+    extra_user_info: str = "",
     **gpt_kwargs: Any,
-) -> Tuple[str, List[str], GPTDialogue]:
-    if thumbnail_urls_cfg is None:
-        thumbnail_urls_cfg = {}
+) -> Tuple[List[str], GPTDialogue]:
+    assert (thumbnail_urls is None) != (
+        thumbnail_urls_cfg is None
+    ), "Either thumbnail_urls or thumbnail_urls_cfg must be provided, but not both."
 
-    # Get the urls of the available views.
-    thumbnail_tuples = get_thumbnail_urls(uid, **thumbnail_urls_cfg)
+    if thumbnail_urls is None:
+        # Get the urls of the available views.
+        thumbnail_tuples = get_thumbnail_urls(uid, **thumbnail_urls_cfg)
+    else:
+        thumbnail_tuples = thumbnail_urls
 
     # Construct the initial prompt message. For the system description, we're using the
     # default content used in the OpenAI API document.
@@ -124,7 +156,8 @@ def describe_asset_from_views(
     user_messages = [
         Text(
             f"Here are {len(thumbnail_tuples)} views of a 3D asset."
-            f" The series of images show the same asset from rotated views, so that you can see all sides of it.",
+            f" The series of images show the same asset from rotated views,"
+            f" so that you can see all sides of it.{extra_user_info}",
         )
     ]
 
@@ -157,10 +190,50 @@ def describe_asset_from_views(
         model=VISION_LLM,
     )
     all_gpt_kwargs.update(gpt_kwargs)
+    return urls, all_gpt_kwargs
+
+
+def describe_asset_from_views(
+    uid: str,
+    question: str = DEFAULT_QUESTION_NO_SYNSET,
+    thumbnail_urls_cfg: Dict[str, Any] = None,
+    thumbnail_urls: List[Tuple[int, str]] = None,
+    extra_user_info: str = "",
+    **gpt_kwargs: Any,
+) -> Tuple[str, List[str], GPTDialogue]:
+    urls, all_gpt_kwargs = get_gpt_dialogue_to_describe_asset_from_views(
+        uid=uid,
+        question=question,
+        thumbnail_urls_cfg=thumbnail_urls_cfg,
+        thumbnail_urls=thumbnail_urls,
+        extra_user_info=extra_user_info,
+        **gpt_kwargs,
+    )
 
     answer = get_answer(**all_gpt_kwargs)
 
     return answer, urls, all_gpt_kwargs
+
+
+def gpt_dialogue_to_batchable_request(gpt_dialogue: GPTDialogue) -> Dict[str, Any]:
+
+    messages = [
+        dict(role=msg.role, content=[msg.gpt()]) for msg in gpt_dialogue["prompt"]
+    ] + [dict(role=msg.role, content=msg.gpt()) for msg in gpt_dialogue["dialog"]]
+
+    return (
+        # dict(
+        # custom_id=uid,
+        # method="POST",
+        # url="/v1/chat/completions",
+        # body=
+        dict(
+            model=gpt_dialogue["model"],
+            messages=messages,
+            max_tokens=2000,
+            temperature=0.0,
+        )
+    )
 
 
 def clean_up_json(json_string):
@@ -186,58 +259,24 @@ def clean_up_json(json_string):
         return None
 
 
-def get_best_synset_initial_annotation_message_context(
-    annotation: Dict[str, Any],
-    json_str_of_annotations: str,
-    dialogue_dict: GPTDialogue,
-):
-    # This function is not actually used, see `get_best_synset_using_annotations` below
-    near_synsets, distances = nearest_synsets_from_annotation(
-        annotation,
-        save_to_dir=DESCRIPTION_EMBEDDING_OUTPUT_DIR,
-        n_neighbors=NUM_NEIGHS,
-    )
-    annotation["near_synsets"] = {s: d for s, d in zip(near_synsets, distances)}
-
-    for s in synsets_from_text(annotation["category"]):
-        if s not in near_synsets:
-            near_synsets.append(s)
-
-    dialogue_dict = copy.deepcopy(dialogue_dict)
-
-    dialogue_dict["dialog"][0].content.append(
-        Text(content=json_str_of_annotations, role="assistant")
-    )
-    dialogue_dict["dialog"][0].content.append(
-        Text(content=prompt_for_best_synset(near_synsets), role="user")
-    )
-
-    answer = get_answer(**dialogue_dict).strip().lower()
-
-    if answer.startswith("synset id: "):
-        answer = answer.replace("synset id: ", "").strip()
-
-    assert answer in near_synsets, f"Got answer {answer} not in {near_synsets}"
-
-    return answer
-
-
-def get_best_synset_using_annotations(
+def get_gpt_dialogue_to_get_best_synset_using_annotations(
     annotation: Dict[str, Any],
     n_neighbors: int = NUM_NEIGHS,
-    retry: bool = False,
-    **chat_kwargs,
-) -> str:
+    **chat_kwargs: Any,
+) -> GPTDialogue:
+
     near_synsets, distances = nearest_synsets_from_annotation(
         annotation,
         save_to_dir=DESCRIPTION_EMBEDDING_OUTPUT_DIR,
         n_neighbors=n_neighbors,
     )
-    annotation["near_synsets"] = {s: d for s, d in zip(near_synsets, distances)}
-
+    distances = distances.tolist()
     for s in synsets_from_text(annotation["category"]):
         if s not in near_synsets:
             near_synsets.append(s)
+            distances.append(-1000.0)
+
+    annotation["near_synsets"] = {s: d for s, d in zip(near_synsets, distances)}
 
     # Construct the initial prompt message. For the system description, we're using the
     # default content used in the OpenAI API document.
@@ -249,7 +288,7 @@ def get_best_synset_using_annotations(
     user_messages = [
         Text(
             PICK_SINGLE_SYNSET_USING_OBJECT_INFO_TEMPLATE.format(
-                description=annotation["description"],
+                description=f"A {annotation['category']}. {annotation['description']}",
                 scale=annotation["height"] * 0.01,
             )
             + "\n"
@@ -263,6 +302,21 @@ def get_best_synset_using_annotations(
     dialogue_dict["prompt"] = [prompt]
     dialogue_dict["dialog"] = [ComposedMessage(user_messages)]
     dialogue_dict["model"] = TEXT_LLM
+    return dialogue_dict
+
+
+def get_best_synset_using_annotations(
+    annotation: Dict[str, Any],
+    n_neighbors: int = NUM_NEIGHS,
+    retry: bool = False,
+    **chat_kwargs,
+) -> str:
+    dialogue_dict = get_gpt_dialogue_to_get_best_synset_using_annotations(
+        annotation=annotation,
+        n_neighbors=n_neighbors,
+        **chat_kwargs,
+    )
+    near_synsets = list(annotation["near_synsets"].keys())
 
     answer = get_answer(**dialogue_dict).strip().lower()
 
@@ -286,44 +340,70 @@ def get_best_synset_using_annotations(
     return answer
 
 
-def get_initial_annotation(
-    uid: str, get_best_synset: bool = True, **describe_kwargs: Any
-) -> Optional[Tuple[Dict[str, Any], List[str]]]:
-    json_str, urls, dialogue_dict = describe_asset_from_views(uid, **describe_kwargs)
-
+def load_gpt_annotations_from_json_str(
+    uid: str, json_str: str, attempt_cleanup: bool
+) -> Dict[str, Any]:
     if json_str.startswith("```json"):
         json_str = json_str.replace("```json", "").replace("```", "")
 
     try:
         annotation = json.loads(json_str)
-        assert "annotations" in annotation, f"Got annotation: {annotation}"
-    except JSONDecodeError as e:
-        new_json_str = clean_up_json(json_str)
-        if new_json_str is None:
-            print(
-                f"Failed to clean up response\n{json_str}\nwith urls\n{urls}\nwith error\n{e}"
-            )
-            raise
-        annotation = json.loads(new_json_str)
+    except JSONDecodeError:
+        annotation = None
+        try:
+            annotation = ast.literal_eval(json_str)
+        except:
+            pass
 
-    annotation = annotation["annotations"]
+        if annotation is None:
+            new_json_str = None
+            if attempt_cleanup:
+                new_json_str = clean_up_json(json_str)
+
+            if new_json_str is None:
+                print(
+                    f"Failed to clean up response"
+                    f"\n{json_str}"
+                    f"\nwith error:"
+                    f"\n{traceback.format_exc()}"
+                )
+                raise
+            annotation = json.loads(new_json_str)
+
+    if "annotations" in annotation:
+        annotation = annotation["annotations"]
+    elif "annotation" in annotation:
+        annotation = annotation["annotation"]
+
+    assert "description" in annotation, f"Missing description in {annotation}"
     annotation["uid"] = uid
+    return annotation
 
-    try:
-        if get_best_synset:
+
+def get_initial_annotation(
+    uid: str, get_best_synset: bool = True, **describe_kwargs: Any
+) -> Optional[Tuple[Dict[str, Any], List[str]]]:
+    json_str, urls, dialogue_dict = describe_asset_from_views(uid, **describe_kwargs)
+
+    annotation = load_gpt_annotations_from_json_str(
+        uid=uid, json_str=json_str, attempt_cleanup=True
+    )
+
+    if get_best_synset:
+        try:
             annotation["synset"] = get_best_synset_using_annotations(
                 annotation,
                 **dialogue_dict,
             )
-    except (SystemExit, KeyboardInterrupt):
-        raise
-    except:
-        print(
-            f"[ERROR] Failed to get best synset using annotations for uid {uid}. Annotations"
-            f" are {annotation}",
-            flush=True,
-        )
-        raise
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except:
+            print(
+                f"[ERROR] Failed to get best synset using annotations for uid {uid}. Annotations"
+                f" are {annotation}",
+                flush=True,
+            )
+            raise
 
     if "synset" in annotation:
         annotation["wn_version"] = "oewn:2022"

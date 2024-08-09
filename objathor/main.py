@@ -1,27 +1,40 @@
 import argparse
 import glob
+import json
 import os
 import sys
 import traceback
 from functools import lru_cache
 from importlib import import_module
-from typing import Union, Callable, Any, Dict, Optional, cast, Literal
+from typing import Union, Callable, Any, Dict, Optional, cast, Literal, Tuple
 
 import compress_json
 import compress_pickle
 import numpy as np
 import objaverse
+from PIL import Image
 from ai2thor.controller import Controller
 
-from objathor.annotation.gpt_from_views import get_initial_annotation
+from objathor.annotation.annotation_utils import compute_llm_cost
+from objathor.annotation.gpt_from_views import (
+    get_initial_annotation,
+    get_thumbnail_urls,
+    get_gpt_dialogue_to_describe_asset_from_views,
+    gpt_dialogue_to_batchable_request,
+    load_gpt_annotations_from_json_str,
+    get_gpt_dialogue_to_get_best_synset_using_annotations,
+)
 from objathor.annotation.objaverse_annotations_utils import (
     get_objaverse_home_annotations,
     get_objaverse_ref_categories,
     compute_clip_vit_l_similarity,
 )
+from objathor.annotation.synset_from_description import NUM_NEIGHS
 from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
 from objathor.asset_conversion.util import get_blender_installation_path
-from objathor.constants import OBJATHOR_CACHE_PATH
+from objathor.constants import OBJATHOR_CACHE_PATH, TEXT_LLM, VISION_LLM
+from objathor.dataset.openai_batch_client import OpenAIBatchClient
+from objathor.dataset.openai_batch_server import RequestStatus
 from objathor.utils.blender import render_glb_from_angles
 from objathor.utils.download_utils import download_with_locking
 
@@ -82,7 +95,7 @@ def annotate_asset(
     allow_overwrite=False,
     extra_anns: Optional[Dict[str, Any]] = None,
     **kwargs: Any,
-) -> None:
+) -> Dict[str, Any]:
     save_path = os.path.join(output_dir, f"annotations.json.gz")
     if os.path.exists(save_path) and not allow_overwrite:
         raise ValueError(
@@ -91,11 +104,22 @@ def annotate_asset(
     render_dir = os.path.join(output_dir, "blender_renders")
     os.makedirs(render_dir, exist_ok=True)
     try:
-        render_glb_from_angles(
+        blender_render_paths = render_glb_from_angles(
             glb_path=glb_path,
             save_dir=render_dir,
             angles=render_angles,
         )
+        for p in blender_render_paths:
+            # Verify that images are not nearly completely white
+            img = np.array(Image.open(p))
+            if img.shape[-1] == 4:
+                img[img[:, :, 3] == 0] = 255
+                img = img[:, :, :3]
+
+            if img.min() > 245:
+                raise ValueError(
+                    f"Image {p} is nearly completely white, likely a rendering error"
+                )
 
         anno, urls = get_initial_annotation(
             uid,
@@ -104,7 +128,9 @@ def annotate_asset(
                 view_indices=[str(float(angle)) for angle in render_angles],
                 local_renders=True,
             ),
+            get_best_synset=True,
         )
+        anno["annotation_info"] = {"vision_llm": VISION_LLM, "text_llm": TEXT_LLM}
 
         # -1.0 * ... needed to undo the rotation of the object in the render
         anno["pose_z_rot_angle"] = -1.0 * np.deg2rad(render_angles[anno["frontView"]])
@@ -117,7 +143,8 @@ def annotate_asset(
         if extra_anns is None:
             extra_anns = {}
 
-        write({**anno, **extra_anns}, save_path, **kwargs)
+        write(anno={**anno, **extra_anns}, output_file=save_path, **kwargs)
+        return {**anno, **extra_anns}
     finally:
         if delete_blender_render_dir:
             if os.path.exists(render_dir):
@@ -127,6 +154,227 @@ def annotate_asset(
                     os.remove(p)
 
                 os.rmdir(render_dir)
+
+
+def check_async_request_and_save_response_if_complete(
+    request_uid: str, save_path: str, batch_client: OpenAIBatchClient
+) -> RequestStatus:
+    status = batch_client.check_status(uid=request_uid)
+
+    if status == RequestStatus.COMPLETED:
+        response = batch_client.get(uid=request_uid)
+
+        compress_json.dump(obj=response, path=save_path, json_kwargs=dict(indent=2))
+        _print_batch_cost_from_response(
+            response, prefix=f"Request response saved to {save_path}. "
+        )
+
+        batch_client.delete(uid=request_uid)
+        return status
+
+    elif status in [
+        RequestStatus.FAILED,
+        RequestStatus.EXPIRED,
+        RequestStatus.CANCELLED,
+        RequestStatus.CANCELLING,
+    ]:
+
+        batch_client.delete(uid=request_uid)
+        raise ValueError(f"Batch job failed with status {status}")
+    else:
+        return status
+
+
+def _get_content_from_response(response: Dict[str, Any]) -> str:
+    return response["response"]["body"]["choices"][0]["message"]["content"]
+
+
+def _print_batch_cost_from_response(response: Dict[str, Any], prefix: str = "") -> None:
+    try:
+        usage = response["response"]["body"]["usage"]
+        pt = usage["prompt_tokens"]
+        ct = usage["completion_tokens"]
+        model = response["response"]["body"]["model"]
+        cost = (
+            compute_llm_cost(input_tokens=pt, output_tokens=ct, model=model) * 0.5
+        )  # 0.5 due to batching
+        print(
+            f"{prefix}Prompt tokens: {pt}."
+            f" Completion tokens: {ct}."
+            f" Approx cost: ${cost:.2g}.",
+            flush=True,
+        )
+    except:
+        print(f"{prefix}Failed to print cost from response", flush=True)
+
+
+def async_annotate_asset(
+    uid: str,
+    glb_path: str,
+    output_dir: str,
+    async_host_and_port: str,
+    render_angles=(0, 90, 180, 270),
+    delete_blender_render_dir=False,
+    allow_overwrite=False,
+    extra_anns: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
+) -> Tuple[RequestStatus, Optional[Dict[str, Any]]]:
+    if allow_overwrite:
+        raise NotImplementedError(
+            "allow_overwrite=True is not supported for async_annotate_asset"
+        )
+
+    if delete_blender_render_dir:
+        raise NotImplementedError(
+            "delete_blender_render_dir=True is not supported for async_annotate_asset"
+        )
+
+    save_path = os.path.join(output_dir, f"annotations.json.gz")
+    if os.path.exists(save_path) and not allow_overwrite:
+        raise ValueError(
+            f"Annotations already exist at {save_path} and allow_overwrite is False"
+        )
+
+    host, port_str = async_host_and_port.strip().split(":")
+    batch_client = OpenAIBatchClient(host=host, port=int(port_str))
+
+    annotate_from_views_uid_path = os.path.join(
+        output_dir, f"annotate_from_views_uid.txt"
+    )
+    annotate_from_views_response_path = os.path.join(
+        output_dir, "annotate_from_views_response.json"
+    )
+
+    synset_uid_path = os.path.join(output_dir, f"synset_uid.txt")
+    synset_response_path = os.path.join(output_dir, "synset_response.json")
+
+    render_dir = os.path.join(output_dir, "blender_renders")
+    os.makedirs(render_dir, exist_ok=True)
+    try:
+        blender_render_paths = [
+            path.replace("file://", "")
+            for _, path in get_thumbnail_urls(
+                uid,
+                base_url=render_dir,
+                view_indices=[str(float(angle)) for angle in render_angles],
+                local_renders=True,
+            )
+        ]
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except:
+        blender_render_paths = render_glb_from_angles(
+            glb_path=glb_path,
+            save_dir=render_dir,
+            angles=render_angles,
+        )
+
+    for p in blender_render_paths:
+        # Verify that images are not nearly completely white
+        img = np.array(Image.open(p))
+        if img.shape[-1] == 4:
+            img[img[:, :, 3] == 0] = 255
+            img = img[:, :, :3]
+
+        if img.min() > 245:
+            raise ValueError(
+                f"Image {p} is nearly completely white, likely a rendering error"
+            )
+
+    if not (os.path.exists(annotate_from_views_uid_path)):
+        _, dialogue_dict = get_gpt_dialogue_to_describe_asset_from_views(
+            uid,
+            thumbnail_urls_cfg=dict(
+                base_url=render_dir,
+                view_indices=[str(float(angle)) for angle in render_angles],
+                local_renders=True,
+            ),
+        )
+        annotate_from_views_uid = batch_client.put(
+            gpt_dialogue_to_batchable_request(gpt_dialogue=dialogue_dict)
+        )
+        if annotate_from_views_uid is None:
+            raise RuntimeError(f"Failed to send annotate_from_views request for {uid}")
+
+        with open(annotate_from_views_uid_path, "w") as f:
+            f.write(annotate_from_views_uid)
+
+    if not os.path.exists(annotate_from_views_response_path):
+        with open(annotate_from_views_uid_path, "r") as f:
+            annotate_from_views_uid = f.read().strip()
+
+        status = check_async_request_and_save_response_if_complete(
+            request_uid=annotate_from_views_uid,
+            save_path=annotate_from_views_response_path,
+            batch_client=batch_client,
+        )
+        if status != RequestStatus.COMPLETED:
+            print(
+                f"annotate_from_views request for {uid} is in state: {status}. Please re-run later if it is IN_PROGRESS or VALIDATING."
+            )
+            return status, None
+
+    annotate_from_views_response = compress_json.load(annotate_from_views_response_path)
+    json_str = _get_content_from_response(annotate_from_views_response)
+
+    anno = load_gpt_annotations_from_json_str(
+        uid=uid, json_str=json_str, attempt_cleanup=False
+    )
+
+    if not os.path.exists(synset_uid_path):
+        dialogue_dict = get_gpt_dialogue_to_get_best_synset_using_annotations(
+            annotation=anno,
+            n_neighbors=2 * NUM_NEIGHS,
+        )
+        # Need to resave the json with the updated annotations as the near synsets have been added
+        # by the above call
+        annotate_from_views_response["response"]["body"]["choices"][0]["message"][
+            "content"
+        ] = json.dumps({"annotations": anno})
+        compress_json.dump(
+            annotate_from_views_response, annotate_from_views_response_path
+        )
+
+        synset_request = gpt_dialogue_to_batchable_request(gpt_dialogue=dialogue_dict)
+        synset_uid = batch_client.put(synset_request)
+
+        with open(synset_uid_path, "w") as f:
+            f.write(synset_uid)
+
+    if not os.path.exists(synset_response_path):
+        with open(synset_uid_path, "r") as f:
+            synset_uid = f.read().strip()
+
+        status = check_async_request_and_save_response_if_complete(
+            request_uid=synset_uid,
+            save_path=synset_response_path,
+            batch_client=batch_client,
+        )
+        if status != RequestStatus.COMPLETED:
+            print(
+                f"Synset request for {uid} is in state: {status}. Please re-run later if it is IN_PROGRESS or VALIDATING."
+            )
+            return status, None
+
+    synset = _get_content_from_response(compress_json.load(synset_response_path))
+
+    if synset.startswith("synset id: "):
+        synset = synset.replace("synset id: ", "").strip()
+
+    anno["synset"] = synset
+
+    anno["annotation_info"] = {"vision_llm": VISION_LLM, "text_llm": TEXT_LLM}
+    # -1.0 * ... needed to undo the rotation of the object in the render
+    anno["pose_z_rot_angle"] = -1.0 * np.deg2rad(render_angles[anno["frontView"]])
+    anno["scale"] = float(anno["height"]) / 100
+    anno["z_axis_scale"] = True
+    anno["uid"] = uid
+
+    if extra_anns is None:
+        extra_anns = {}
+
+    write(anno={**anno, **extra_anns}, output_file=save_path, **kwargs)
+    return RequestStatus.COMPLETED, {**anno, **extra_anns}
 
 
 def add_annotation_arguments(
@@ -151,7 +399,7 @@ def add_annotation_arguments(
         type=str,
         required=True,
         help=(
-            "The output directory to write to (in particular, data will be saved to `<output>/<uid>/*`."
+            "The output directory to write to (in particular, data will be saved to `<output>/<uid>/*`)."
         ),
     )
     parser.add_argument(
@@ -164,11 +412,11 @@ def add_annotation_arguments(
         action="store_true",
         help="Compute the cosine similarity between the blender and THOR renders and store it in the annotations.",
     )
-    # parser.add_argument(
-    #     "--local_render",
-    #     action="store_true",
-    #     help="Generate object views to be uploaded to GPT locally (requires blender)",
-    # )
+    parser.add_argument(
+        "--async_host_and_port",
+        type=str,
+        help="Host and port of the async server to use for annotation (a OpenAIBatchServer should have been launched on this host and port).",
+    )
     return parser
 
 
@@ -207,10 +455,10 @@ def add_optimization_arguments(
         help="Adds house creation with single object and look at object center actions to json.",
     )
     parser.add_argument(
-        "--width", type=int, default=300, help="Width of THOR asset visualization."
+        "--width", type=int, default=512, help="Width of THOR asset visualization."
     )
     parser.add_argument(
-        "--height", type=int, default=300, help="Height of THOR asset visualization."
+        "--height", type=int, default=512, help="Height of THOR asset visualization."
     )
     parser.add_argument(
         "--skybox_color",
@@ -302,11 +550,14 @@ def annotate_and_optimize_asset(
     blender_installation_path: str,
     thor_platform: str,
     keep_json_asset: bool,
+    compute_blender_thor_similarity: bool,
     controller: Optional[Controller] = None,
-    compute_blender_thor_similarity: bool = False,
+    async_host_and_port: Optional[str] = None,
 ) -> None:
-    output_dir_with_uid = cast(str, os.path.join(output_dir, uid))
+    output_dir_with_uid = cast(str, os.path.abspath(os.path.join(output_dir, uid)))
     os.makedirs(output_dir_with_uid, exist_ok=True)
+
+    print(f"Saving to {output_dir_with_uid}")
 
     objaverse_uids = objaverse.load_uids()
     is_objaverse = uid in objaverse_uids
@@ -352,12 +603,25 @@ def annotate_and_optimize_asset(
 
             render_with_blender()
         else:
-            annotate_asset(
-                uid=uid,
-                glb_path=glb_path,
-                output_dir=output_dir_with_uid,
-                extra_anns=license_info,
-            )
+            if async_host_and_port is not None:
+                status, result = async_annotate_asset(
+                    uid=uid,
+                    glb_path=glb_path,
+                    output_dir=output_dir_with_uid,
+                    extra_anns=license_info,
+                    async_host_and_port=async_host_and_port,
+                )
+
+                if status != RequestStatus.COMPLETED:
+                    return
+
+            else:
+                annotate_asset(
+                    uid=uid,
+                    glb_path=glb_path,
+                    output_dir=output_dir_with_uid,
+                    extra_anns=license_info,
+                )
 
     # OPTIMIZATION
     optimize_assets_for_thor(
@@ -385,39 +649,53 @@ def annotate_and_optimize_asset(
     )
 
     if compute_blender_thor_similarity:
-        print("Computing similarity between blender and THOR renders.")
-        try:
-            import torch
+        annotations = compress_json.load(annotations_path)
 
-            if controller is not None and controller.gpu_device is not None:
-                device = torch.device(controller.gpu_device)
-            else:
-                device = torch.device("cpu")
-
-            annotations = compress_json.load(annotations_path)
-            blender_render_path = os.path.join(
-                output_dir_with_uid,
-                "blender_renders",
-                f"render_{-np.rad2deg(annotations['pose_z_rot_angle']):0.1f}.jpg",
+        if "blender_thor_similarity" in annotations:
+            print(
+                f"Blender-THOR similarity already computed for {uid}, will not recompute."
             )
+        else:
             thor_render_path = os.path.join(
                 output_dir_with_uid, "thor_renders", f"0_1_0_0.0.jpg"
             )
-            sim = compute_clip_vit_l_similarity(
-                img_path0=blender_render_path,
-                img_path1=thor_render_path,
-                device=device,
-            )
-            annotations["blender_thor_similarity"] = sim
-            compress_json.dump(
-                obj=annotations, path=annotations_path, json_kwargs=dict(indent=2)
-            )
-        except (SystemExit, KeyboardInterrupt):
-            raise
-        except:
-            print(
-                f"Failed to compute similarity, will not store in annotations, traceback:\n{traceback.format_exc()}"
-            )
+            if not os.path.exists(thor_render_path):
+                print(
+                    f"THOR render does not exist at {thor_render_path}, will not compute similarity."
+                )
+            else:
+                print("Computing similarity between blender and THOR renders.")
+                try:
+                    import torch
+
+                    if controller is not None and controller.gpu_device is not None:
+                        device = torch.device(controller.gpu_device)
+                    else:
+                        device = torch.device("cpu")
+
+                    blender_render_path = os.path.join(
+                        output_dir_with_uid,
+                        "blender_renders",
+                        f"render_{(-np.rad2deg(annotations['pose_z_rot_angle'])) % 360:0.1f}.jpg",
+                    )
+
+                    sim = compute_clip_vit_l_similarity(
+                        img_path0=blender_render_path,
+                        img_path1=thor_render_path,
+                        device=device,
+                    )
+                    annotations["blender_thor_similarity"] = sim
+                    compress_json.dump(
+                        obj=annotations,
+                        path=annotations_path,
+                        json_kwargs=dict(indent=2),
+                    )
+                except (SystemExit, KeyboardInterrupt):
+                    raise
+                except:
+                    print(
+                        f"Failed to compute similarity, will not store in annotations, traceback:\n{traceback.format_exc()}"
+                    )
 
 
 if __name__ == "__main__":
@@ -443,4 +721,5 @@ if __name__ == "__main__":
         thor_platform=args.thor_platform,
         keep_json_asset=args.keep_json_asset,
         compute_blender_thor_similarity=args.compute_similarity,
+        async_host_and_port=args.async_host_and_port,
     )

@@ -363,9 +363,9 @@ def generate_colliders(
         )
         info[uid] = result_info
 
-    # delete the obj files and the texture files
+    # delete the obj files
     if delete_objs:
-        for file in obj_files:  # + texture_files:
+        for file in obj_files:
             os.remove(file)
     return info
 

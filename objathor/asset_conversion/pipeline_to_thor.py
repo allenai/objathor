@@ -20,7 +20,6 @@ from tqdm import tqdm
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
-
 # shared library
 from objathor.asset_conversion.util import (
     add_visualize_thor_actions,
@@ -370,8 +369,8 @@ def obj_to_colliders(
 
 def validate_in_thor(
     controller: Any,
-    asset_dir: str,
-    asset_name: str,
+    asset_dir: Optional[str],
+    asset_id: str,
     output_dir: str,
     failed_objects: OrderedDictWithDefault,
     skip_images=False,
@@ -386,42 +385,48 @@ def validate_in_thor(
 
     evt = None
     try:
-        evt = create_asset(
-            thor_controller=controller,
-            asset_directory=asset_dir,
-            asset_id=asset_name,
-            load_file_in_unity=load_file_in_unity,
-            extension=extension,
-        )
-        if not evt.metadata["lastActionSuccess"]:
-            failed_objects[asset_name] = {
-                "failure_reason": THOR_CREATE_ASSET_FAIL,
-                "lastAction": controller.last_action,
-                "info": {
-                    "asset_dir": asset_dir,
-                    "asset_name": asset_name,
-                    "extension": extension,
-                },
-                "errorMessage": evt.metadata["errorMessage"],
-            }
-            return False, None
+        if asset_dir is None:
+            ad = controller.step(action="GetAssetDatabase").metadata["actionReturn"]
+            assert asset_id in ad, f"Asset {asset_id} not in asset database"
+            asset_metadata = ad[asset_id]
+        else:
+            evt = create_asset(
+                thor_controller=controller,
+                asset_directory=asset_dir,
+                asset_id=asset_id,
+                load_file_in_unity=load_file_in_unity,
+                extension=extension,
+            )
+            if not evt.metadata["lastActionSuccess"]:
+                failed_objects[asset_id] = {
+                    "failure_reason": THOR_CREATE_ASSET_FAIL,
+                    "lastAction": controller.last_action,
+                    "info": {
+                        "asset_dir": asset_dir,
+                        "asset_id": asset_id,
+                        "extension": extension,
+                    },
+                    "errorMessage": evt.metadata["errorMessage"],
+                }
+                return False, None
 
-        asset_metadata = evt.metadata["actionReturn"]
+            asset_metadata = evt.metadata["actionReturn"]
 
         if asset_metadata is None:
-            failed_objects[asset_name] = {
+            failed_objects[asset_id] = {
                 "failure_reason": THOR_CREATE_ASSET_FAIL,
                 "lastAction": controller.last_action,
                 "info": {
                     "asset_dir": asset_dir,
-                    "asset_name": asset_name,
+                    "asset_id": asset_id,
                     "extension": extension,
                 },
                 "errorMessage": evt.metadata["errorMessage"],
             }
             return False, None
 
-        del asset_metadata["objectMetadata"]
+        if "objectMetadata" in asset_metadata:
+            del asset_metadata["objectMetadata"]
 
         if not skip_images:
             if isinstance(angles, int):
@@ -429,14 +434,14 @@ def validate_in_thor(
             rotations = [(x, y, z, degrees) for degrees in angles for (x, y, z) in axes]
 
             evt = view_asset_in_thor(
-                asset_name,
-                controller,
-                output_dir,
+                asset_id=asset_id,
+                controller=controller,
+                output_dir=output_dir,
                 rotations=rotations,
                 skybox_color=skybox_color,
             )
             if not evt.metadata["lastActionSuccess"]:
-                failed_objects[asset_name] = {
+                failed_objects[asset_id] = {
                     "failure_reason": THOR_VIEW_ASSET_FAIL,
                     "lastAction": controller.last_action,
                     "errorMessage": evt.metadata["errorMessage"],
@@ -448,7 +453,7 @@ def validate_in_thor(
         raise
     except Exception:
         print(traceback.format_exc())
-        failed_objects[asset_name] = {
+        failed_objects[asset_id] = {
             "failure_reason": THOR_PROCESS_FAILURE,
             "exception": traceback.format_exc(),
             "lastAction": controller.last_action,
@@ -483,6 +488,7 @@ def optimize_assets_for_thor(
     report_out_file_name: Optional[str] = "failed_objects.json",
     log_prefix="",
     timeout: Optional[int] = None,
+    overwrite: bool = False,
     **extra_collider_kwargs: Dict[str, Any],
 ) -> Dict[str, Dict[str, Any]]:
     report_out_path: Optional[str] = None
@@ -498,8 +504,49 @@ def optimize_assets_for_thor(
         for uid, glb_path in tqdm(uid_to_glb_path.items()):
             start_obj_time = time.perf_counter()
             asset_out_dir = os.path.join(output_dir, uid)
-            metadata_output_file = os.path.join(asset_out_dir, "thor_metadata.json")
+            metadata_output_path = os.path.join(asset_out_dir, "thor_metadata.json")
 
+            # First let's verify if we need to skip conversion, collider generation, or thor metadata generation
+            object_save_path = get_extension_save_path(
+                out_dir=asset_out_dir, asset_id=uid, extension=extension
+            )
+            if (not overwrite) and os.path.exists(object_save_path):
+                asset = load_existing_thor_asset_file(
+                    out_dir=asset_out_dir, object_name=uid
+                )
+
+                has_colliders = "colliders" in asset
+                has_valid_textures = True
+                for key in asset.keys():
+                    if key.endswith("TexturePath"):
+                        has_valid_textures = has_valid_textures and (
+                            (os.path.isabs(asset[key]) and os.path.exists(asset[key]))
+                            or os.path.exists(os.path.join(asset_out_dir, asset[key]))
+                        )
+
+                if has_colliders and has_valid_textures:
+                    print(
+                        f"{log_prefix}{object_save_path} already exists and the asset has colliders."
+                        f" Will skip conversion and collider generation."
+                    )
+                    skip_conversion = True
+                    skip_colliders = True
+                    if (
+                        os.path.exists(metadata_output_path)
+                        and os.stat(metadata_output_path).st_size > 0
+                    ):
+                        if not skip_thor_metadata:
+                            print(
+                                f"{log_prefix}{metadata_output_path} already exists will skip generating thor metadata and thor images."
+                            )
+                            skip_thor_metadata = True
+                else:
+                    raise RuntimeError(
+                        f"{object_save_path} already exists but the asset does not have colliders or valid textures."
+                        f" As overwrite is False, we cannot continue."
+                    )
+
+            # Ensure annotations exist and determine their path
             if os.path.isdir(annotations_path):
                 if os.path.exists(os.path.join(annotations_path, f"{uid}.json")):
                     sub_annotations_path = os.path.join(annotations_path, f"{uid}.json")
@@ -516,6 +563,7 @@ def optimize_assets_for_thor(
             else:
                 sub_annotations_path = annotations_path
 
+            # GLB to THOR conversion
             success = True
             if not skip_conversion:
                 with Timer(f"{log_prefix}GLB to THOR ({uid})"):
@@ -534,6 +582,7 @@ def optimize_assets_for_thor(
                     )
                 assert success == (uid not in failed_objects)
 
+            # Collider generation
             if success and not skip_colliders:
                 with Timer(f"{log_prefix}OBJ to collider ({uid})"):
                     success = obj_to_colliders(
@@ -592,7 +641,8 @@ def optimize_assets_for_thor(
                         flush=True,
                     )
 
-            asset_metadata: Optional[Dict[str, Any]] = None
+            # Validating the object can be spawned in thor, generate images in thor,
+            # and save thor object metadata
             if success and not skip_thor_metadata:
                 import ai2thor.controller
                 import ai2thor.fifo_server
@@ -618,7 +668,7 @@ def optimize_assets_for_thor(
                     success, asset_metadata = validate_in_thor(
                         controller=controller,
                         asset_dir=asset_out_dir,
-                        asset_name=uid,
+                        asset_id=uid,
                         output_dir=os.path.join(asset_out_dir, "thor_renders"),
                         failed_objects=failed_objects,
                         skip_images=skip_thor_render,
@@ -630,7 +680,8 @@ def optimize_assets_for_thor(
                     assert success == (asset_metadata is not None)
 
                     if success:
-                        with open(metadata_output_file, "w") as f:
+                        asset_metadata["thor_commit_id"] = THOR_COMMIT_ID
+                        with open(metadata_output_path, "w") as f:
                             json.dump(asset_metadata, f, indent=2)
 
                     if add_visualize_thor_actions:

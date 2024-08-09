@@ -24,12 +24,6 @@ NUM_NEIGHS = 5
 _SYNSET_EMBEDDINGS: Optional[Dict[str, np.ndarray]] = None
 
 
-PICK_SINGLE_SYNSET_TEMPLATE = """\
-Below are a list of synsets from WordNet2022 along with their definitions, lemmas, hypernyms, and hyponyms.\
- Pick exactly one synset that best describes the object in the image and respond with that synset's ID. Include\
- no other text in your response.
-"""
-
 PICK_SINGLE_SYNSET_USING_OBJECT_INFO_TEMPLATE = """\
 I have an object with description:
 
@@ -39,7 +33,7 @@ This object is approximately {scale:0.3g} meters tall.
 
 Below are a list of synsets from WordNet2022 along with their definitions, lemmas, hypernyms, and hyponyms.\
  Pick exactly one synset that best describes the above object's type and respond with that synset's ID. Include\
- no other text in your response. If no synset is a good match, respond with the word none and no other text.
+ no other text in your response.
 """
 
 
@@ -62,14 +56,6 @@ def synset_to_summary_str(synset: str) -> str:
         hypernyms=", ".join([h.name() for h in s.hypernyms()][:5]),
         hyponyms=", ".join([h.name() for h in s.hyponyms()][:5]),
         lemmas=", ".join([l.name() for l in s.lemmas()][:5]),
-    )
-
-
-def prompt_for_best_synset(synsets: Sequence[str]) -> str:
-    return (
-        PICK_SINGLE_SYNSET_TEMPLATE
-        + "\n"
-        + "\n\n".join([synset_to_summary_str(s) for s in synsets])
     )
 
 
