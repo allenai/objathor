@@ -23,7 +23,7 @@ if __name__ == "__main__":
         name="objathor",
         packages=find_packages(),
         include_package_data=True,
-        version="0.0.5",
+        version="0.0.6",
         license="Apache 2.0",
         description="Objaverse asset importer for THOR",
         long_description=long_description,
