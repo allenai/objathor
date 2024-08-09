@@ -24,7 +24,7 @@ SYNSET_DEFINITION_EMB_FILE = os.path.join(
 
 
 def download_embeddings(
-    url: str = "https://prior-datasets.s3.us-east-2.amazonaws.com/vida-synset-embeddings/synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz",
+    url: str = "https://pub-daedd7738a984186a00f2ab264d06a07.r2.dev/misc/synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz",
 ):
     os.makedirs(OBJATHOR_DATA_DIR, exist_ok=True)
     if not os.path.isfile(SYNSET_DEFINITION_EMB_FILE):

@@ -22,6 +22,7 @@ from objathor.annotation.gpt_from_views import (
     get_initial_annotation,
 )
 from objathor.asset_conversion.pipeline_to_thor import validate_in_thor
+
 # shared library
 from objathor.asset_conversion.util import (
     OrderedDictWithDefault,
