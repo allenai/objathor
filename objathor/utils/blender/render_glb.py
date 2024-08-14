@@ -158,7 +158,7 @@ def render_glb(glb_path: str, output_dir: str, angles: Sequence[float]):
 
         # Render and save the final result with only the object's pixels and transparent background
         bpy.context.scene.render.filepath = os.path.join(
-            output_dir, f"render_{azimuth}.png"
+            output_dir, f"render_{azimuth:0.1f}.png"
         )
         bpy.ops.render.render(write_still=True)
 
@@ -191,4 +191,9 @@ if __name__ == "__main__":
     args = parser.parse_args(argv)
 
     angles = [float(angle) for angle in args.angles.split(",")]
+
+    assert len(set(f"{a:0.1f}" for a in angles)) == len(
+        angles
+    ), "Azimuth angles must be unique when saved with 1 decimal point of precision"
+
     render_glb(glb_path=args.glb_path, output_dir=args.output_dir, angles=angles)

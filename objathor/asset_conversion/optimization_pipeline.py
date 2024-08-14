@@ -10,13 +10,12 @@ import time
 import traceback
 from contextlib import contextmanager
 from time import perf_counter
-from typing import Any, List, Dict, Sequence, Optional, Union, Literal
+from typing import Any, List, Dict, Sequence, Optional, Union
 
 import PIL.Image
 import ai2thor.controller
 import numpy as np
 import objaverse
-from tqdm import tqdm
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
@@ -36,17 +35,14 @@ from objathor.asset_conversion.util import (
     add_default_annotations,
 )
 from objathor.constants import ABS_PATH_OF_OBJATHOR, THOR_COMMIT_ID
+from objathor.utils.types import (
+    ObjathorStatus,
+    PROCESSED_ASSET_EXTENSIONS,
+    ObjathorInfo,
+)
 
 FORMAT = "%(asctime)s %(message)s"
 logger = logging.getLogger(__name__)
-
-BLENDER_PROCESS_FAIL = "blender_process_fail"
-BLENDER_PROCESS_TIMEOUT_FAIL = "blender_process_timeout_fail"
-IMAGE_COMPRESS_FAIL = "png_to_jpg_compression_fail"
-GENERATE_COLLIDERS_FAIL = "vhacd_generate_colliders_fail"
-THOR_CREATE_ASSET_FAIL = "thor_create_asset_fail"
-THOR_VIEW_ASSET_FAIL = "thor_view_asset_in_thor_fail"
-THOR_PROCESS_FAILURE = "thor_process_fail"
 
 
 @contextmanager
@@ -189,9 +185,11 @@ def glb_to_thor(
             success = True
         else:
             if timeout_hit:
-                failed_objects[uid]["failure_reason"] = BLENDER_PROCESS_TIMEOUT_FAIL
+                failed_objects[uid][
+                    "status"
+                ] = ObjathorStatus.BLENDER_PROCESS_TIMEOUT_FAIL
             else:
-                failed_objects[uid]["failure_reason"] = BLENDER_PROCESS_FAIL
+                failed_objects[uid]["status"] = ObjathorStatus.BLENDER_PROCESS_FAIL
 
             failed_objects[uid]["blender_output"] = out if out else ""
             return False
@@ -265,7 +263,7 @@ def glb_to_thor(
         raise
     except Exception as e:
         logger.error(f"Exception: {e}")
-        failed_objects[uid]["failure_reason"] = IMAGE_COMPRESS_FAIL
+        failed_objects[uid]["status"] = ObjathorStatus.IMAGE_COMPRESS_FAIL
         failed_objects[uid]["exception"] = traceback.format_exc()
         success = False
 
@@ -351,7 +349,7 @@ def obj_to_colliders(
             **kwargs,
         )
         if "failed" in result_info[uid] and result_info[uid]["failed"]:
-            failed_objects[uid]["failure_reason"] = GENERATE_COLLIDERS_FAIL
+            failed_objects[uid]["status"] = ObjathorStatus.GENERATE_COLLIDERS_FAIL
             failed_objects[uid]["generate_colliders_info"] = result_info[uid]
             return False
         else:
@@ -360,11 +358,10 @@ def obj_to_colliders(
     except (SystemExit, KeyboardInterrupt):
         raise
     except:
-        print("Exception while running 'generate_colliders'")
-        print(traceback.format_exc())
+        print(f"Exception while running 'generate_colliders'\n{traceback.format_exc()}")
 
-        failed_objects[uid]["failure_reason"] = GENERATE_COLLIDERS_FAIL
-        failed_objects[uid]["generate_colliders_exception"] = traceback.format_exc()
+        failed_objects[uid]["status"] = ObjathorStatus.GENERATE_COLLIDERS_FAIL
+        failed_objects[uid]["traceback"] = traceback.format_exc()
         return False
 
 
@@ -400,7 +397,7 @@ def validate_in_thor(
             )
             if not evt.metadata["lastActionSuccess"]:
                 failed_objects[asset_id] = {
-                    "failure_reason": THOR_CREATE_ASSET_FAIL,
+                    "status": ObjathorStatus.THOR_CREATE_ASSET_FAIL,
                     "lastAction": controller.last_action,
                     "info": {
                         "asset_dir": asset_dir,
@@ -415,7 +412,7 @@ def validate_in_thor(
 
         if asset_metadata is None:
             failed_objects[asset_id] = {
-                "failure_reason": THOR_CREATE_ASSET_FAIL,
+                "status": ObjathorStatus.THOR_CREATE_ASSET_FAIL,
                 "lastAction": controller.last_action,
                 "info": {
                     "asset_dir": asset_dir,
@@ -443,7 +440,7 @@ def validate_in_thor(
             )
             if not evt.metadata["lastActionSuccess"]:
                 failed_objects[asset_id] = {
-                    "failure_reason": THOR_VIEW_ASSET_FAIL,
+                    "status": ObjathorStatus.THOR_VIEW_ASSET_FAIL,
                     "lastAction": controller.last_action,
                     "errorMessage": evt.metadata["errorMessage"],
                 }
@@ -455,7 +452,7 @@ def validate_in_thor(
     except Exception:
         print(traceback.format_exc())
         failed_objects[asset_id] = {
-            "failure_reason": THOR_PROCESS_FAILURE,
+            "status": ObjathorStatus.THOR_PROCESS_FAIL,
             "exception": traceback.format_exc(),
             "lastAction": controller.last_action,
             "errorMessage": evt.metadata["errorMessage"] if evt else "",
@@ -465,11 +462,12 @@ def validate_in_thor(
 
 def optimize_assets_for_thor(
     output_dir: str,
-    uid_to_glb_path: Dict[str, str],
+    uid: str,
+    glb_path: str,
     annotations_path: str,
     max_colliders: int,
     blender_as_module: bool,
-    extension: Literal[".json", "json.gz", ".pkl.gz", ".msgpack", ".msgpack.gz"],
+    extension: PROCESSED_ASSET_EXTENSIONS,
     skip_conversion: bool,
     skip_colliders: bool = False,
     skip_thor_metadata: bool = False,
@@ -481,20 +479,22 @@ def optimize_assets_for_thor(
     absolute_texture_paths: bool = False,
     delete_objs: bool = False,
     keep_json_asset: bool = False,
-    width: int = 300,
-    height: int = 300,
+    width: int = 512,
+    height: int = 512,
     skybox_color: Sequence[int] = (255, 255, 255),
-    send_asset_to_controller: bool = False,
     add_visualize_thor_actions: bool = False,
-    report_out_file_name: Optional[str] = "failed_objects.json",
     log_prefix="",
     timeout: Optional[int] = None,
     overwrite: bool = False,
     **extra_collider_kwargs: Dict[str, Any],
-) -> Dict[str, Dict[str, Any]]:
-    report_out_path: Optional[str] = None
-    if report_out_file_name is not None:
-        report_out_path = os.path.join(output_dir, report_out_file_name)
+) -> ObjathorInfo:
+    if controller is not None:
+        assert (width is None or controller.last_event.frame.shape[1] == width) and (
+            height is None or controller.last_event.frame.shape[0] == height
+        ), (
+            f"Input height ({height}) or width ({width}) do not match the"
+            f" input controller's frame shape ({controller.last_event.frame.shape})"
+        )
 
     failed_objects = OrderedDictWithDefault(dict)
 
@@ -502,213 +502,210 @@ def optimize_assets_for_thor(
 
     given_controller = controller is not None
     try:
-        for uid, glb_path in tqdm(uid_to_glb_path.items()):
-            start_obj_time = time.perf_counter()
-            asset_out_dir = os.path.join(output_dir, uid)
-            metadata_output_path = os.path.join(asset_out_dir, "thor_metadata.json")
+        start_obj_time = time.perf_counter()
+        asset_out_dir = os.path.join(output_dir, uid)
+        metadata_output_path = os.path.join(asset_out_dir, "thor_metadata.json")
 
-            # First let's verify if we need to skip conversion, collider generation, or thor metadata generation
-            object_save_path = get_extension_save_path(
-                out_dir=asset_out_dir, asset_id=uid, extension=extension
+        # First let's verify if we need to skip conversion, collider generation, or thor metadata generation
+        optimized_object_save_path = get_extension_save_path(
+            out_dir=asset_out_dir, asset_id=uid, extension=extension
+        )
+        if (not overwrite) and os.path.exists(optimized_object_save_path):
+            asset = load_existing_thor_asset_file(
+                out_dir=asset_out_dir, object_name=uid
             )
-            if (not overwrite) and os.path.exists(object_save_path):
-                asset = load_existing_thor_asset_file(
-                    out_dir=asset_out_dir, object_name=uid
-                )
 
-                has_colliders = "colliders" in asset
-                has_valid_textures = True
-                for key in asset.keys():
-                    if key.endswith("TexturePath"):
-                        has_valid_textures = has_valid_textures and (
-                            (os.path.isabs(asset[key]) and os.path.exists(asset[key]))
-                            or os.path.exists(os.path.join(asset_out_dir, asset[key]))
-                        )
-
-                if has_colliders and has_valid_textures:
-                    print(
-                        f"{log_prefix}{object_save_path} already exists and the asset has colliders."
-                        f" Will skip conversion and collider generation."
-                    )
-                    skip_conversion = True
-                    skip_colliders = True
-                    if (
-                        os.path.exists(metadata_output_path)
-                        and os.stat(metadata_output_path).st_size > 0
-                    ):
-                        if not skip_thor_metadata:
-                            print(
-                                f"{log_prefix}{metadata_output_path} already exists will skip generating thor metadata and thor images."
-                            )
-                            skip_thor_metadata = True
-                else:
-                    raise RuntimeError(
-                        f"{object_save_path} already exists but the asset does not have colliders or valid textures."
-                        f" As overwrite is False, we cannot continue."
+            has_colliders = "colliders" in asset
+            has_valid_textures = True
+            for key in asset.keys():
+                if key.endswith("TexturePath"):
+                    has_valid_textures = has_valid_textures and (
+                        (os.path.isabs(asset[key]) and os.path.exists(asset[key]))
+                        or os.path.exists(os.path.join(asset_out_dir, asset[key]))
                     )
 
-            # Ensure annotations exist and determine their path
-            if os.path.isdir(annotations_path):
-                if os.path.exists(os.path.join(annotations_path, f"{uid}.json")):
-                    sub_annotations_path = os.path.join(annotations_path, f"{uid}.json")
-                elif os.path.exists(
-                    os.path.join(annotations_path, uid, f"annotations.json.gz")
-                ):
-                    sub_annotations_path = os.path.join(
-                        annotations_path, uid, f"annotations.json.gz"
-                    )
-                else:
-                    raise RuntimeError(
-                        f"Annotations path {annotations_path} does not contain annotations for {uid}"
-                    )
-            else:
-                sub_annotations_path = annotations_path
-
-            # GLB to THOR conversion
-            success = True
-            if not skip_conversion:
-                with Timer(f"{log_prefix}GLB to THOR ({uid})"):
-                    success = glb_to_thor(
-                        glb_path=glb_path,
-                        annotations_path=sub_annotations_path,
-                        object_out_dir=asset_out_dir,
-                        uid=uid,
-                        failed_objects=failed_objects,
-                        capture_stdout=not live,
-                        generate_obj=True,
-                        relative_texture_paths=not absolute_texture_paths,
-                        run_blender_as_module=blender_as_module,
-                        blender_installation_path=blender_installation_path,
-                        timeout=timeout,
-                    )
-                assert success == (uid not in failed_objects)
-
-            # Collider generation
-            if success and not skip_colliders:
-                with Timer(f"{log_prefix}OBJ to collider ({uid})"):
-                    success = obj_to_colliders(
-                        uid=uid,
-                        object_out_dir=asset_out_dir,
-                        max_colliders=max_colliders,
-                        capture_stdout=(not live),
-                        failed_objects=failed_objects,
-                        delete_objs=delete_objs,
-                        **{
-                            "timeout": 60,
-                            **extra_collider_kwargs,
-                        },
-                    )
-                assert success == (uid not in failed_objects)
-
-            if success and (not skip_conversion) and (not skip_colliders):
-                with Timer(
-                    f"{log_prefix}Saving {asset_out_dir} {uid} with extension {extension}"
-                ):
-                    # Save to desired format, compression step
-                    save_path = get_extension_save_path(
-                        out_dir=asset_out_dir, asset_id=uid, extension=extension
-                    )
-                    save_thor_asset_file(
-                        asset_json=add_default_annotations(
-                            load_existing_thor_asset_file(
-                                out_dir=asset_out_dir, object_name=uid
-                            ),
-                            asset_directory=asset_out_dir,
-                        ),
-                        save_path=save_path,
-                    )
-                    if extension != ".json" and not keep_json_asset:
-                        print(f"{log_prefix}Removing .json asset")
-                        try:
-                            json_asset_path = get_existing_thor_asset_file_path(
-                                out_dir=asset_out_dir,
-                                asset_id=uid,
-                                force_extension=".json",
-                            )
-                            os.remove(json_asset_path)
-                        except RuntimeError:
-                            pass
-
-                    # Get size of GLB asset in MB
-                    glb_size = os.path.getsize(glb_path) / (1024 * 1024)
-                    # Get size of optimized asset in MB
-                    asset_size = os.path.getsize(save_path) / (1024 * 1024)
-                    for p in glob.glob(os.path.join(asset_out_dir, "*.jpg")):
-                        asset_size += os.path.getsize(p) / (1024 * 1024)
-
-                    print(
-                        f"{log_prefix}Original asset size {glb_size:.2f} MB,"
-                        f" new asset size {asset_size:.2f}MB ({100 * (1 - asset_size / glb_size):0.2f}% reduction)",
-                        flush=True,
-                    )
-
-            # Validating the object can be spawned in thor, generate images in thor,
-            # and save thor object metadata
-            if success and not skip_thor_metadata:
-                import ai2thor.controller
-                import ai2thor.fifo_server
-
-                with Timer(f"{log_prefix}THOR Metadata and visualization ({uid})"):
-                    if not controller:
-                        controller = ai2thor.controller.Controller(
-                            commit_id=THOR_COMMIT_ID,
-                            fieldOfView=46,
-                            platform=thor_platform,
-                            start_unity=True,
-                            scene="Procedural",
-                            gridSize=0.25,
-                            width=width,
-                            height=height,
-                            server_class=ai2thor.fifo_server.FifoServer,
-                            antiAliasing=None if skip_thor_render else "fxaa",
-                            quality="Very Low" if skip_thor_render else "Ultra",
-                            makeAgentsVisible=False,
-                        )
-
-                    controller.initialization_parameters["makeAgentsVisible"] = False
-                    success, asset_metadata = validate_in_thor(
-                        controller=controller,
-                        asset_dir=asset_out_dir,
-                        asset_id=uid,
-                        output_dir=os.path.join(asset_out_dir, "thor_renders"),
-                        failed_objects=failed_objects,
-                        skip_images=skip_thor_render,
-                        skybox_color=skybox_color,
-                        load_file_in_unity=not send_asset_to_controller,
-                        extension=extension,
-                        angles=[0, 45, 90, 180, 270, 360 - 45],
-                    )
-                    assert success == (asset_metadata is not None)
-
-                    if success:
-                        asset_metadata["thor_commit_id"] = THOR_COMMIT_ID
-                        with open(metadata_output_path, "w") as f:
-                            json.dump(asset_metadata, f, indent=2)
-
-                    if add_visualize_thor_actions:
-                        objathor.asset_conversion.util.add_visualize_thor_actions(
-                            asset_id=uid, asset_dir=asset_out_dir
-                        )
-                assert success == (uid not in failed_objects)
-
-                end = time.perf_counter()
+            if has_colliders and has_valid_textures:
                 print(
-                    f"{log_prefix}Finished Object '{uid}' success: {success}. Object Runtime: {end-start_obj_time:0.2f}s"
+                    f"{log_prefix}{optimized_object_save_path} already exists and the asset has colliders."
+                    f" Will skip conversion and collider generation."
+                )
+                skip_conversion = True
+                skip_colliders = True
+                if (
+                    os.path.exists(metadata_output_path)
+                    and os.stat(metadata_output_path).st_size > 0
+                ):
+                    if not skip_thor_metadata:
+                        print(
+                            f"{log_prefix}{metadata_output_path} already exists will skip generating thor metadata and thor images."
+                        )
+                        skip_thor_metadata = True
+            else:
+                raise RuntimeError(
+                    f"{optimized_object_save_path} already exists but the asset does not have colliders or valid textures."
+                    f" As overwrite is False, we cannot continue."
                 )
 
-        failed_json_str = json.dumps(failed_objects)
+        # Ensure annotations exist and determine their path
+        if os.path.isdir(annotations_path):
+            if os.path.exists(os.path.join(annotations_path, f"{uid}.json")):
+                sub_annotations_path = os.path.join(annotations_path, f"{uid}.json")
+            elif os.path.exists(
+                os.path.join(annotations_path, uid, f"annotations.json.gz")
+            ):
+                sub_annotations_path = os.path.join(
+                    annotations_path, uid, f"annotations.json.gz"
+                )
+            else:
+                raise RuntimeError(
+                    f"Annotations path {annotations_path} does not contain annotations for {uid}"
+                )
+        else:
+            sub_annotations_path = annotations_path
 
-        if report_out_path is not None and len(failed_objects):
-            with open(report_out_path, "a") as f:
-                f.write(failed_json_str)
+        # GLB to THOR conversion
+        success = True
+        if not skip_conversion:
+            with Timer(f"{log_prefix}GLB to THOR ({uid})"):
+                success = glb_to_thor(
+                    glb_path=glb_path,
+                    annotations_path=sub_annotations_path,
+                    object_out_dir=asset_out_dir,
+                    uid=uid,
+                    failed_objects=failed_objects,
+                    capture_stdout=not live,
+                    generate_obj=True,
+                    relative_texture_paths=not absolute_texture_paths,
+                    run_blender_as_module=blender_as_module,
+                    blender_installation_path=blender_installation_path,
+                    timeout=timeout,
+                )
+            assert success == (uid not in failed_objects)
 
-        print(f"{log_prefix}Failed objects: {failed_json_str}")
+        # Collider generation
+        if success and not skip_colliders:
+            with Timer(f"{log_prefix}OBJ to collider ({uid})"):
+                success = obj_to_colliders(
+                    uid=uid,
+                    object_out_dir=asset_out_dir,
+                    max_colliders=max_colliders,
+                    capture_stdout=(not live),
+                    failed_objects=failed_objects,
+                    delete_objs=delete_objs,
+                    **{
+                        "timeout": 60,
+                        **extra_collider_kwargs,
+                    },
+                )
+            assert success == (uid not in failed_objects)
+
+        if success and (not skip_conversion) and (not skip_colliders):
+            with Timer(
+                f"{log_prefix}Saving {asset_out_dir} {uid} with extension {extension}"
+            ):
+                # Save to desired format, compression step
+                save_path = get_extension_save_path(
+                    out_dir=asset_out_dir, asset_id=uid, extension=extension
+                )
+                save_thor_asset_file(
+                    asset_json=add_default_annotations(
+                        load_existing_thor_asset_file(
+                            out_dir=asset_out_dir, object_name=uid
+                        ),
+                        asset_directory=asset_out_dir,
+                    ),
+                    save_path=save_path,
+                )
+                if extension != ".json" and not keep_json_asset:
+                    print(f"{log_prefix}Removing .json asset")
+                    try:
+                        json_asset_path = get_existing_thor_asset_file_path(
+                            out_dir=asset_out_dir,
+                            asset_id=uid,
+                            force_extension=".json",
+                        )
+                        os.remove(json_asset_path)
+                    except RuntimeError:
+                        pass
+
+                # Get size of GLB asset in MB
+                glb_size = os.path.getsize(glb_path) / (1024 * 1024)
+                # Get size of optimized asset in MB
+                asset_size = os.path.getsize(save_path) / (1024 * 1024)
+                for p in glob.glob(os.path.join(asset_out_dir, "*.jpg")):
+                    asset_size += os.path.getsize(p) / (1024 * 1024)
+
+                print(
+                    f"{log_prefix}Original asset size {glb_size:.2f} MB,"
+                    f" new asset size {asset_size:.2f}MB ({100 * (1 - asset_size / glb_size):0.2f}% reduction)",
+                    flush=True,
+                )
+
+        # Validating the object can be spawned in thor, generate images in thor,
+        # and save thor object metadata
+        if success and not skip_thor_metadata:
+            import ai2thor.controller
+            import ai2thor.fifo_server
+
+            with Timer(f"{log_prefix}THOR Metadata and visualization ({uid})"):
+                if not controller:
+                    controller = ai2thor.controller.Controller(
+                        commit_id=THOR_COMMIT_ID,
+                        fieldOfView=46,
+                        platform=thor_platform,
+                        start_unity=True,
+                        scene="Procedural",
+                        gridSize=0.25,
+                        width=width,
+                        height=height,
+                        server_class=ai2thor.fifo_server.FifoServer,
+                        antiAliasing=None if skip_thor_render else "fxaa",
+                        quality="Very Low" if skip_thor_render else "Ultra",
+                        makeAgentsVisible=False,
+                    )
+
+                controller.initialization_parameters["makeAgentsVisible"] = False
+                success, asset_metadata = validate_in_thor(
+                    controller=controller,
+                    asset_dir=asset_out_dir,
+                    asset_id=uid,
+                    output_dir=os.path.join(asset_out_dir, "thor_renders"),
+                    failed_objects=failed_objects,
+                    skip_images=skip_thor_render,
+                    skybox_color=skybox_color,
+                    load_file_in_unity=True,
+                    extension=extension,
+                    angles=[0, 45, 90, 180, 270, 360 - 45],
+                )
+                assert success == (asset_metadata is not None)
+
+                if success:
+                    asset_metadata["thor_commit_id"] = THOR_COMMIT_ID
+                    with open(metadata_output_path, "w") as f:
+                        json.dump(asset_metadata, f, indent=2)
+
+                if add_visualize_thor_actions:
+                    objathor.asset_conversion.util.add_visualize_thor_actions(
+                        asset_id=uid, asset_dir=asset_out_dir
+                    )
+            assert success == (uid not in failed_objects)
+
+            end = time.perf_counter()
+            print(
+                f"{log_prefix}Finished Object '{uid}' success: {success}."
+                f" Object Runtime: {end-start_obj_time:0.2f}s"
+            )
+
         end = time.perf_counter()
         print(f"{log_prefix}Total Runtime: {end-start_process_time:0.2f}s")
 
     except (SystemExit, KeyboardInterrupt):
         raise
     except:
+        failed_objects[uid] = {
+            "status": ObjathorStatus.UNKNOWN_FAIL,
+            "exception": traceback.format_exc(),
+        }
         print(traceback.format_exc())
     finally:
         try:
@@ -717,7 +714,12 @@ def optimize_assets_for_thor(
         except:
             pass
 
-    return failed_objects
+    if uid in failed_objects:
+        return failed_objects[uid]
+    else:
+        return {
+            "status": ObjathorStatus.OPTIMIZATION_SUCCESS,
+        }
 
 
 def main(args):
@@ -812,12 +814,6 @@ def main(args):
         "--extension",
         choices=[".json", "json.gz", ".pkl.gz", ".msgpack", ".msgpack.gz"],
         default=".json",
-    )
-
-    parser.add_argument(
-        "--send_asset_to_controller",
-        action="store_true",
-        help="Sends all the asset data to the thor controller.",
     )
 
     parser.add_argument(
@@ -918,7 +914,6 @@ def main(args):
         width=args.width,
         height=args.height,
         skybox_color=tuple(map(int, args.skybox_color.split(","))),
-        send_asset_to_controller=args.send_asset_to_controller,
         add_visualize_thor_actions=args.add_visualize_thor_actions,
     )
 

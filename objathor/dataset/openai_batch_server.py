@@ -25,6 +25,25 @@ class RequestStatus(Enum):
     CANCELLED = "cancelled"
     NOT_FOUND = "not_found"
 
+    def is_complete(self):
+        return self == RequestStatus.COMPLETED
+
+    def is_in_progress(self):
+        return self in [
+            RequestStatus.VALIDATING,
+            RequestStatus.IN_PROGRESS,
+            RequestStatus.FINALIZING,
+        ]
+
+    def is_fail(self):
+        return self in [
+            RequestStatus.FAILED,
+            RequestStatus.EXPIRED,
+            RequestStatus.CANCELLING,
+            RequestStatus.CANCELLED,
+            RequestStatus.NOT_FOUND,
+        ]
+
 
 class OpenAIBatchServer:
     def __init__(

@@ -93,11 +93,11 @@ DEFAULT_OPENAI_SYNSET_PROMPT = (
 )
 
 
-def get_thumbnail_urls(
+def get_blender_render_urls(
     uid: str,
+    local_renders: bool,
     base_url: str = DEFAULT_THUMBNAIL_SOURCE_URL,
     view_indices: Sequence[str] = DEFAULT_VIEW_INDICES,
-    local_renders: bool = False,
 ) -> List[Tuple[int, str]]:
     thumbnail_tuples = []
 
@@ -140,9 +140,9 @@ def get_gpt_dialogue_to_describe_asset_from_views(
         thumbnail_urls_cfg is None
     ), "Either thumbnail_urls or thumbnail_urls_cfg must be provided, but not both."
 
-    if thumbnail_urls is None:
+    if thumbnail_urls_cfg is not None:
         # Get the urls of the available views.
-        thumbnail_tuples = get_thumbnail_urls(uid, **thumbnail_urls_cfg)
+        thumbnail_tuples = get_blender_render_urls(uid, **thumbnail_urls_cfg)
     else:
         thumbnail_tuples = thumbnail_urls
 
@@ -368,6 +368,7 @@ def load_gpt_annotations_from_json_str(
                     f"\n{traceback.format_exc()}"
                 )
                 raise
+
             annotation = json.loads(new_json_str)
 
     if "annotations" in annotation:
