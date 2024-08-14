@@ -14,7 +14,7 @@ from flask import Flask, request, jsonify
 from openai import OpenAI
 
 
-class RequestStatus(Enum):
+class RequestStatus(str, Enum):
     VALIDATING = "validating"
     FAILED = "failed"
     IN_PROGRESS = "in_progress"

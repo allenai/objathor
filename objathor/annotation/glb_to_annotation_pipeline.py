@@ -94,11 +94,14 @@ def annotate_asset(
         ) or not verify_images_are_not_all_white(blender_render_paths):
             return {"status": ObjathorStatus.BLENDER_RENDER_FAIL}
 
-        anno, urls = get_initial_annotation(
-            uid,
-            thumbnail_urls=list(enumerate(blender_render_paths)),
-            get_best_synset=True,
-        )
+        try:
+            anno, urls = get_initial_annotation(
+                uid,
+                thumbnail_urls=list(enumerate(blender_render_paths)),
+                get_best_synset=True,
+            )
+        except JSONDecodeError:
+            return {"status": ObjathorStatus.JSON_DECODE_FAIL}
 
         anno["annotation_info"] = {"vision_llm": VISION_LLM, "text_llm": TEXT_LLM}
 

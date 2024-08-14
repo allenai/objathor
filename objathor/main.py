@@ -211,10 +211,10 @@ def annotate_and_optimize_asset(
     absolute_texture_paths: bool,
     extension: PROCESSED_ASSET_EXTENSIONS,
     blender_as_module: bool,
-    blender_installation_path: str,
     thor_platform: str,
     keep_json_asset: bool,
     compute_blender_thor_similarity: bool,
+    blender_installation_path: Optional[str] = None,
     controller: Optional[Controller] = None,
     async_host_and_port: Optional[str] = None,
 ) -> ObjathorInfo:

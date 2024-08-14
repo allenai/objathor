@@ -6,7 +6,7 @@ PROCESSED_ASSET_EXTENSIONS = Literal[
 ]
 
 
-class ObjathorStatus(enum.Enum):
+class ObjathorStatus(str, enum.Enum):
     ANNOTATION_SUCCESS = "annotation_success"
     OPTIMIZATION_SUCCESS = "optimization_success"
     SUCCESS = "success"
@@ -35,7 +35,7 @@ class ObjathorStatus(enum.Enum):
     THOR_PROCESS_FAIL = "thor_process_fail"
 
     # Unknown
-    UNKNOWN_FAIL = "unknown_fail"
+    UNKNOWN_OPTIMIZATION_FAIL = "unknown_optimization_fail"
 
     def is_fail(self) -> bool:
         return self.value.endswith("fail")
@@ -45,6 +45,25 @@ class ObjathorStatus(enum.Enum):
 
     def is_in_progress(self) -> bool:
         return self.value.endswith("in_progress")
+
+    def is_annotation_fail(self) -> bool:
+        return self in [
+            ObjathorStatus.JSON_DECODE_FAIL,
+            ObjathorStatus.ASYNC_ANNOTATE_VIEWS_REQUEST_FAIL,
+            ObjathorStatus.ASYNC_SYNSET_REQUEST_FAIL,
+        ]
+
+    def is_blender_fail(self) -> bool:
+        return self in [
+            ObjathorStatus.BLENDER_RENDER_FAIL,
+            ObjathorStatus.BLENDER_PROCESS_FAIL,
+            ObjathorStatus.BLENDER_PROCESS_TIMEOUT_FAIL,
+        ]
+
+    def is_optimization_fail(self) -> bool:
+        return self.is_fail() and not (
+            self.is_annotation_fail() or self.is_blender_fail()
+        )
 
 
 for _e in ObjathorStatus:

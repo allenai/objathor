@@ -703,7 +703,7 @@ def optimize_assets_for_thor(
         raise
     except:
         failed_objects[uid] = {
-            "status": ObjathorStatus.UNKNOWN_FAIL,
+            "status": ObjathorStatus.UNKNOWN_OPTIMIZATION_FAIL,
             "exception": traceback.format_exc(),
         }
         print(traceback.format_exc())
