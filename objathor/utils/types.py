@@ -35,6 +35,7 @@ class ObjathorStatus(str, enum.Enum):
     THOR_PROCESS_FAIL = "thor_process_fail"
 
     # Unknown
+    UNKNOWN_FAIL = "unknown_fail"
     UNKNOWN_OPTIMIZATION_FAIL = "unknown_optimization_fail"
 
     def is_fail(self) -> bool:
@@ -62,7 +63,9 @@ class ObjathorStatus(str, enum.Enum):
 
     def is_optimization_fail(self) -> bool:
         return self.is_fail() and not (
-            self.is_annotation_fail() or self.is_blender_fail()
+            self.is_annotation_fail()
+            or self.is_blender_fail()
+            or (self == ObjathorStatus.UNKNOWN_FAIL)
         )
 
 
