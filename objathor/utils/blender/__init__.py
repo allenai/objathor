@@ -19,7 +19,7 @@ def render_glb_from_angles(
     glb_path: str,
     save_dir: str,
     angles: Sequence[float] = (0, 90, 180, 270),
-    timeout: Optional[int] = 2 * 60,
+    timeout: Optional[int] = 4 * 60,
     save_as_jpg: bool = True,
     verbose: bool = False,
     blender_as_module: Optional[bool] = None,
@@ -30,13 +30,18 @@ def render_glb_from_angles(
 
     os.makedirs(save_dir, exist_ok=True)
 
+    expected_extension = ".jpg" if save_as_jpg else ".png"
+    expected_paths = [
+        os.path.join(
+            os.path.join(save_dir, f"render_{float(a):0.1f}{expected_extension}")
+        )
+        for a in angles
+    ]
     if not overwrite:
-        expected_extension = ".jpg" if save_as_jpg else ".png"
-        expected_paths = [
-            os.path.join(os.path.join(save_dir, f"{float(a):0.1f}{expected_extension}"))
-            for a in angles
-        ]
         if all(os.path.exists(p) for p in expected_paths):
+            print(
+                f"Skipping rendering for {os.path.basename(glb_path)} as all renders already exist."
+            )
             return expected_paths
 
     if blender_as_module is None:
@@ -109,9 +114,14 @@ def render_glb_from_angles(
                     threshold=0.99,
                 )
                 os.remove(brp)
-            return glob.glob(os.path.join(save_dir, "*.jpg"))
+            blender_render_paths = glob.glob(os.path.join(save_dir, "*.jpg"))
         else:
-            return blender_render_paths
+            blender_render_paths = blender_render_paths
+
+        assert set(expected_paths) == set(blender_render_paths)
+
+        # We return the expected paths because these are in the correct order
+        return expected_paths
 
     raise BlenderRenderError(
         f"Blender render failed for {glb_path}. Command: {command}. Output: {out}"

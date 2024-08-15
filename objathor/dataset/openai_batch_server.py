@@ -5,6 +5,7 @@ import sqlite3
 import threading
 import traceback
 import uuid
+from argparse import ArgumentParser
 from datetime import datetime
 from enum import Enum
 from typing import Dict, Any, Sequence, Tuple, List, Union
@@ -60,6 +61,11 @@ class OpenAIBatchServer:
         self.batch_after_minutes = batch_after_minutes
         self.batch_after_mb = batch_after_mb
         self.batch_after_num = batch_after_num
+
+        assert batch_after_num > 0
+        assert batch_after_mb > 0
+        assert batch_after_minutes > 0
+
         self.check_batch_status_interval = check_batch_status_interval
 
         self.db_lock = threading.RLock()
@@ -134,8 +140,8 @@ class OpenAIBatchServer:
             deleted_count = self.delete_older_than(date)
             return jsonify({"deleted_count": deleted_count})
 
-    def run(self, host="0.0.0.0", port=5000):
-        self.app.run(host=host, port=port)
+    def run(self, host="0.0.0.0", port=5000, **flask_kwargs):
+        self.app.run(host=host, port=port, **flask_kwargs)
 
     def create_table(self):
         with self.db_lock:
@@ -234,17 +240,23 @@ class OpenAIBatchServer:
                 uids = uid
 
             file_id_batch_id_tuples = set()
+            deleted_uids = []
             for uid in uids:
                 cursor.execute(
                     "SELECT file_id, batch_id FROM requests WHERE uid = ?", (uid,)
                 )
                 file_id_batch_id_tuple = cursor.fetchone()
                 if file_id_batch_id_tuple:
+                    deleted_uids.append(uid)
                     file_id_batch_id_tuples.add(file_id_batch_id_tuple)
                     cursor.execute("DELETE FROM requests WHERE uid = ?", (uid,))
-                    self.logger.info(f"Deleted request with UID: {uid}")
                 else:
                     self.logger.warning(f"No request found for UID: {uid}")
+
+            if len(deleted_uids) > 0:
+                self.conn.commit()
+                for uid in deleted_uids:
+                    self.logger.info(f"Deleted request with UID: {uid}")
 
             # Only need to cleanup files, batches, and commit the results if something was actually deleted.
             if len(file_id_batch_id_tuples) > 1:
@@ -254,7 +266,6 @@ class OpenAIBatchServer:
                         batch_id=batch_id,
                         delete_only_if_no_references=True,
                     )
-                self.conn.commit()
 
     def delete_older_than(self, date: datetime):
         with self.db_lock:
@@ -328,16 +339,27 @@ class OpenAIBatchServer:
             )
             uid_and_request_tuples = cursor.fetchall()
 
-        if len(uid_and_request_tuples) > 0 and (
-            len(uid_and_request_tuples) >= self.batch_after_num
-            or self.get_total_size(uid_and_request_tuples) >= self.batch_after_mb
-            or (datetime.now() - self._time_of_last_batch).total_seconds()
-            >= (60 * self.batch_after_minutes)
-            * 0.99  # 0.99 to avoid timing mismatch between the scheduler and the batch_after_minutes
-        ):
-            self.logger.info(
-                f"Processing batch of {len(uid_and_request_tuples)} requests"
+        enough_num = len(uid_and_request_tuples) >= max(self.batch_after_num, 1)
+        enough_mb = self.get_total_size(uid_and_request_tuples) >= self.batch_after_mb
+        enough_time = (datetime.now() - self._time_of_last_batch).total_seconds() >= (
+            60 * self.batch_after_minutes
+        ) * 0.99  # 0.99 to avoid timing mismatch between the scheduler and the batch_after_minutes
+
+        if enough_num or enough_mb or (enough_time and len(uid_and_request_tuples) > 0):
+            why_logging_message = (
+                f"Processing batch of {len(uid_and_request_tuples)} requests as"
             )
+            if enough_num:
+                why_logging_message += f" {len(uid_and_request_tuples)} >= {max(self.batch_after_num, 1)} requests."
+            elif enough_mb:
+                why_logging_message += f" {self.get_total_size(uid_and_request_tuples)} >= {self.batch_after_mb} MB of requests."
+            else:
+                why_logging_message += (
+                    f" {(datetime.now() - self._time_of_last_batch).total_seconds() / 60}"
+                    f" >= {0.99 * self.batch_after_minutes} minutes have elapsed."
+                )
+
+            self.logger.info(why_logging_message)
             self.process_batch(uid_and_request_tuples)
 
             self._time_of_last_batch = datetime.now()
@@ -488,11 +510,48 @@ class OpenAIBatchServer:
         )
 
 
-if __name__ == "__main__":
+def main():
+    parser = ArgumentParser(
+        description="Starts a OpenAIBatchServer running on this machine."
+    )
+    parser.add_argument(
+        "--batch_after_minutes",
+        type=int,
+        default=15,
+    )
+    parser.add_argument(
+        "--batch_after_mb",
+        type=int,
+        default=50,
+    )
+    parser.add_argument(
+        "--batch_after_num",
+        type=int,
+        default=5000,
+    )
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        required=True,
+    )
+    parser.add_argument("--host", type=str, default="0.0.0.0")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5000,
+    )
+
+    args = parser.parse_args()
+
     server = OpenAIBatchServer(
-        batch_after_minutes=3,
-        batch_after_mb=5,
-        batch_after_num=5,
-        save_dir="batch_server_data",
+        batch_after_minutes=args.batch_after_minutes,
+        batch_after_mb=args.batch_after_mb,
+        batch_after_num=args.batch_after_num,
+        save_dir=args.save_dir,
     )
     server.run(host="0.0.0.0", port=5000)
+
+
+if __name__ == "__main__":
+
+    main()

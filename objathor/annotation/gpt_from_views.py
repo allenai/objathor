@@ -33,13 +33,14 @@ DEFAULT_QUESTION_NO_SYNSET = """Annotate this 3D asset assuming it can be found 
 "annotations": {
     "description_long": a very detailed visual description of the object that is no more than 6 sentences. Don't use the term "3D asset" or similar here and don't comment on the object's orientation. Do use proper nouns when appropriate.,
     "description": a 1-2 summary of description_long, keep the description rich and visual,
+    "description_view_<i>": a short description of the object from view i (highlight/compare features that are different from other views),
     "category": a category such as "chair", "table", "building", "person", "airplane", "car", "seashell", "fish", "toy", etc. Be concise but specific, e.g. do not say "furniture" when "eames chair" would be more specific,
     "height": approximate height of the object in cm. Report the height for the object's orientation as shown in the images. For a standing human male this could be "175",
     "materials": a Python list of the materials that the object appears to be made of, taking into account the visible exterior and also likely interior (roughly in order of most used material to least used; include "air" if the object interior doesn't seem completely solid),
     "composition": a Python list with the apparent volume mixture of the materials above (make the list sum to 1),
     "mass": approximate mass in kilogram considering typical densities for the materials. For a human being this could be "72",
     "receptacle": a boolean indicating whether or not this object is a receptacle (e.g. a bowl, a cup, a vase, a box, a bag, etc). Return true or false with no explanations,
-    "frontView": which of the views represents the front of the object (value should be the integer index associated with the chosen view). Note that the front view of an object, including furniture, tends to be the view that exhibits the highest degree of symmetry and detail, and it's usually the one you'd expect to observe when using the object,
+    "frontView": integer index of the view that represents the front of the object. This is typically the view from which you would approach the object to interact with it,
     "onCeiling": whether this object can appear on the ceiling; return true or false with no explanations. This would be true for a ceiling fan but false for a chair,
     "onWall": whether this object can appear on the wall; return true or false with no explanations. This would be true for a painting but false for a table,
     "onFloor": whether this object can appear on the floor; return true or false with no explanations. This would be true for a piano but false for a curtain,
@@ -144,7 +145,12 @@ def get_gpt_dialogue_to_describe_asset_from_views(
         # Get the urls of the available views.
         thumbnail_tuples = get_blender_render_urls(uid, **thumbnail_urls_cfg)
     else:
-        thumbnail_tuples = thumbnail_urls
+        thumbnail_tuples = []
+        for i, p in thumbnail_urls:
+            if os.path.exists(p):
+                thumbnail_tuples.append((i, f"file://{p}"))
+            else:
+                thumbnail_tuples.append((i, p))
 
     # Construct the initial prompt message. For the system description, we're using the
     # default content used in the OpenAI API document.
@@ -153,7 +159,7 @@ def get_gpt_dialogue_to_describe_asset_from_views(
         role="system",
     )
 
-    user_messages = [
+    dialogue = [
         Text(
             f"Here are {len(thumbnail_tuples)} views of a 3D asset."
             f" The series of images show the same asset from rotated views,"
@@ -174,7 +180,7 @@ def get_gpt_dialogue_to_describe_asset_from_views(
         else:
             img_msg_contents = url
 
-        user_messages.extend(
+        dialogue.extend(
             [
                 Text(f"View {num}"),
                 Image(img_msg_contents),
@@ -182,11 +188,11 @@ def get_gpt_dialogue_to_describe_asset_from_views(
         )
 
     # Finally, ask the question.
-    user_messages.append(Text(question))
+    dialogue.append(Text(question))
 
     all_gpt_kwargs = GPTDialogue(
         prompt=[prompt],
-        dialog=[ComposedMessage(user_messages)],
+        dialog=[ComposedMessage(dialogue)],
         model=VISION_LLM,
     )
     all_gpt_kwargs.update(gpt_kwargs)
@@ -289,7 +295,7 @@ def get_gpt_dialogue_to_get_best_synset_using_annotations(
         Text(
             PICK_SINGLE_SYNSET_USING_OBJECT_INFO_TEMPLATE.format(
                 description=f"A {annotation['category']}. {annotation['description']}",
-                scale=annotation["height"] * 0.01,
+                scale=float(annotation["height"]) * 0.01,
             )
             + "\n"
             + "\n\n".join([synset_to_summary_str(s) for s in near_synsets]),

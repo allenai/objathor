@@ -1,6 +1,7 @@
 import glob
 import json
 import os
+import traceback
 from importlib import import_module
 from json import JSONDecodeError
 from typing import Dict, Any, Union, Callable, Optional
@@ -79,6 +80,7 @@ def annotate_asset(
     render_dir = os.path.join(output_dir, "blender_renders")
     os.makedirs(render_dir, exist_ok=True)
     try:
+        blender_error = ""
         try:
             blender_render_paths = render_glb_from_angles(
                 glb_path=glb_path,
@@ -87,12 +89,16 @@ def annotate_asset(
                 overwrite=overwrite,
             )
         except BlenderRenderError:
+            blender_error = traceback.format_exc()
             blender_render_paths = []
 
         if len(blender_render_paths) != len(
             render_angles
         ) or not verify_images_are_not_all_white(blender_render_paths):
-            return {"status": ObjathorStatus.BLENDER_RENDER_FAIL}
+            return {
+                "status": ObjathorStatus.BLENDER_RENDER_FAIL,
+                "exception": blender_error,
+            }
 
         try:
             anno, urls = get_initial_annotation(
@@ -226,6 +232,7 @@ def async_annotate_asset(
 
     render_dir = os.path.join(output_dir, "blender_renders")
 
+    blender_error = ""
     try:
         blender_render_paths = render_glb_from_angles(
             glb_path=glb_path,
@@ -234,12 +241,16 @@ def async_annotate_asset(
             overwrite=overwrite,
         )
     except BlenderRenderError:
+        blender_error = traceback.format_exc()
         blender_render_paths = []
 
     if len(blender_render_paths) != len(
         render_angles
     ) or not verify_images_are_not_all_white(blender_render_paths):
-        return {"status": ObjathorStatus.BLENDER_RENDER_FAIL}
+        return {
+            "status": ObjathorStatus.BLENDER_RENDER_FAIL,
+            "exception": blender_error,
+        }
 
     if not os.path.exists(annotate_from_views_uid_path):
         _, dialogue_dict = get_gpt_dialogue_to_describe_asset_from_views(
@@ -291,7 +302,7 @@ def async_annotate_asset(
     if not os.path.exists(synset_uid_path):
         dialogue_dict = get_gpt_dialogue_to_get_best_synset_using_annotations(
             annotation=anno,
-            n_neighbors=2 * NUM_NEIGHS,
+            n_neighbors=NUM_NEIGHS,
         )
         # Need to resave the json with the updated annotations as the near synsets have been added
         # by the above call
@@ -347,6 +358,21 @@ def async_annotate_asset(
 
     anno = {**anno, **extra_anns}
     write(anno=anno, output_file=annotations_save_path, **kwargs)
+
+    # Clean up the batch server request files
+    for p in [
+        annotate_from_views_uid_path,
+        annotate_from_views_response_path,
+        synset_uid_path,
+        synset_response_path,
+    ]:
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+            except (SystemExit, KeyboardInterrupt):
+                raise
+            except:
+                pass
 
     return {
         "status": ObjathorStatus.ANNOTATION_SUCCESS,

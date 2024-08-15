@@ -258,6 +258,7 @@ def annotate_and_optimize_asset(
             if enough_renders():
                 break
 
+            render_info = {"status": ObjathorStatus.RENDER_SUCCESS}
             try:
                 blender_render_paths = render_glb_from_angles(
                     glb_path=glb_path,
@@ -267,16 +268,17 @@ def annotate_and_optimize_asset(
                 )
             except BlenderRenderError:
                 blender_render_paths = []
+                render_info = {
+                    "status": ObjathorStatus.BLENDER_RENDER_FAIL,
+                    "exception": traceback.format_exc(),
+                }
 
             if len(blender_render_paths) != len(
                 angles
             ) or not verify_images_are_not_all_white(blender_render_paths):
-                return {"status": ObjathorStatus.BLENDER_RENDER_FAIL}
+                render_info = {"status": ObjathorStatus.BLENDER_RENDER_FAIL}
 
-        if not enough_renders():
-            raise BlenderRenderError(
-                f"Failed to render the glb at {glb_path} with blender at {blender_render_dir}"
-            )
+        return render_info
 
     # ANNOTATION
     annotations_path = os.path.join(output_dir_with_uid, f"annotations.json.gz")
@@ -291,8 +293,9 @@ def annotate_and_optimize_asset(
 
     if os.path.exists(annotations_path):
         print(f"Annotations already exist at {annotations_path}, will use these.")
-        if render_with_blender() is None:
-            return {"status": ObjathorStatus.BLENDER_RENDER_FAIL}
+        render_info = render_with_blender()
+        if render_info["status"].is_fail():
+            return render_info
     else:
         if (
             is_objaverse
@@ -304,8 +307,9 @@ def annotate_and_optimize_asset(
                 anno["ref_category"] = get_objaverse_ref_categories()[uid]
             write({**anno, **license_info}, annotations_path)
 
-            if render_with_blender() is None:
-                return {"status": ObjathorStatus.BLENDER_RENDER_FAIL}
+            render_info = render_with_blender()
+            if render_info["status"].is_fail():
+                return render_info
         else:
             if async_host_and_port is not None:
                 annotation_info = async_annotate_asset(
@@ -355,53 +359,56 @@ def annotate_and_optimize_asset(
         return optimization_info
 
     if compute_blender_thor_similarity:
+
         annotations = compress_json.load(annotations_path)
 
-        if "blender_thor_similarity" in annotations:
+        thor_render_path = os.path.join(
+            output_dir_with_uid, "thor_renders", f"0_1_0_0.0.jpg"
+        )
+        if optimization_info.get(
+            "blender_thor_similarity"
+        ) is not None and not optimization_info.get("any_change", True):
             print(
-                f"Blender-THOR similarity already computed for {uid}, will not recompute."
+                f"Skipping thor/blender similarity computation as this field"
+                f" already exists in the annotations and we have not detected any change in the blender/thor renders."
+            )
+        if not os.path.exists(thor_render_path):
+            print(
+                f"THOR render does not exist at {thor_render_path}, will not compute similarity."
             )
         else:
-            thor_render_path = os.path.join(
-                output_dir_with_uid, "thor_renders", f"0_1_0_0.0.jpg"
-            )
-            if not os.path.exists(thor_render_path):
-                print(
-                    f"THOR render does not exist at {thor_render_path}, will not compute similarity."
+            print("Computing similarity between blender and THOR renders.")
+            try:
+                import torch
+
+                if controller is not None and controller.gpu_device is not None:
+                    device = torch.device(controller.gpu_device)
+                else:
+                    device = torch.device("cpu")
+
+                blender_render_path = os.path.join(
+                    output_dir_with_uid,
+                    "blender_renders",
+                    f"render_{(-np.rad2deg(annotations['pose_z_rot_angle'])) % 360:0.1f}.jpg",
                 )
-            else:
-                print("Computing similarity between blender and THOR renders.")
-                try:
-                    import torch
 
-                    if controller is not None and controller.gpu_device is not None:
-                        device = torch.device(controller.gpu_device)
-                    else:
-                        device = torch.device("cpu")
-
-                    blender_render_path = os.path.join(
-                        output_dir_with_uid,
-                        "blender_renders",
-                        f"render_{(-np.rad2deg(annotations['pose_z_rot_angle'])) % 360:0.1f}.jpg",
-                    )
-
-                    sim = compute_clip_vit_l_similarity(
-                        img_path0=blender_render_path,
-                        img_path1=thor_render_path,
-                        device=device,
-                    )
-                    annotations["blender_thor_similarity"] = sim
-                    compress_json.dump(
-                        obj=annotations,
-                        path=annotations_path,
-                        json_kwargs=dict(indent=2),
-                    )
-                except (SystemExit, KeyboardInterrupt):
-                    raise
-                except:
-                    print(
-                        f"Failed to compute similarity, will not store in annotations, traceback:\n{traceback.format_exc()}"
-                    )
+                sim = compute_clip_vit_l_similarity(
+                    img_path0=blender_render_path,
+                    img_path1=thor_render_path,
+                    device=device,
+                )
+                annotations["blender_thor_similarity"] = sim
+                compress_json.dump(
+                    obj=annotations,
+                    path=annotations_path,
+                    json_kwargs=dict(indent=2),
+                )
+            except (SystemExit, KeyboardInterrupt):
+                raise
+            except:
+                print(
+                    f"Failed to compute similarity, will not store in annotations, traceback:\n{traceback.format_exc()}"
+                )
 
     return {"status": ObjathorStatus.SUCCESS}
 

@@ -19,7 +19,6 @@ import objaverse
 
 import objathor
 from objathor.asset_conversion.colliders.generate_colliders import generate_colliders
-
 # shared library
 from objathor.asset_conversion.util import (
     add_visualize_thor_actions,
@@ -537,7 +536,8 @@ def optimize_assets_for_thor(
                 ):
                     if not skip_thor_metadata:
                         print(
-                            f"{log_prefix}{metadata_output_path} already exists will skip generating thor metadata and thor images."
+                            f"{log_prefix}{metadata_output_path} already exists will skip"
+                            f" generating thor metadata and thor images."
                         )
                         skip_thor_metadata = True
             else:
@@ -719,6 +719,9 @@ def optimize_assets_for_thor(
     else:
         return {
             "status": ObjathorStatus.OPTIMIZATION_SUCCESS,
+            "any_change": not (
+                skip_conversion and skip_colliders and skip_thor_metadata
+            ),
         }
 
 

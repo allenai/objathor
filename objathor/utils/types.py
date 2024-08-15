@@ -9,6 +9,7 @@ PROCESSED_ASSET_EXTENSIONS = Literal[
 class ObjathorStatus(str, enum.Enum):
     ANNOTATION_SUCCESS = "annotation_success"
     OPTIMIZATION_SUCCESS = "optimization_success"
+    RENDER_SUCCESS = "render_success"
     SUCCESS = "success"
 
     # Annotation
