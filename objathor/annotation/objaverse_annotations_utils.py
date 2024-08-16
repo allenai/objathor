@@ -74,10 +74,10 @@ def compute_clip_vit_l_similarity(img_path0: str, img_path1: str, device: torch.
 
     with torch.no_grad():
         blender_features = clip_model.encode_image(
-            clip_im_preprocessor(Image.fromarray(img0)).unsqueeze(0)
+            clip_im_preprocessor(Image.fromarray(img0)).unsqueeze(0).to(device)
         )
         thor_features = clip_model.encode_image(
-            clip_im_preprocessor(Image.fromarray(img1)).unsqueeze(0)
+            clip_im_preprocessor(Image.fromarray(img1)).unsqueeze(0).to(device)
         )
 
         sim = torch.cosine_similarity(blender_features, thor_features)
