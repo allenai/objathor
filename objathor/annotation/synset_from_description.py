@@ -12,9 +12,7 @@ import nltk
 from nltk.corpus import wordnet2022 as wn
 from sklearn.neighbors import NearestNeighbors
 
-from objathor.annotation.embed_synset_definitions import (
-    get_embeddings_single as get_synset_embeddings,
-)
+from objathor.annotation.embed_synset_definitions import _load_synset_embeddings
 from objathor.utils.gpt_utils import get_embedding
 
 DESCRIPTION_EMBEDDING_OUTPUT_DIR = "/tmp/objathor_description_embeddings"
@@ -62,7 +60,7 @@ def synset_to_summary_str(synset: str) -> str:
 def synset_embeddings():
     global _SYNSET_EMBEDDINGS
     if _SYNSET_EMBEDDINGS is None:
-        _SYNSET_EMBEDDINGS = get_synset_embeddings()
+        _SYNSET_EMBEDDINGS = _load_synset_embeddings()
         print(f"Loaded {len(_SYNSET_EMBEDDINGS)} embeddings")
     return _SYNSET_EMBEDDINGS
 

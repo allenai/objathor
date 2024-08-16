@@ -27,21 +27,15 @@ SYNSET_DEFINITION_EMB_FILE = os.path.join(
 def download_embeddings(
     url: str = "https://pub-daedd7738a984186a00f2ab264d06a07.r2.dev/misc/synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz",
 ):
-    os.makedirs(OBJATHOR_DATA_DIR, exist_ok=True)
-    if not os.path.isfile(SYNSET_DEFINITION_EMB_FILE):
-        print(f"Downloading\n{url}\nto\n{SYNSET_DEFINITION_EMB_FILE}")
-
-        download_with_locking(
-            url=url,
-            save_path=SYNSET_DEFINITION_EMB_FILE,
-            lock_path=SYNSET_DEFINITION_EMB_FILE + ".lock",
-            desc="Downloading synset definition embeddings",
-        )
-
-    assert os.path.isfile(SYNSET_DEFINITION_EMB_FILE)
+    download_with_locking(
+        url=url,
+        save_path=SYNSET_DEFINITION_EMB_FILE,
+        lock_path=SYNSET_DEFINITION_EMB_FILE + ".lock",
+        desc="Downloading synset definition embeddings",
+    )
 
 
-def get_embeddings(
+def compute_synset_embeddings(
     fname: str = os.path.join(OBJATHOR_DATA_DIR, "synset_definition_embeddings.pkl.gz"),
 ) -> Dict[str, np.ndarray]:
     from nltk.corpus import wordnet2022 as wn
@@ -87,7 +81,7 @@ def get_embeddings(
     return data
 
 
-def get_embeddings_single(
+def _load_synset_embeddings(
     fname: str = SYNSET_DEFINITION_EMB_FILE,
 ) -> Dict[str, np.ndarray]:
     if not os.path.isfile(fname):
@@ -96,10 +90,11 @@ def get_embeddings_single(
         except (SystemExit, KeyboardInterrupt):
             raise
         except:
-            data = get_embeddings()
-            for key, value in data.items():
-                data[key] = value.astype(np.float32)
-            compress_pickle.dump(data, fname)
+            raise
+            # data = compute_synset_embeddings()
+            # for key, value in data.items():
+            #     data[key] = value.astype(np.float32)
+            # compress_pickle.dump(data, fname)
 
     return compress_pickle.load(fname)
 
@@ -252,21 +247,22 @@ def get_lemmas_definition_embeddings(
 
 
 if __name__ == "__main__":
-    data = get_embeddings()
-    for key, value in data.items():
-        data[key] = value.astype(np.float32)
-
-    compress_pickle.dump(
-        data,
-        os.path.join(
-            OBJATHOR_DATA_DIR,
-            "synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz",
-        ),
-    )
-
-    # data = get_embeddings()
-    # data = get_embeddings_single()
-    # local_smoothing(data, "wardrobe.n.01")
-
-    # data = get_lemmas_definition_embeddings()
-    print("DONE")
+    download_embeddings()
+    # data = compute_synset_embeddings()
+    # for key, value in data.items():
+    #     data[key] = value.astype(np.float32)
+    #
+    # compress_pickle.dump(
+    #     data,
+    #     os.path.join(
+    #         OBJATHOR_DATA_DIR,
+    #         "synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz",
+    #     ),
+    # )
+    #
+    # # data = get_embeddings()
+    # # data = get_embeddings_single()
+    # # local_smoothing(data, "wardrobe.n.01")
+    #
+    # # data = get_lemmas_definition_embeddings()
+    # print("DONE")
