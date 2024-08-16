@@ -46,9 +46,11 @@ def get_open_clip_vit_l(device: torch.device):
 
     clip_model_name = "ViT-L-14"
     pretrained = "laion2b_s32b_b82k"
-    clip_model, _, clip_img_preprocessor = open_clip.create_model_and_transforms(
-        model_name=clip_model_name, pretrained=pretrained, device=device
-    )
+
+    with _lock_for_load():
+        clip_model, _, clip_img_preprocessor = open_clip.create_model_and_transforms(
+            model_name=clip_model_name, pretrained=pretrained, device=device
+        )
     clip_model.eval()
     return clip_model, clip_img_preprocessor
 
