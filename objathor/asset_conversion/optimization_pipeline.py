@@ -594,7 +594,7 @@ def optimize_assets_for_thor(
                     failed_objects=failed_objects,
                     delete_objs=delete_objs,
                     **{
-                        "timeout": 60,
+                        "timeout": 60 if timeout is None else timeout,
                         **extra_collider_kwargs,
                     },
                 )

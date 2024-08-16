@@ -156,6 +156,12 @@ def add_optimization_arguments(
         action="store_true",
         help="Whether it keeps the intermediate .json asset file when storing in a different format to json.",
     )
+    parser.add_argument(
+        "--optimization_timeout",
+        type=int,
+        default=None,
+        help="Timeout for the optimization pipeline.",
+    )
 
     found_blender = False
     try:
@@ -217,6 +223,7 @@ def annotate_and_optimize_asset(
     blender_installation_path: Optional[str] = None,
     controller: Optional[Controller] = None,
     async_host_and_port: Optional[str] = None,
+    optimization_timeout: Optional[int] = None,
 ) -> ObjathorInfo:
     if controller is not None:
         assert (width is None or controller.last_event.frame.shape[1] == width) and (
@@ -353,6 +360,7 @@ def annotate_and_optimize_asset(
         skybox_color=tuple(map(int, skybox_color.split(","))),
         add_visualize_thor_actions=add_visualize_thor_actions,
         controller=controller,
+        timeout=optimization_timeout,
     )
 
     if not optimization_info["status"].is_success():
