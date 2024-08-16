@@ -72,7 +72,9 @@ def annotate_asset(
     **kwargs: Any,
 ) -> ObjathorInfo:
     if os.environ.get("OPENAI_API_KEY") is None:
-        raise RuntimeError("OPENAI_API_KEY is not specified, cannot generate annotations.")
+        raise RuntimeError(
+            "OPENAI_API_KEY is not specified, cannot generate annotations."
+        )
 
     save_path = os.path.join(output_dir, f"annotations.json.gz")
     if os.path.exists(save_path) and not overwrite:
@@ -215,7 +217,9 @@ def async_annotate_asset(
         )
 
     if os.environ.get("OPENAI_API_KEY") is None:
-        raise RuntimeError("OPENAI_API_KEY is not specified, cannot generate annotations.")
+        raise RuntimeError(
+            "OPENAI_API_KEY is not specified, cannot generate annotations."
+        )
 
     annotations_save_path = os.path.join(output_dir, f"annotations.json.gz")
     if os.path.exists(annotations_save_path) and not overwrite:
