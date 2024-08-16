@@ -7,6 +7,7 @@ import compress_pickle
 import numpy as np
 from tqdm import tqdm
 
+from objathor.utils.download_utils import download_with_locking
 from objathor.utils.gpt_utils import get_embedding, get_embeddings_from_texts
 from objathor.utils.synsets import (
     all_synsets,
@@ -30,17 +31,13 @@ def download_embeddings(
     if not os.path.isfile(SYNSET_DEFINITION_EMB_FILE):
         print(f"Downloading\n{url}\nto\n{SYNSET_DEFINITION_EMB_FILE}")
 
-        def report_hook(block, block_size, total_size, freq=1e7):
-            if (block * block_size) % freq < block_size:
-                print(f"{block * block_size / total_size * 100:.2f}% downloaded"),
-
-        urllib.request.urlretrieve(
-            url,
-            SYNSET_DEFINITION_EMB_FILE,
-            reporthook=report_hook,
+        download_with_locking(
+            url=url,
+            save_path=SYNSET_DEFINITION_EMB_FILE,
+            lock_path=SYNSET_DEFINITION_EMB_FILE + ".lock",
+            desc="Downloading synset definition embeddings",
         )
 
-        print("Finished downloading")
     assert os.path.isfile(SYNSET_DEFINITION_EMB_FILE)
 
 
