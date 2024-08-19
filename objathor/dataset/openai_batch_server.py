@@ -517,9 +517,7 @@ def main():
     )
     parser.add_argument(
         "--debug",
-        type=bool,
         action="store_true",
-        default=False,
     )
 
     args = parser.parse_args()
