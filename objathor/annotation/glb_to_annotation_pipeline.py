@@ -243,6 +243,7 @@ def async_annotate_asset(
     render_dir = os.path.join(output_dir, "blender_renders")
 
     blender_error = ""
+    did_change = False
     try:
         blender_render_paths = render_glb_from_angles(
             glb_path=glb_path,
@@ -276,6 +277,8 @@ def async_annotate_asset(
         with open(annotate_from_views_uid_path, "w") as f:
             f.write(annotate_from_views_uid)
 
+        did_change = True
+
     if not os.path.exists(annotate_from_views_response_path):
         with open(annotate_from_views_uid_path, "r") as f:
             annotate_from_views_uid = f.read().strip()
@@ -296,7 +299,12 @@ def async_annotate_asset(
                 f"annotate_from_views request for {uid} is in state:"
                 f" {status}. Please re-run later if it is IN_PROGRESS or VALIDATING."
             )
-            return {"status": ObjathorStatus.ANNOTATE_VIEWS_IN_PROGRESS}
+            return {
+                "status": ObjathorStatus.ANNOTATE_VIEWS_IN_PROGRESS,
+                "did_change": did_change,
+            }
+
+        did_change = True
 
     annotate_from_views_response = compress_json.load(annotate_from_views_response_path)
 
@@ -330,6 +338,8 @@ def async_annotate_asset(
         with open(synset_uid_path, "w") as f:
             f.write(synset_uid)
 
+        did_change = True
+
     if not os.path.exists(synset_response_path):
         with open(synset_uid_path, "r") as f:
             synset_uid = f.read().strip()
@@ -347,7 +357,12 @@ def async_annotate_asset(
             print(
                 f"Synset request for {uid} is in state: {status}. Please re-run later if it is IN_PROGRESS or VALIDATING."
             )
-            return {"status": ObjathorStatus.SYNSET_IN_PROGRESS}
+            return {
+                "status": ObjathorStatus.SYNSET_IN_PROGRESS,
+                "did_change": did_change,
+            }
+
+        did_change = True
 
     synset = _get_content_from_response(compress_json.load(synset_response_path))
 
