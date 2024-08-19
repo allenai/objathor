@@ -8,6 +8,7 @@ import uuid
 from argparse import ArgumentParser
 from datetime import datetime
 from typing import Dict, Any, Sequence, Tuple, List, Union
+from wsgiref.simple_server import WSGIServer
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, request, jsonify
@@ -112,6 +113,10 @@ class OpenAIBatchServer:
 
     def run(self, host="0.0.0.0", port=5000, **flask_kwargs):
         self.app.run(host=host, port=port, **flask_kwargs)
+
+    def run_wsgi(self, host="0.0.0.0", port=5000):
+        http_server = WSGIServer((host, port), self.app)
+        http_server.serve_forever()
 
     def create_table(self):
         with self.db_lock:
@@ -510,6 +515,12 @@ def main():
         type=int,
         default=5000,
     )
+    parser.add_argument(
+        "--debug",
+        type=bool,
+        action="store_true",
+        default=False,
+    )
 
     args = parser.parse_args()
 
@@ -519,9 +530,11 @@ def main():
         batch_after_num=args.batch_after_num,
         save_dir=args.save_dir,
     )
-    server.run(host="0.0.0.0", port=5000)
+    if args.debug:
+        server.run(host=args.host, port=args.port, debug=True)
+    else:
+        server.run_wsgi(host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
-
     main()
