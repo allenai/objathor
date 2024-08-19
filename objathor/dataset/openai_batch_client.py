@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional, Union
 
 import requests
 
-from objathor.dataset.openai_batch_server import RequestStatus
+from objathor.dataset.openai_batch_constants import RequestStatus
 
 
 class OpenAIBatchClientError(Exception):

@@ -7,43 +7,13 @@ import traceback
 import uuid
 from argparse import ArgumentParser
 from datetime import datetime
-from enum import Enum
 from typing import Dict, Any, Sequence, Tuple, List, Union
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, request, jsonify
 from openai import OpenAI
 
-
-class RequestStatus(str, Enum):
-    VALIDATING = "validating"
-    FAILED = "failed"
-    IN_PROGRESS = "in_progress"
-    FINALIZING = "finalizing"
-    COMPLETED = "completed"
-    EXPIRED = "expired"
-    CANCELLING = "cancelling"
-    CANCELLED = "cancelled"
-    NOT_FOUND = "not_found"
-
-    def is_complete(self):
-        return self == RequestStatus.COMPLETED
-
-    def is_in_progress(self):
-        return self in [
-            RequestStatus.VALIDATING,
-            RequestStatus.IN_PROGRESS,
-            RequestStatus.FINALIZING,
-        ]
-
-    def is_fail(self):
-        return self in [
-            RequestStatus.FAILED,
-            RequestStatus.EXPIRED,
-            RequestStatus.CANCELLING,
-            RequestStatus.CANCELLED,
-            RequestStatus.NOT_FOUND,
-        ]
+from objathor.dataset.openai_batch_constants import RequestStatus
 
 
 class OpenAIBatchServer:

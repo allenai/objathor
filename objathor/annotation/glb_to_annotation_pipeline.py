@@ -21,7 +21,7 @@ from objathor.annotation.gpt_from_views import (
 from objathor.annotation.synset_from_description import NUM_NEIGHS
 from objathor.constants import VISION_LLM, TEXT_LLM
 from objathor.dataset.openai_batch_client import OpenAIBatchClient
-from objathor.dataset.openai_batch_server import RequestStatus
+from objathor.dataset.openai_batch_constants import RequestStatus
 from objathor.utils.blender import render_glb_from_angles, BlenderRenderError
 from objathor.utils.image_processing import verify_images_are_not_all_white
 from objathor.utils.types import (
