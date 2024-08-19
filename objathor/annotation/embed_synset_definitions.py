@@ -1,10 +1,10 @@
 import os
 import random
-import urllib.request
 from typing import Dict
 
 import compress_pickle
 import numpy as np
+from filelock import FileLock
 from tqdm import tqdm
 
 from objathor.utils.download_utils import download_with_locking
@@ -26,13 +26,34 @@ SYNSET_DEFINITION_EMB_FILE = os.path.join(
 
 def download_embeddings(
     url: str = "https://pub-daedd7738a984186a00f2ab264d06a07.r2.dev/misc/synset_definition_embeddings_with_lemmas__2024-01-22.pkl.gz",
+    retry_if_failure: bool = True,
 ):
+    lock_path = SYNSET_DEFINITION_EMB_FILE + ".lock"
+
     download_with_locking(
         url=url,
         save_path=SYNSET_DEFINITION_EMB_FILE,
-        lock_path=SYNSET_DEFINITION_EMB_FILE + ".lock",
+        lock_path=lock_path,
         desc="Downloading synset definition embeddings",
     )
+
+    load_failure = False
+    with FileLock(lock_path):
+        try:
+            compress_pickle.load(SYNSET_DEFINITION_EMB_FILE)
+        except EOFError:
+            if retry_if_failure:
+                load_failure = True
+                try:
+                    os.remove(SYNSET_DEFINITION_EMB_FILE)
+                except FileNotFoundError:
+                    pass
+            else:
+                raise
+
+    if load_failure:
+        print("Failed to load embeddings, reattempting download...")
+        download_embeddings(url=url, retry_if_failure=False)
 
 
 def compute_synset_embeddings(

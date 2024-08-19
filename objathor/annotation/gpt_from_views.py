@@ -36,7 +36,7 @@ DEFAULT_QUESTION_NO_SYNSET = """Annotate this 3D asset assuming it can be found 
     "description_view_<i>": a short description of the object from view i (highlight/compare features that are different from other views),
     "category": a category such as "chair", "table", "building", "person", "airplane", "car", "seashell", "fish", "toy", etc. Be concise but specific, e.g. do not say "furniture" when "eames chair" would be more specific,
     "height": approximate height of the object in cm. Report the height for the object's orientation as shown in the images. For a standing human male this could be "175",
-    "max_dimension": approximate maximum dimension of the object in cm. This is the longest dimension of the object, regardless of orientation,
+    "max_dimension": approximate maximum dimension of the object in cm. This is the longest dimension of the object, regardless of orientation. This should always be greater or equal to the height,
     "materials": a Python list of the materials that the object appears to be made of, taking into account the visible exterior and also likely interior (roughly in order of most used material to least used; include "air" if the object interior doesn't seem completely solid),
     "composition": a Python list with the apparent volume mixture of the materials above (make the list sum to 1),
     "mass": approximate mass in kilogram considering typical densities for the materials. For a human being this could be "72",
