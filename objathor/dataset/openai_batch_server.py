@@ -8,7 +8,7 @@ import uuid
 from argparse import ArgumentParser
 from datetime import datetime
 from typing import Dict, Any, Sequence, Tuple, List, Union
-from wsgiref.simple_server import WSGIServer
+from gevent.pywsgi import WSGIServer
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, request, jsonify
