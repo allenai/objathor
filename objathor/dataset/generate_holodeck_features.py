@@ -143,6 +143,8 @@ class ObjectDatasetTars(Dataset):
         asset_dir: str,
         image_preprocessor: Callable,
         img_angles: Sequence[float] = (0.0, 45.0, 315.0),
+        max_processes: int = 32,
+        load_chunksize: int = 16,
     ):
         self.asset_dir = asset_dir
         self.image_preprocessor = image_preprocessor
@@ -150,12 +152,13 @@ class ObjectDatasetTars(Dataset):
 
         tar_files = sorted([f for f in os.listdir(asset_dir) if f.endswith(".tar")])
 
-        with mp.Pool(min(32, os.cpu_count() or 1)) as pool:
+        with mp.Pool(min(max_processes, os.cpu_count() or 1)) as pool:
             is_tar_good = list(
                 tqdm.tqdm(
                     pool.imap(
                         _check_tar_success,
                         [os.path.join(asset_dir, f) for f in tar_files],
+                        chunksize=load_chunksize,
                     ),
                     total=len(tar_files),
                     desc="Loading tar files.",
