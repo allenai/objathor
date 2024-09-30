@@ -74,7 +74,7 @@ def postprocess_assets(dataset_dir: str, batch_size: int, num_workers: int):
     print("Generating holodeck features...")
     generate_features(
         base_dir=dataset_dir,
-        assets_dir=assets_dir,
+        asset_dir=assets_dir,
         annotations_path=os.path.join(dataset_dir, "annotations.json.gz"),
         device=DEFAULT_DEVICE,
         batch_size=batch_size if torch.cuda.is_available() else 8,
