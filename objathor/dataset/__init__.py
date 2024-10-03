@@ -110,11 +110,20 @@ def load_features_dir(
             glob.glob(os.path.join(features_save_dir, "**", "*.pkl"), recursive=True)
         ) == 0:
             tar_path = features_save_dir + ".tar"
-            download_with_progress_bar(
-                url=f"{dsc.VERSIONED_BUCKET_URL}/features.tar",
-                save_path=tar_path,
-                desc="Downloading features.",
-            )
+            try:
+                download_with_progress_bar(
+                    url=f"{dsc.VERSIONED_BUCKET_URL}/features.tar",
+                    save_path=tar_path,
+                    desc="Downloading features.",
+                )
+            except ValueError:
+                # Fallback to assuming BASE_BUCKET_URL is a link to the bucket root
+                # with a flat structure.
+                download_with_progress_bar(
+                    url=f"{dsc.BASE_BUCKET_URL}/features.tar",
+                    save_path=tar_path,
+                    desc="Downloading features.",
+                )
 
             _td = TemporaryDirectory()
             with _td as tmp_untar_dir:
