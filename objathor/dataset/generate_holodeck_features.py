@@ -1,14 +1,15 @@
 import gzip
 import json
-import os
 import multiprocessing as mp
+import os
 import tarfile
 from argparse import ArgumentParser
-from typing import Dict, Callable, Union, Sequence
+from typing import Dict, Callable, Union, Sequence, Optional
 
 import PIL.Image as Image
 import compress_json
 import compress_pickle
+import numpy as np
 import torch
 import tqdm
 
@@ -57,13 +58,15 @@ class ObjectDatasetDirs(Dataset):
         annotations: Dict[str, ObjectAnnotation],
         image_preprocessor: Callable,
         img_angles: Sequence[float] = (0.0, 45.0, 315.0),
+        uids_to_skip: Optional[Sequence[str]] = None,
     ):
         self.annotations = annotations
         self.asset_dir = asset_dir
         self.image_preprocessor = image_preprocessor
         self.img_angles = img_angles
+        self.uids_to_skip = set(uids_to_skip or [])
 
-        self.uids = sorted(
+        uids = sorted(
             [
                 k
                 for k, v in self.annotations.items()
@@ -74,6 +77,7 @@ class ObjectDatasetDirs(Dataset):
                 )
             ]
         )
+        self.uids = [uid for uid in uids if uid not in self.uids_to_skip]
         assert len(self.uids) > 0, "No valid uids found in the annotations."
 
         if self.image_preprocessor is not None:
@@ -145,10 +149,12 @@ class ObjectDatasetTars(Dataset):
         img_angles: Sequence[float] = (0.0, 45.0, 315.0),
         max_processes: int = 32,
         load_chunksize: int = 16,
+        uids_to_skip: Optional[Sequence[str]] = None,
     ):
         self.asset_dir = asset_dir
         self.image_preprocessor = image_preprocessor
         self.img_angles = img_angles
+        self.uids_to_skip = set(uids_to_skip or [])
 
         tar_files = sorted([f for f in os.listdir(asset_dir) if f.endswith(".tar")])
 
@@ -176,7 +182,8 @@ class ObjectDatasetTars(Dataset):
         # Sorting again shouldn't be necessary, but just in case
         self.tar_files = sorted([f for f, good in zip(tar_files, is_tar_good) if good])
 
-        self.uids = [tf[: -len(".tar")] for tf in self.tar_files]
+        uids = [tf[: -len(".tar")] for tf in self.tar_files]
+        self.uids = [uid for uid in uids if uid not in self.uids_to_skip]
 
     def __len__(self) -> int:
         return len(self.uids)
@@ -230,6 +237,24 @@ def generate_features(
     base_dir = os.path.join(base_dir, "features")
     os.makedirs(base_dir, exist_ok=True)
 
+    clip_save_path = os.path.join(base_dir, "clip_features.pkl")
+    sbert_save_path = os.path.join(base_dir, "sbert_features.pkl")
+
+    uids_to_skip = None
+    old_clip_features_dict = None
+    old_sbert_features_dict = None
+    if os.path.exists(clip_save_path):
+        print(
+            f"Found existing clip features at {clip_save_path}, will attempt to load and only generate new features."
+        )
+        old_clip_features_dict = compress_pickle.load(clip_save_path)
+        old_sbert_features_dict = compress_pickle.load(sbert_save_path)
+
+        uids_to_skip = old_clip_features_dict["uids"]
+        assert (
+            uids_to_skip == old_sbert_features_dict["uids"]
+        ), "UIDs in clip and sbert features do not match."
+
     # CLIP
     device = torch.device(device)
     clip_model_name = "ViT-L-14"
@@ -246,12 +271,14 @@ def generate_features(
         dataset = ObjectDatasetTars(
             asset_dir=asset_dir,
             image_preprocessor=clip_img_preprocessor,
+            uids_to_skip=uids_to_skip,
         )
     else:
         dataset = ObjectDatasetDirs(
             annotations=compress_json.load(annotations_path),
             asset_dir=asset_dir,
             image_preprocessor=clip_img_preprocessor,
+            uids_to_skip=uids_to_skip,
         )
 
     dataloader = DataLoader(
@@ -295,6 +322,25 @@ def generate_features(
     sbert_text_features = (
         torch.cat(sbert_text_features, dim=0).numpy().astype("float16")
     )
+
+    if uids_to_skip is not None:
+        uids = uids_to_skip + uids
+
+        clip_img_features = np.concatenate(
+            [old_clip_features_dict["img_features"], clip_img_features], axis=0
+        )
+        clip_text_features = np.concatenate(
+            [old_clip_features_dict["text_features"], clip_text_features], axis=0
+        )
+        sbert_text_features = np.concatenate(
+            [old_sbert_features_dict["text_features"], sbert_text_features], axis=0
+        )
+
+    sort_index = np.argsort(uids)
+    uids = [uids[i] for i in sort_index]
+    clip_img_features = clip_img_features[sort_index]
+    clip_text_features = clip_text_features[sort_index]
+    sbert_text_features = sbert_text_features[sort_index]
 
     compress_pickle.dump(
         {
