@@ -117,7 +117,7 @@ def update_annotations(
             )
             asset_ann["thor_metadata"] = {}
 
-        all_annotations[uid] = all_annotations
+        all_annotations[uid] = asset_ann
     finally:
         if pbar is not None:
             pbar.update(1)
