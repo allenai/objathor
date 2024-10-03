@@ -4,7 +4,7 @@ import os
 import tarfile
 import warnings
 from argparse import ArgumentParser
-from typing import Dict, Any, Sequence
+from typing import Dict, Any, Sequence, Optional
 
 import compress_json
 import tqdm
@@ -42,60 +42,85 @@ def add_thor_metadata_to_existing_annotations(annotations_path: str, assets_dir:
     compress_json.dump(annotations, annotations_path, json_kwargs={"indent": 2})
 
 
-def update_annotations(dir_or_tar_path: str, all_annotations: Dict[str, Any]):
-    if not os.path.isdir(dir_or_tar_path) and not tarfile.is_tarfile(dir_or_tar_path):
-        warnings.warn(f"Invalid path: {dir_or_tar_path}")
-        return
+def update_annotations(
+    dir_or_tar_path: str,
+    all_annotations: Dict[str, Any],
+    pbar: Optional[tqdm.tqdm] = None,
+):
+    try:
 
-    uid = os.path.basename(dir_or_tar_path).replace(".tar", "")
+        def print_or_log(msg):
+            if pbar is not None:
+                pbar.write(msg)
+            else:
+                print(msg)
 
-    if uid in all_annotations:
-        print(f"Annotations for {uid} already exist, skipping...")
-        return
+        if not os.path.isdir(dir_or_tar_path) and not tarfile.is_tarfile(
+            dir_or_tar_path
+        ):
+            print_or_log(f"WARNING: Invalid path: {dir_or_tar_path}")
+            return
 
-    print(f"Loading annotations for {uid}...")
+        uid = os.path.basename(dir_or_tar_path).replace(".tar", "")
 
-    thor_metadata = None
-    if os.path.isdir(dir_or_tar_path):
-        annotations_path = os.path.join(dir_or_tar_path, "annotations.json.gz")
-        thor_metadata_path = os.path.join(dir_or_tar_path, "thor_metadata.json")
+        if uid in all_annotations:
+            print_or_log(f"Annotations for {uid} already exist, skipping...")
+            return
 
-        if not os.path.exists(annotations_path):
-            warnings.warn(f"Annotations not found at {annotations_path}, skipping...")
+        print_or_log(f"Loading annotations for {uid}...")
 
-        asset_ann = compress_json.load(annotations_path)
-        try:
-            thor_metadata = compress_json.load(thor_metadata_path)
-        except:
-            pass
-    else:
-        with tarfile.open(dir_or_tar_path, "r:*") as asset_tf:
-            with asset_tf.extractfile(f"{uid}/annotations.json.gz") as f:
-                asset_ann = json.loads(gzip.decompress(f.read()))
+        thor_metadata = None
+        if os.path.isdir(dir_or_tar_path):
+            annotations_path = os.path.join(dir_or_tar_path, "annotations.json.gz")
+            thor_metadata_path = os.path.join(dir_or_tar_path, "thor_metadata.json")
 
+            if not os.path.exists(annotations_path):
+                print_or_log(
+                    f"WARNING: Annotations not found at {annotations_path}, skipping..."
+                )
+
+            asset_ann = compress_json.load(annotations_path)
             try:
-                with asset_tf.extractfile(f"{uid}/thor_metadata.json") as f:
-                    thor_metadata = json.loads(f.read())
+                thor_metadata = compress_json.load(thor_metadata_path)
             except:
                 pass
+        else:
+            with tarfile.open(dir_or_tar_path, "r:*") as asset_tf:
+                try:
+                    with asset_tf.extractfile(f"{uid}/annotations.json.gz") as f:
+                        asset_ann = json.loads(gzip.decompress(f.read()))
+                except:
+                    print_or_log(
+                        f"WARNING: Annotations not found for {uid} at path {dir_or_tar_path}, skipping..."
+                    )
+                    return
 
-    assert asset_ann["uid"] == uid
+                try:
+                    with asset_tf.extractfile(f"{uid}/thor_metadata.json") as f:
+                        thor_metadata = json.loads(f.read())
+                except:
+                    pass
 
-    if "thor_metadata" in asset_ann:
-        warnings.warn(
-            f"Warning: THOR metadata already exists for {asset_ann['uid']}, replacing..."
-        )
-        asset_ann["thor_metadata"] = {}
+        assert asset_ann["uid"] == uid
 
-    if thor_metadata is not None:
-        asset_ann["thor_metadata"] = thor_metadata
-    else:
-        print(
-            f"Warning: No THOR metadata found for {asset_ann['uid']} at path {dir_or_tar_path}."
-        )
-        asset_ann["thor_metadata"] = {}
+        if "thor_metadata" in asset_ann:
+            warnings.warn(
+                f"Warning: THOR metadata already exists for {asset_ann['uid']}, replacing..."
+            )
+            asset_ann["thor_metadata"] = {}
 
-    all_annotations[uid] = all_annotations
+        if thor_metadata is not None:
+            asset_ann["thor_metadata"] = thor_metadata
+        else:
+            print_or_log(
+                f"Warning: No THOR metadata found for {asset_ann['uid']} at path {dir_or_tar_path}."
+            )
+            asset_ann["thor_metadata"] = {}
+
+        all_annotations[uid] = all_annotations
+    finally:
+        if pbar is not None:
+            pbar.update(1)
 
 
 def prepare_annotations(save_dir: str, assets_dir: str):
@@ -113,17 +138,20 @@ def prepare_annotations(save_dir: str, assets_dir: str):
         all_annotations = {}
 
     # Walk along the assets dir
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-        futures = [
-            executor.submit(
-                update_annotations,
-                dir_or_tar_path=path,
-                all_annotations=all_annotations,
-            )
-            for path in os.scandir(assets_dir)
-        ]
+    paths = sorted(os.scandir(assets_dir))
+    with tqdm.tqdm(total=len(paths), desc="Compiling annotations") as pbar:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [
+                executor.submit(
+                    update_annotations,
+                    dir_or_tar_path=path,
+                    all_annotations=all_annotations,
+                    pbar=pbar,
+                )
+                for path in paths
+            ]
 
-        wait_for_futures_and_raise_errors(futures)
+            wait_for_futures_and_raise_errors(futures)
 
     # Save the annotations to a file
     compress_json.dump(all_annotations, all_annotations_save_path)
