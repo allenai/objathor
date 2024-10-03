@@ -138,7 +138,7 @@ def prepare_annotations(save_dir: str, assets_dir: str):
         all_annotations = {}
 
     # Walk along the assets dir
-    paths = sorted(os.scandir(assets_dir))
+    paths = sorted(os.scandir(assets_dir), key=lambda x: x.name)
     with tqdm.tqdm(total=len(paths), desc="Compiling annotations") as pbar:
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             futures = [
