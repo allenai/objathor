@@ -45,8 +45,7 @@ def download_with_progress_bar(
 
 
 def download_with_locking(url: str, save_path: str, lock_path: str, desc: str = ""):
-    if not os.path.exists(save_path):
-        with FileLock(lock_path):
-            if not os.path.exists(save_path):
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                download_with_progress_bar(url=url, save_path=save_path, desc=desc)
+    with FileLock(lock_path):
+        if not os.path.exists(save_path):
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            download_with_progress_bar(url=url, save_path=save_path, desc=desc)

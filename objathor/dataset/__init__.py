@@ -1,7 +1,7 @@
 import glob
 import os
 from tempfile import TemporaryDirectory
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import attrs
 import compress_json
@@ -19,9 +19,14 @@ from objathor.utils.download_utils import (
 class DatasetSaveConfig:
     VERSION: str = attrs.field(default="2023_07_28")
     BASE_PATH: str = attrs.field(default=OBJATHOR_CACHE_PATH)
-    BASE_BUCKET_URL: str = attrs.field(
-        default="https://pub-daedd7738a984186a00f2ab264d06a07.r2.dev"
-    )
+    BASE_BUCKET_URL: Optional[str] = attrs.field()
+
+    @BASE_BUCKET_URL.default
+    def _default_base_bucket_url(self) -> str:
+        if self.VERSION == "2024_08_16":
+            return "https://pub-2619544d52bd4f35927b08d301d2aba0.r2.dev"
+        else:
+            return "https://pub-daedd7738a984186a00f2ab264d06a07.r2.dev"
 
     @property
     def VERSIONED_PATH(self) -> str:
@@ -29,7 +34,10 @@ class DatasetSaveConfig:
 
     @property
     def VERSIONED_BUCKET_URL(self) -> str:
-        return f"{self.BASE_BUCKET_URL}/{self.VERSION}"
+        if self.VERSION == "2024_08_16":
+            return self.BASE_BUCKET_URL
+        else:
+            return f"{self.BASE_BUCKET_URL}/{self.VERSION}"
 
     @property
     def ANNOTATIONS_LOCK(self) -> str:
@@ -110,11 +118,20 @@ def load_features_dir(
             glob.glob(os.path.join(features_save_dir, "**", "*.pkl"), recursive=True)
         ) == 0:
             tar_path = features_save_dir + ".tar"
-            download_with_progress_bar(
-                url=f"{dsc.VERSIONED_BUCKET_URL}/features.tar",
-                save_path=tar_path,
-                desc="Downloading features.",
-            )
+            try:
+                download_with_progress_bar(
+                    url=f"{dsc.VERSIONED_BUCKET_URL}/features.tar",
+                    save_path=tar_path,
+                    desc="Downloading features.",
+                )
+            except ValueError:
+                # Fallback to assuming BASE_BUCKET_URL is a link to the bucket root
+                # with a flat structure.
+                download_with_progress_bar(
+                    url=f"{dsc.BASE_BUCKET_URL}/features.tar",
+                    save_path=tar_path,
+                    desc="Downloading features.",
+                )
 
             _td = TemporaryDirectory()
             with _td as tmp_untar_dir:

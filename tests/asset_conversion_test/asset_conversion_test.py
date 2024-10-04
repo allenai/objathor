@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_dummy():
     assert True
 
@@ -46,7 +43,7 @@ def test_dummy():
 
 #     return pipeline_main(
 #         [
-#             # f"/Users/alvaroh/ai2/objathor/objathor/asset_conversion/pipeline_to_thor.py",
+#             # f"/Users/alvaroh/ai2/objathor/objathor/asset_conversion/optimization_pipeline.py",
 #             f"--uids={object_id}",
 #             f"--output_dir={out_path}",
 #             "--live",

@@ -1,9 +1,7 @@
 import os
 from pathlib import Path
-import subprocess
-from setuptools import setup, find_packages
-from setuptools.command.install import install
 
+from setuptools import setup, find_packages
 
 if __name__ == "__main__":
     with Path(Path(__file__).parent, "README.md").open(encoding="utf-8") as file:
@@ -25,7 +23,7 @@ if __name__ == "__main__":
         name="objathor",
         packages=find_packages(),
         include_package_data=True,
-        version="0.0.5",
+        version="0.0.7",
         license="Apache 2.0",
         description="Objaverse asset importer for THOR",
         long_description=long_description,

@@ -168,3 +168,9 @@ tmp
 
 log.txt
 LICENSE.txt
+objathor/out/*
+*.jpg
+*.json
+*.json.gz
+examples
+*batch_server_data/

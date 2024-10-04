@@ -12,9 +12,7 @@ import nltk
 from nltk.corpus import wordnet2022 as wn
 from sklearn.neighbors import NearestNeighbors
 
-from objathor.annotation.embed_synset_definitions import (
-    get_embeddings_single as get_synset_embeddings,
-)
+from objathor.annotation.embed_synset_definitions import _load_synset_embeddings
 from objathor.utils.gpt_utils import get_embedding
 
 DESCRIPTION_EMBEDDING_OUTPUT_DIR = "/tmp/objathor_description_embeddings"
@@ -23,12 +21,6 @@ NUM_NEIGHS = 5
 
 _SYNSET_EMBEDDINGS: Optional[Dict[str, np.ndarray]] = None
 
-
-PICK_SINGLE_SYNSET_TEMPLATE = """\
-Below are a list of synsets from WordNet2022 along with their definitions, lemmas, hypernyms, and hyponyms.\
- Pick exactly one synset that best describes the object in the image and respond with that synset's ID. Include\
- no other text in your response.
-"""
 
 PICK_SINGLE_SYNSET_USING_OBJECT_INFO_TEMPLATE = """\
 I have an object with description:
@@ -65,18 +57,10 @@ def synset_to_summary_str(synset: str) -> str:
     )
 
 
-def prompt_for_best_synset(synsets: Sequence[str]) -> str:
-    return (
-        PICK_SINGLE_SYNSET_TEMPLATE
-        + "\n"
-        + "\n\n".join([synset_to_summary_str(s) for s in synsets])
-    )
-
-
 def synset_embeddings():
     global _SYNSET_EMBEDDINGS
     if _SYNSET_EMBEDDINGS is None:
-        _SYNSET_EMBEDDINGS = get_synset_embeddings()
+        _SYNSET_EMBEDDINGS = _load_synset_embeddings()
         print(f"Loaded {len(_SYNSET_EMBEDDINGS)} embeddings")
     return _SYNSET_EMBEDDINGS
 

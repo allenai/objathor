@@ -1,11 +1,15 @@
-import glob
+import gzip
+import json
+import multiprocessing as mp
 import os
+import tarfile
 from argparse import ArgumentParser
-from typing import Dict, Callable, Union, Sequence
+from typing import Dict, Callable, Union, Sequence, Optional
 
 import PIL.Image as Image
 import compress_json
 import compress_pickle
+import numpy as np
 import torch
 import tqdm
 
@@ -26,6 +30,7 @@ except ImportError:
         f"sentence_transformers is not installed, make sure to run 'pip install sentence_transformers' to install it."
     )
 
+
 from torch.utils.data import Dataset, DataLoader
 
 if torch.cuda.is_available():
@@ -36,20 +41,32 @@ else:
     DEFAULT_DEVICE = "cpu"
 
 
-class ObjectDataset(Dataset):
+def str2bool(val: str):
+    val = val.lower()
+    if val in ("y", "yes", "t", "true", "on", "1"):
+        return 1
+    elif val in ("n", "no", "f", "false", "off", "0"):
+        return 0
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
+
+
+class ObjectDatasetDirs(Dataset):
     def __init__(
         self,
         asset_dir: str,
         annotations: Dict[str, ObjectAnnotation],
         image_preprocessor: Callable,
         img_angles: Sequence[float] = (0.0, 45.0, 315.0),
+        uids_to_skip: Optional[Sequence[str]] = None,
     ):
         self.annotations = annotations
         self.asset_dir = asset_dir
         self.image_preprocessor = image_preprocessor
         self.img_angles = img_angles
+        self.uids_to_skip = set(uids_to_skip or [])
 
-        self.uids = sorted(
+        uids = sorted(
             [
                 k
                 for k, v in self.annotations.items()
@@ -60,6 +77,7 @@ class ObjectDataset(Dataset):
                 )
             ]
         )
+        self.uids = [uid for uid in uids if uid not in self.uids_to_skip]
         assert len(self.uids) > 0, "No valid uids found in the annotations."
 
         if self.image_preprocessor is not None:
@@ -115,16 +133,127 @@ class ObjectDataset(Dataset):
         return item
 
 
+def _check_tar_success(tar_path: str):
+    with tarfile.open(tar_path, "r:*") as tar:
+        if any(k.endswith("success.txt") for k in tar.getnames()):
+            return True
+        else:
+            return False
+
+
+class ObjectDatasetTars(Dataset):
+    def __init__(
+        self,
+        asset_dir: str,
+        image_preprocessor: Callable,
+        img_angles: Sequence[float] = (0.0, 45.0, 315.0),
+        max_processes: int = 32,
+        load_chunksize: int = 16,
+        uids_to_skip: Optional[Sequence[str]] = None,
+    ):
+        self.asset_dir = asset_dir
+        self.image_preprocessor = image_preprocessor
+        self.img_angles = img_angles
+        self.uids_to_skip = set(uids_to_skip or [])
+
+        tar_files = sorted([f for f in os.listdir(asset_dir) if f.endswith(".tar")])
+
+        with mp.Pool(min(max_processes, os.cpu_count() or 1)) as pool:
+            is_tar_good = list(
+                tqdm.tqdm(
+                    pool.imap(
+                        _check_tar_success,
+                        [os.path.join(asset_dir, f) for f in tar_files],
+                        chunksize=load_chunksize,
+                    ),
+                    total=len(tar_files),
+                    desc="Loading tar files.",
+                )
+            )
+
+        assert len(tar_files) == len(
+            is_tar_good
+        ), "Number of tar files and is_tar_good do not match."
+
+        print(
+            f"Of {len(is_tar_good)} files, {sum(is_tar_good)} were successful and will be processed."
+        )
+
+        # Sorting again shouldn't be necessary, but just in case
+        self.tar_files = sorted([f for f, good in zip(tar_files, is_tar_good) if good])
+
+        uids = [tf[: -len(".tar")] for tf in self.tar_files]
+        self.uids = [uid for uid in uids if uid not in self.uids_to_skip]
+
+    def __len__(self) -> int:
+        return len(self.uids)
+
+    def __getitem__(self, idx: int) -> Dict[str, Union[int, torch.Tensor]]:
+        uid = self.uids[idx]
+
+        tar_path = os.path.join(self.asset_dir, f"{uid}.tar")
+
+        with tarfile.open(tar_path, "r:*") as asset_tf:
+
+            with asset_tf.extractfile(f"{uid}/annotations.json.gz") as f:
+                bytes = f.read()
+                ann_str = gzip.decompress(bytes)
+                ann = json.loads(ann_str)
+
+            item = {
+                "idx": idx,
+                "uid": uid,
+                "text": (
+                    ann["description"]
+                    if ann.get("description") is not None
+                    else ann["description_auto"]
+                ),
+            }
+
+            if self.image_preprocessor is not None:
+                # angle = float(np.rad2deg(ann["pose_z_rot_angle"])) # Used for blender renders
+
+                for angle in self.img_angles:
+
+                    img_path = f"{uid}/thor_renders/0_1_0_{angle:.1f}.jpg"
+
+                    with asset_tf.extractfile(img_path) as f:
+                        item[f"img_{angle:.1f}"] = self.image_preprocessor(
+                            Image.open(f)
+                        )
+
+            return item
+
+
 def generate_features(
     base_dir: str,
-    assets_dir: str,
+    asset_dir: str,
     annotations_path: str,
     device: str,
     batch_size: int,
     num_workers: int,
+    tarred_assets: bool,
 ):
     base_dir = os.path.join(base_dir, "features")
     os.makedirs(base_dir, exist_ok=True)
+
+    clip_save_path = os.path.join(base_dir, "clip_features.pkl")
+    sbert_save_path = os.path.join(base_dir, "sbert_features.pkl")
+
+    uids_to_skip = None
+    old_clip_features_dict = None
+    old_sbert_features_dict = None
+    if os.path.exists(clip_save_path):
+        print(
+            f"Found existing clip features at {clip_save_path}, will attempt to load and only generate new features."
+        )
+        old_clip_features_dict = compress_pickle.load(clip_save_path)
+        old_sbert_features_dict = compress_pickle.load(sbert_save_path)
+
+        uids_to_skip = old_clip_features_dict["uids"]
+        assert (
+            uids_to_skip == old_sbert_features_dict["uids"]
+        ), "UIDs in clip and sbert features do not match."
 
     # CLIP
     device = torch.device(device)
@@ -138,11 +267,19 @@ def generate_features(
     # Sentence BERT
     sbert_model = SentenceTransformer("all-mpnet-base-v2").to(device)
 
-    dataset = ObjectDataset(
-        annotations=compress_json.load(annotations_path),
-        asset_dir=assets_dir,
-        image_preprocessor=clip_img_preprocessor,
-    )
+    if tarred_assets:
+        dataset = ObjectDatasetTars(
+            asset_dir=asset_dir,
+            image_preprocessor=clip_img_preprocessor,
+            uids_to_skip=uids_to_skip,
+        )
+    else:
+        dataset = ObjectDatasetDirs(
+            annotations=compress_json.load(annotations_path),
+            asset_dir=asset_dir,
+            image_preprocessor=clip_img_preprocessor,
+            uids_to_skip=uids_to_skip,
+        )
 
     dataloader = DataLoader(
         dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
@@ -186,6 +323,25 @@ def generate_features(
         torch.cat(sbert_text_features, dim=0).numpy().astype("float16")
     )
 
+    if uids_to_skip is not None:
+        uids = uids_to_skip + uids
+
+        clip_img_features = np.concatenate(
+            [old_clip_features_dict["img_features"], clip_img_features], axis=0
+        )
+        clip_text_features = np.concatenate(
+            [old_clip_features_dict["text_features"], clip_text_features], axis=0
+        )
+        sbert_text_features = np.concatenate(
+            [old_sbert_features_dict["text_features"], sbert_text_features], axis=0
+        )
+
+    sort_index = np.argsort(uids)
+    uids = [uids[i] for i in sort_index]
+    clip_img_features = clip_img_features[sort_index]
+    clip_text_features = clip_text_features[sort_index]
+    sbert_text_features = sbert_text_features[sort_index]
+
     compress_pickle.dump(
         {
             "uids": uids,
@@ -217,11 +373,18 @@ def main():
         help="Base directory for datasets.",
     )
     parser.add_argument(
-        "--assets_dir",
+        "--asset_dir",
         type=str,
         help="Assets directory, will default to <base_dir>/assets if not specified.",
     )
-
+    parser.add_argument(
+        "--tarred_assets",
+        type=str2bool,
+        required=True,
+        help="If true, assumes all of the assets in <asset_dir> have been tar'ed into individual files, one"
+        " per object. These files should contain the thor image renders and the object annotation.json.gz file."
+        " If False, assumes the assets are in individual directories with the object annotations and renders.",
+    )
     parser.add_argument(
         "--device",
         type=str,
@@ -237,15 +400,15 @@ def main():
     parser.add_argument(
         "--annotations_path",
         type=str,
-        default="",
+        default=None,
         help="Path to the annotations file for all objects. See the aggregate_asset_annotations.py script."
         "Defaults to <base_dir>/annotations.json.gz if not specified.",
     )
     args = parser.parse_args()
 
     # Setting up save / loading paths
-    assets_dir = (
-        args.assets_dir if args.assets_dir else os.path.join(args.base_dir, "assets")
+    asset_dir = (
+        args.asset_dir if args.asset_dir else os.path.join(args.base_dir, "assets")
     )
     annotations_path = (
         args.annotations_path
@@ -255,11 +418,12 @@ def main():
 
     generate_features(
         base_dir=args.base_dir,
-        assets_dir=assets_dir,
+        asset_dir=asset_dir,
         annotations_path=annotations_path,
         device=args.device,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
+        tarred_assets=args.tarred_assets,
     )
 
 

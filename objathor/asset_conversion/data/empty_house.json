@@ -98,16 +98,16 @@
    ],
    "proceduralParameters":{
       "ceilingColor":{
-         "b":0.25882352941176473,
-         "g":0.26666666666666666,
-         "r":0.2627450980392157
+         "b":1.0,
+         "g":1.0,
+         "r":1.0
       },
       "ceilingMaterial":{
          "name":"PureWhite",
          "color":{
-            "b":0.25882352941176473,
-            "g":0.26666666666666666,
-            "r":0.2627450980392157
+            "b":1.0,
+            "g":1.0,
+            "r":1.0
          }
       },
       "floorColliderThickness":1.0,
@@ -115,7 +115,7 @@
          {
             "id":"DirectionalLight0",
             "indirectMultiplier":1.0,
-            "intensity":1.0,
+            "intensity":0.5,
             "position":{
                "x":0,
                "y":0,
@@ -144,7 +144,7 @@
          {
             "id":"DirectionalLight1",
             "indirectMultiplier":1.0,
-            "intensity":1.0,
+            "intensity":0.5,
             "position":{
                "x":0,
                "y":0,
@@ -173,7 +173,7 @@
          {
             "id":"DirectionalLight2",
             "indirectMultiplier":1.0,
-            "intensity":1.0,
+            "intensity":0.5,
             "position":{
                "x":0,
                "y":0,
@@ -202,7 +202,7 @@
          {
             "id":"DirectionalLight3",
             "indirectMultiplier":1.0,
-            "intensity":1.0,
+            "intensity":0.5,
             "position":{
                "x":0,
                "y":0,
@@ -231,7 +231,7 @@
          {
             "id":"DirectionalLight4",
             "indirectMultiplier":1.0,
-            "intensity":1.0,
+            "intensity":0.5,
             "position":{
                "x":0,
                "y":0,
@@ -260,7 +260,7 @@
          {
             "id":"DirectionalLight5",
             "indirectMultiplier":1.0,
-            "intensity":1.0,
+            "intensity":0.5,
             "position":{
                "x":0,
                "y":0,

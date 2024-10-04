@@ -1,32 +1,37 @@
 import argparse
-import glob
 import os
 import sys
+import traceback
 from functools import lru_cache
-from importlib import import_module
-from typing import Union, Callable, Any, Dict, Optional, cast, Literal
+from typing import Optional, cast
 
 import compress_json
-import compress_pickle
 import numpy as np
 import objaverse
 from ai2thor.controller import Controller
 
-from objathor.annotation.gpt_from_views import get_initial_annotation
+from objathor.annotation.glb_to_annotation_pipeline import (
+    NUM_BLENDER_RENDER_TRIES,
+    write,
+    annotate_asset,
+    async_annotate_asset,
+)
 from objathor.annotation.objaverse_annotations_utils import (
     get_objaverse_home_annotations,
     get_objaverse_ref_categories,
+    compute_clip_vit_l_similarity,
 )
-from objathor.asset_conversion.pipeline_to_thor import optimize_assets_for_thor
+from objathor.asset_conversion.optimization_pipeline import optimize_assets_for_thor
 from objathor.asset_conversion.util import get_blender_installation_path
 from objathor.constants import OBJATHOR_CACHE_PATH
-from objathor.utils.blender import render_glb_from_angles
+from objathor.utils.blender import render_glb_from_angles, BlenderRenderError
 from objathor.utils.download_utils import download_with_locking
-
-
-@lru_cache(maxsize=1)
-def base_objaverse_annotations():
-    return objaverse.load_annotations()
+from objathor.utils.image_processing import verify_images_are_not_all_white
+from objathor.utils.types import (
+    PROCESSED_ASSET_EXTENSIONS,
+    ObjathorStatus,
+    ObjathorInfo,
+)
 
 
 @lru_cache(maxsize=1)
@@ -40,91 +45,6 @@ def objaverse_license_info():
         lock_path=save_path + ".lock",
     )
     return compress_json.load(save_path)
-
-
-def write(
-    anno: Dict[str, Any],
-    output_file: Union[str, Callable[[Dict[str, Any]], Optional[Any]]],
-    **kwargs: Any,
-) -> None:
-    if isinstance(output_file, str):
-        if output_file.endswith(".json.gz"):
-            compress_json.dump(anno, output_file, json_kwargs=dict(indent=2))
-        elif output_file.endswith(".pickle.gz") or output_file.endswith(".pkl.gz"):
-            compress_pickle.dump(anno, output_file)
-        else:
-            try:
-                module_name, function_name = output_file.rsplit(".", 1)
-                getattr(import_module(module_name), function_name)(anno, **kwargs)
-            except (SystemExit, KeyboardInterrupt):
-                raise
-            except Exception as e:
-                print("Error", e)
-                raise NotImplementedError(
-                    "Only .pkl.gz and .json.gz supported, besides appropriate library function identifiers"
-                )
-    elif isinstance(output_file, Callable):
-        output_file(anno)
-    else:
-        raise NotImplementedError(
-            f"Unsupported output_file arg of type {type(output_file).__name__}"
-        )
-
-
-def annotate_asset(
-    uid: str,
-    glb_path: str,
-    output_dir: str,
-    render_angles=(0, 90, 180, 270),
-    delete_blender_render_dir=False,
-    allow_overwrite=False,
-    extra_anns: Optional[Dict[str, Any]] = None,
-    **kwargs: Any,
-) -> None:
-    save_path = os.path.join(output_dir, f"annotations.json.gz")
-    if os.path.exists(save_path) and not allow_overwrite:
-        raise ValueError(
-            f"Annotations already exist at {save_path} and allow_overwrite is False"
-        )
-    render_dir = os.path.join(output_dir, "blender_renders")
-    os.makedirs(render_dir, exist_ok=True)
-    try:
-        render_glb_from_angles(
-            glb_path=glb_path,
-            save_dir=render_dir,
-            angles=render_angles,
-        )
-
-        anno, urls = get_initial_annotation(
-            uid,
-            thumbnail_urls_cfg=dict(
-                base_url=render_dir,
-                view_indices=[str(float(angle)) for angle in render_angles],
-                local_renders=True,
-            ),
-        )
-
-        # -1.0 * ... needed to undo the rotation of the object in the render
-        anno["pose_z_rot_angle"] = -1.0 * np.deg2rad(render_angles[anno["frontView"]])
-
-        anno["scale"] = float(anno["height"]) / 100
-        anno["z_axis_scale"] = True
-
-        anno["uid"] = uid
-
-        if extra_anns is None:
-            extra_anns = {}
-
-        write({**anno, **extra_anns}, save_path, **kwargs)
-    finally:
-        if delete_blender_render_dir:
-            if os.path.exists(render_dir):
-                for p in glob.glob(os.path.join(render_dir, "*.png")) + glob.glob(
-                    os.path.join(render_dir, "*.jpg")
-                ):
-                    os.remove(p)
-
-                os.rmdir(render_dir)
 
 
 def add_annotation_arguments(
@@ -149,7 +69,7 @@ def add_annotation_arguments(
         type=str,
         required=True,
         help=(
-            "The output directory to write to (in particular, data will be saved to `<output>/<uid>/*`."
+            "The output directory to write to (in particular, data will be saved to `<output>/<uid>/*`)."
         ),
     )
     parser.add_argument(
@@ -157,11 +77,16 @@ def add_annotation_arguments(
         action="store_true",
         help="If annotations already exist for this asset in Objaverse-Home, use them instead of generating new ones.",
     )
-    # parser.add_argument(
-    #     "--local_render",
-    #     action="store_true",
-    #     help="Generate object views to be uploaded to GPT locally (requires blender)",
-    # )
+    parser.add_argument(
+        "--compute_similarity",
+        action="store_true",
+        help="Compute the cosine similarity between the blender and THOR renders and store it in the annotations.",
+    )
+    parser.add_argument(
+        "--async_host_and_port",
+        type=str,
+        help="Host and port of the async server to use for annotation (a OpenAIBatchServer should have been launched on this host and port).",
+    )
     return parser
 
 
@@ -200,10 +125,10 @@ def add_optimization_arguments(
         help="Adds house creation with single object and look at object center actions to json.",
     )
     parser.add_argument(
-        "--width", type=int, default=300, help="Width of THOR asset visualization."
+        "--width", type=int, default=512, help="Width of THOR asset visualization."
     )
     parser.add_argument(
-        "--height", type=int, default=300, help="Height of THOR asset visualization."
+        "--height", type=int, default=512, help="Height of THOR asset visualization."
     )
     parser.add_argument(
         "--skybox_color",
@@ -222,11 +147,6 @@ def add_optimization_arguments(
         default=".json",
     )
     parser.add_argument(
-        "--send_asset_to_controller",
-        action="store_true",
-        help="Sends all the asset data to the thor controller.",
-    )
-    parser.add_argument(
         "--blender_as_module",
         action="store_true",
         help="Runs blender as a module. Requires bpy to be installed in python environment.",
@@ -235,6 +155,12 @@ def add_optimization_arguments(
         "--keep_json_asset",
         action="store_true",
         help="Whether it keeps the intermediate .json asset file when storing in a different format to json.",
+    )
+    parser.add_argument(
+        "--optimization_timeout",
+        type=int,
+        default=None,
+        help="Timeout for the optimization pipeline.",
     )
 
     found_blender = False
@@ -285,20 +211,32 @@ def annotate_and_optimize_asset(
     skip_thor_metadata: bool,
     skip_thor_render: bool,
     add_visualize_thor_actions: bool,
-    width: int,
-    height: int,
+    width: Optional[int],
+    height: Optional[int],
     skybox_color: str,
     absolute_texture_paths: bool,
-    extension: Literal[".json", "json.gz", ".pkl.gz", ".msgpack", ".msgpack.gz"],
-    send_asset_to_controller: bool,
+    extension: PROCESSED_ASSET_EXTENSIONS,
     blender_as_module: bool,
-    blender_installation_path: str,
     thor_platform: str,
     keep_json_asset: bool,
+    compute_blender_thor_similarity: bool,
+    blender_installation_path: Optional[str] = None,
     controller: Optional[Controller] = None,
-) -> None:
-    output_dir_with_uid = cast(str, os.path.join(output_dir, uid))
+    async_host_and_port: Optional[str] = None,
+    optimization_timeout: Optional[int] = None,
+) -> ObjathorInfo:
+    if controller is not None:
+        assert (width is None or controller.last_event.frame.shape[1] == width) and (
+            height is None or controller.last_event.frame.shape[0] == height
+        ), (
+            f"Input height ({height}) or width ({width}) do not match the"
+            f" input controller's frame shape ({controller.last_event.frame.shape})"
+        )
+
+    output_dir_with_uid = cast(str, os.path.abspath(os.path.join(output_dir, uid)))
     os.makedirs(output_dir_with_uid, exist_ok=True)
+
+    print(f"Saving to {output_dir_with_uid}")
 
     objaverse_uids = objaverse.load_uids()
     is_objaverse = uid in objaverse_uids
@@ -308,29 +246,63 @@ def annotate_and_optimize_asset(
         license_info["license_info"] = objaverse_license_info()[uid]
 
     if glb_path is None:
+        assert uid is not None
         assert is_objaverse, "If glb_path is not provided, uid must be an objaverse uid"
         glb_path = objaverse.load_objects([uid])[uid]
 
     def render_with_blender():
         blender_render_dir = os.path.join(output_dir_with_uid, "blender_renders")
-        if len(glob.glob(os.path.join(blender_render_dir, "*"))) < 4:
-            os.makedirs(blender_render_dir)
-            render_glb_from_angles(
-                glb_path=glb_path,
-                save_dir=blender_render_dir,
-                angles=(0, 90, 180, 270),
-                blender_as_module=blender_as_module,
-            )
-            if len(glob.glob(os.path.join(blender_render_dir, "*"))) < 4:
-                raise ValueError(
-                    f"Failed to render the glb at {glb_path} with blender at {blender_render_dir}"
+        os.makedirs(blender_render_dir, exist_ok=True)
+
+        angles = (0, 90, 180, 270)
+
+        blender_render_paths = []
+
+        def enough_renders():
+            return len(blender_render_paths) >= len(angles)
+
+        for _ in range(NUM_BLENDER_RENDER_TRIES):
+            if enough_renders():
+                break
+
+            render_info = {"status": ObjathorStatus.RENDER_SUCCESS}
+            try:
+                blender_render_paths = render_glb_from_angles(
+                    glb_path=glb_path,
+                    save_dir=blender_render_dir,
+                    angles=angles,
+                    blender_as_module=blender_as_module,
                 )
+            except BlenderRenderError:
+                blender_render_paths = []
+                render_info = {
+                    "status": ObjathorStatus.BLENDER_RENDER_FAIL,
+                    "exception": traceback.format_exc(),
+                }
+
+            if len(blender_render_paths) != len(
+                angles
+            ) or not verify_images_are_not_all_white(blender_render_paths):
+                render_info = {"status": ObjathorStatus.BLENDER_RENDER_FAIL}
+
+        return render_info
 
     # ANNOTATION
     annotations_path = os.path.join(output_dir_with_uid, f"annotations.json.gz")
+    annotations_path_no_gz = annotations_path[: -len(".gz")]
+
+    if os.path.exists(annotations_path_no_gz) and not os.path.exists(annotations_path):
+        compress_json.dump(
+            compress_json.load(annotations_path_no_gz),
+            annotations_path,
+            json_kwargs=dict(indent=2),
+        )
+
     if os.path.exists(annotations_path):
         print(f"Annotations already exist at {annotations_path}, will use these.")
-        render_with_blender()
+        render_info = render_with_blender()
+        if render_info["status"].is_fail():
+            return render_info
     else:
         if (
             is_objaverse
@@ -342,19 +314,34 @@ def annotate_and_optimize_asset(
                 anno["ref_category"] = get_objaverse_ref_categories()[uid]
             write({**anno, **license_info}, annotations_path)
 
-            render_with_blender()
+            render_info = render_with_blender()
+            if render_info["status"].is_fail():
+                return render_info
         else:
-            annotate_asset(
-                uid=uid,
-                glb_path=glb_path,
-                output_dir=output_dir_with_uid,
-                extra_anns=license_info,
-            )
+            if async_host_and_port is not None:
+                annotation_info = async_annotate_asset(
+                    uid=uid,
+                    glb_path=glb_path,
+                    output_dir=output_dir_with_uid,
+                    extra_anns=license_info,
+                    async_host_and_port=async_host_and_port,
+                )
+            else:
+                annotation_info = annotate_asset(
+                    uid=uid,
+                    glb_path=glb_path,
+                    output_dir=output_dir_with_uid,
+                    extra_anns=license_info,
+                )
+
+            if not annotation_info["status"].is_success():
+                return annotation_info
 
     # OPTIMIZATION
-    optimize_assets_for_thor(
+    optimization_info = optimize_assets_for_thor(
         output_dir=output_dir,
-        uid_to_glb_path={uid: glb_path},
+        uid=uid,
+        glb_path=glb_path,
         annotations_path=output_dir,
         max_colliders=max_colliders,
         skip_conversion=False,
@@ -371,34 +358,67 @@ def annotate_and_optimize_asset(
         height=height,
         skip_thor_render=skip_thor_render,
         skybox_color=tuple(map(int, skybox_color.split(","))),
-        send_asset_to_controller=send_asset_to_controller,
         add_visualize_thor_actions=add_visualize_thor_actions,
         controller=controller,
+        timeout=optimization_timeout,
     )
 
-    # TODO: Should we use CLIP to validate that the assets still look like the blender renders? Example below
-    # import clip
-    # import torch
-    # import numpy as np
-    # from PIL import Image
-    #
-    # annotations = compress_json.load(annotations_path)
-    # blender_render_path = os.path.join(output_dir_with_uid, "blender_renders", f"render_{-annotations['pose_z_rot_angle']:0.1f}.png")
-    #
-    # blender_img = np.array(Image.open(blender_render_path).convert("RGBA"), dtype=np.uint8)
-    # blender_img[blender_img[:, :, 3] == 0] = 255
-    # blender_img = blender_img[:,:,:3]
-    #
-    # thor_img = np.array(Image.open(os.path.join(output_dir_with_uid, "thor_renders", f"0_1_0_90.jpg")).convert("RGB"), dtype=np.uint8
-    #
-    # model, preprocess = clip.load("RN50", device="cpu")
-    # model.eval()
-    #
-    # with torch.no_grad():
-    #     blender_features = model.encode_image(preprocess(Image.fromarray(blender_img)).unsqueeze(0))
-    #     thor_features = model.encode_image(preprocess(Image.fromarray(thor_img)).unsqueeze(0))
-    #
-    #     print(torch.cosine_similarity(blender_features, thor_features))
+    if not optimization_info["status"].is_success():
+        return optimization_info
+
+    if compute_blender_thor_similarity:
+
+        annotations = compress_json.load(annotations_path)
+
+        thor_render_path = os.path.join(
+            output_dir_with_uid, "thor_renders", f"0_1_0_0.0.jpg"
+        )
+        if optimization_info.get(
+            "blender_thor_similarity"
+        ) is not None and not optimization_info.get("any_change", True):
+            print(
+                f"Skipping thor/blender similarity computation as this field"
+                f" already exists in the annotations and we have not detected any change in the blender/thor renders."
+            )
+        if not os.path.exists(thor_render_path):
+            print(
+                f"THOR render does not exist at {thor_render_path}, will not compute similarity."
+            )
+        else:
+            print("Computing similarity between blender and THOR renders.")
+            try:
+                import torch
+
+                if controller is not None and controller.gpu_device is not None:
+                    device = torch.device(controller.gpu_device)
+                else:
+                    device = torch.device("cpu")
+
+                blender_render_path = os.path.join(
+                    output_dir_with_uid,
+                    "blender_renders",
+                    f"render_{(-np.rad2deg(annotations['pose_z_rot_angle'])) % 360:0.1f}.jpg",
+                )
+
+                sim = compute_clip_vit_l_similarity(
+                    img_path0=blender_render_path,
+                    img_path1=thor_render_path,
+                    device=device,
+                )
+                annotations["blender_thor_similarity"] = sim
+                compress_json.dump(
+                    obj=annotations,
+                    path=annotations_path,
+                    json_kwargs=dict(indent=2),
+                )
+            except (SystemExit, KeyboardInterrupt):
+                raise
+            except:
+                print(
+                    f"Failed to compute similarity, will not store in annotations, traceback:\n{traceback.format_exc()}"
+                )
+
+    return {"status": ObjathorStatus.SUCCESS}
 
 
 if __name__ == "__main__":
@@ -418,9 +438,10 @@ if __name__ == "__main__":
         skybox_color=args.skybox_color,
         absolute_texture_paths=args.absolute_texture_paths,
         extension=args.extension,
-        send_asset_to_controller=args.send_asset_to_controller,
         blender_as_module=args.blender_as_module,
         blender_installation_path=args.blender_installation_path,
         thor_platform=args.thor_platform,
         keep_json_asset=args.keep_json_asset,
+        compute_blender_thor_similarity=args.compute_similarity,
+        async_host_and_port=args.async_host_and_port,
     )

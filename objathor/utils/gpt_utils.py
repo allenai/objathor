@@ -4,6 +4,7 @@ from typing import List, Any, Callable, Sequence
 import openai
 from tqdm import tqdm
 
+from objathor.annotation.annotation_utils import compute_llm_cost
 from objathor.utils.queries import Message, ComposedMessage
 
 GPT_TIMEOUT_SECONDS = 10
@@ -13,6 +14,7 @@ DEFAULT_MAX_ATTEMPTS = 10
 DEFAULT_EMBED = "text-embedding-ada-002"
 
 _OPENAI_CLIENT = None
+_OPENAI_BATCH_CLIENT = None
 
 
 def client() -> openai.OpenAI:
@@ -98,6 +100,10 @@ def get_embedding(
     return access_gpt_with_retries(func=embedding_create, max_attempts=max_attempts)
 
 
+def message_to_content(msg: Message):
+    return msg.gpt() if isinstance(msg, ComposedMessage) else [msg.gpt()]
+
+
 def get_answer(
     prompt: Sequence[Message],
     dialog: Sequence[Message],
@@ -106,9 +112,6 @@ def get_answer(
     verbose: bool = True,
     **chat_completion_cfg: Any,
 ) -> str:
-    def message_to_content(msg):
-        return msg.gpt() if isinstance(msg, ComposedMessage) else [msg.gpt()]
-
     messages = [
         dict(role=msg.role, content=message_to_content(msg)) for msg in prompt
     ] + [dict(role=msg.role, content=message_to_content(msg)) for msg in dialog]
@@ -130,7 +133,8 @@ def get_answer(
             print(
                 f"Prompt tokens: {pt}."
                 f" Completion tokens: {ct}."
-                f" Approx cost: ${(pt * 0.01 + ct * 0.03)/1000:.2g}."
+                f" Approx cost: ${compute_llm_cost(input_tokens=pt, output_tokens=ct, model=model):.2g}.",
+                flush=True,
             )
 
         return res
