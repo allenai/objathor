@@ -11,9 +11,7 @@ WORKDIR /objathor
 
 RUN pip install -e ".[annotation]"
 
-ENTRYPOINT []
-CMD ["python3.10", "-m", "objathor.asset_conversion.optimization_pipeline", \
-     "--uids=model", \
+ENTRYPOINT ["python3.10", "-m", "objathor.asset_conversion.optimization_pipeline", \
      "--glb_paths=/input/model.glb", \
      "--output_dir=/output", \
      "--extension=.pkl.gz", \
