@@ -23,7 +23,9 @@ class DatasetSaveConfig:
 
     @BASE_BUCKET_URL.default
     def _default_base_bucket_url(self) -> str:
-        if self.VERSION == "2024_08_16":
+        if self.VERSION == "2025_06_10":
+            return "https://pub-ddc5ca49fcee4247b552f4217e910a0f.r2.dev"
+        elif self.VERSION == "2024_08_16":
             return "https://pub-2619544d52bd4f35927b08d301d2aba0.r2.dev"
         else:
             return "https://pub-daedd7738a984186a00f2ab264d06a07.r2.dev"
@@ -34,7 +36,9 @@ class DatasetSaveConfig:
 
     @property
     def VERSIONED_BUCKET_URL(self) -> str:
-        if self.VERSION == "2024_08_16":
+        if self.VERSION == "2025_06_10":
+            return self.BASE_BUCKET_URL
+        elif self.VERSION == "2024_08_16":
             return self.BASE_BUCKET_URL
         else:
             return f"{self.BASE_BUCKET_URL}/{self.VERSION}"
