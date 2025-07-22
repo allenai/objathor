@@ -898,28 +898,30 @@ def main(args):
         raise ValueError("Must specify either `uids` or `glb_paths`.")
 
     # noinspection PyTestUnpassedFixture
-    optimize_assets_for_thor(
-        output_dir=args.output_dir,
-        uid_to_glb_path=uid_to_glb_path,
-        annotations_path=args.annotations,
-        max_colliders=args.max_colliders,
-        skip_conversion=args.skip_conversion,
-        skip_colliders=args.skip_colliders,
-        skip_thor_metadata=args.skip_thor_metadata,
-        skip_thor_render=args.skip_thor_render,
-        blender_as_module=args.blender_as_module,
-        extension=args.extension,
-        thor_platform=args.thor_platform,
-        blender_installation_path=args.blender_installation_path,
-        live=args.live,
-        absolute_texture_paths=args.absolute_texture_paths,
-        delete_objs=args.delete_objs,
-        keep_json_asset=args.keep_json_asset,
-        width=args.width,
-        height=args.height,
-        skybox_color=tuple(map(int, args.skybox_color.split(","))),
-        add_visualize_thor_actions=args.add_visualize_thor_actions,
-    )
+    for uid, glb in uid_to_glb_path.items():
+        optimize_assets_for_thor(
+            output_dir=args.output_dir,
+            uid=uid,
+            glb_path=glb,
+            annotations_path=args.annotations,
+            max_colliders=args.max_colliders,
+            skip_conversion=args.skip_conversion,
+            skip_colliders=args.skip_colliders,
+            skip_thor_metadata=args.skip_thor_metadata,
+            skip_thor_render=args.skip_thor_render,
+            blender_as_module=args.blender_as_module,
+            extension=args.extension,
+            thor_platform=args.thor_platform,
+            blender_installation_path=args.blender_installation_path,
+            live=args.live,
+            absolute_texture_paths=args.absolute_texture_paths,
+            delete_objs=args.delete_objs,
+            keep_json_asset=args.keep_json_asset,
+            width=args.width,
+            height=args.height,
+            skybox_color=tuple(map(int, args.skybox_color.split(","))),
+            add_visualize_thor_actions=args.add_visualize_thor_actions,
+        )
 
 
 if __name__ == "__main__":
