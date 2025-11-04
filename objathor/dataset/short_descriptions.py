@@ -424,6 +424,24 @@ class BatchActions:
 
         return responses
 
+    def complete(self) -> List[Dict[str, str]]:
+        responses = []
+
+        for custom_id, query_dict in tqdm(
+            self.data_source.iterator(), total=len(self.data_source), desc="Processing"
+        ):
+            response = self.client.chat.completions.create(**query_dict["body"])
+            actual_uuid = self.data_source.dataset.filtered_ids[int(custom_id.split("_")[1])]
+            responses.append(
+                dict(uuid=actual_uuid, description=json.loads(response.choices[0].message.content))
+            )
+            print(responses[-1])
+
+        print("JSON DUMP")
+        print(json.dumps(responses))
+
+        return responses
+
     def submit(self, batch_ids_path: str):
         if os.path.exists(batch_ids_path):
             print(f"Batch IDs file {batch_ids_path} exists, skipping resubmission")
@@ -605,11 +623,18 @@ Using the specified amount of words, describe the object in simple words keeping
         encode_query: bool = True,
         num_queries: int | None = None,
         first_query: int = 0,
+        uuids_file: str = None,
     ):
         self.encode_query = encode_query
         self.annotation = SharedJSONDatabase()
 
         valid_ids = set(sum([split_items for split, split_items in get_split_to_whitelisted_assets().items()], []))
+        if uuids_file is not None:
+            with open(uuids_file) as f:
+                to_process_uuids = {line[:-1] for line in f.readlines()}
+            assert len(to_process_uuids - valid_ids) == 0
+            valid_ids = to_process_uuids
+            assert len(valid_ids & set(self.annotation.keys())) == len(valid_ids)
         self.filtered_ids = sorted(valid_ids & set(self.annotation.keys()))
 
         if num_queries is not None:
@@ -680,6 +705,11 @@ if __name__ == "__main__":
             "--num_queries", help="number of queries to submit", default=1, type=int
         )
 
+        immediate_parser = subparsers.add_parser("complete")
+        immediate_parser.add_argument(
+            "uuids_file", help="file with uuids to process"
+        )
+
         return parser.parse_args()
 
     def main():
@@ -708,6 +738,15 @@ if __name__ == "__main__":
         elif args.command == "retrieve":
             actions = BatchActions()
             actions.retrieve(args.batch_ids_file, args.out_dir, save_source=True)
+
+        elif args.command == "complete":
+            actions = BatchActions(
+                MergeDescriptionQueryDataset(
+                    encode_query=False,
+                    uuids_file=args.uuids_file,
+                )
+            )
+            responses = actions.complete()
 
         else:
             raise NotImplementedError
