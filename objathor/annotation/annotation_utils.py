@@ -8,6 +8,8 @@ MODEL_STR_TO_PRICE_PER_1M_INPUT_TOKENS = {
     "gpt-4o-2024-05-13": 5.0,
     "gpt-4o-2024-08-06": 2.5,
     "gpt-4o-mini-2024-07-18": 0.15,
+    "gpt-4.1": 2.0,
+    "gpt-4.1-mini": 0.4,
 }
 
 MODEL_STR_TO_PRICE_PER_1M_OUTPUT_TOKENS = {
@@ -18,6 +20,8 @@ MODEL_STR_TO_PRICE_PER_1M_OUTPUT_TOKENS = {
     "gpt-4o-2024-05-13": 15.0,
     "gpt-4o-2024-08-06": 10.0,
     "gpt-4o-mini-2024-07-18": 0.6,
+    "gpt-4.1": 8.0,
+    "gpt-4.1-mini": 1.6,
 }
 
 

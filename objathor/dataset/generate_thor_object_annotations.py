@@ -98,9 +98,9 @@ def annotate_procthor_asset(
 ):
     print(f"Starting object '{asset_id}'")
 
-    if asset_id not in OLD_THOR_ANNOTATIONS:
-        warnings.warn(f"[ERROR] Object '{asset_id}' not found in old annotations")
-        return
+    # if asset_id not in OLD_THOR_ANNOTATIONS:
+    #     warnings.warn(f"[ERROR] Object '{asset_id}' not found in old annotations")
+    #     return
 
     asset_base_save_dir = os.path.join(base_out_dir, asset_id)
 
@@ -176,14 +176,15 @@ def annotate_procthor_asset(
     annotations.update(extra_info_kwargs)
     annotations["receptacle"] = obj["receptacle"]
 
-    old_annotations = OLD_THOR_ANNOTATIONS[asset_id]["annotations"]
-    for k in [
-        "onCeiling",
-        "onWall",
-        "onFloor",
-        "onObject",
-    ]:
-        annotations[k] = copy.deepcopy(old_annotations[k])
+    if asset_id in OLD_THOR_ANNOTATIONS:
+        old_annotations = OLD_THOR_ANNOTATIONS[asset_id]["annotations"]
+        for k in [
+            "onCeiling",
+            "onWall",
+            "onFloor",
+            "onObject",
+        ]:
+            annotations[k] = copy.deepcopy(old_annotations[k])
 
     annotations.update(
         {
@@ -197,9 +198,14 @@ def annotate_procthor_asset(
     mins = dict(zip("xyz", aabb.min(0)))
     maxes = dict(zip("xyz", aabb.max(0)))
 
-    annotations["thor_metadata"] = dict(
-        assetMetadata=OLD_THOR_ANNOTATIONS[asset_id]["assetMetadata"]
-    )
+    if asset_id in OLD_THOR_ANNOTATIONS:
+        annotations["thor_metadata"] = dict(
+            assetMetadata=OLD_THOR_ANNOTATIONS[asset_id]["assetMetadata"]
+        )
+    else:
+        annotations["thor_metadata"] = dict(
+            assetMetadata=asset_metadata
+        )
     annotations["thor_metadata"]["assetMetadata"]["boundingBox"] = {
         "min": mins,
         "max": maxes,
@@ -265,7 +271,8 @@ if __name__ == "__main__":
     # Get the current date formatted as as YYYY_MM_DD
     # current_date = datetime.now()
     # formatted_date = current_date.strftime("%Y_%m_%d")
-    formatted_date = "2024_08_05"
+    # formatted_date = "2024_08_05"
+    formatted_date = "2025_11_06"
 
     base_out_dir = os.path.abspath(
         os.path.join(ABS_PATH_OF_OBJATHOR, "out", formatted_date, "thor_object_data")
