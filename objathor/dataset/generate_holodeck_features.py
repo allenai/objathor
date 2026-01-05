@@ -70,8 +70,9 @@ class ObjectDatasetDirs(Dataset):
             [
                 k
                 for k, v in self.annotations.items()
-                if v.get("thor_metadata")
-                and (
+                # if v.get("thor_metadata")
+                # and (
+                if (
                     v.get("description") is not None
                     or v.get("description_auto") is not None
                 )
