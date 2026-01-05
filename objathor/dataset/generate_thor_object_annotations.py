@@ -203,9 +203,7 @@ def annotate_procthor_asset(
             assetMetadata=OLD_THOR_ANNOTATIONS[asset_id]["assetMetadata"]
         )
     else:
-        annotations["thor_metadata"] = dict(
-            assetMetadata=asset_metadata
-        )
+        annotations["thor_metadata"] = dict(assetMetadata=asset_metadata)
     annotations["thor_metadata"]["assetMetadata"]["boundingBox"] = {
         "min": mins,
         "max": maxes,
@@ -266,14 +264,7 @@ def generate_object_annotations_worker(
             )
 
 
-if __name__ == "__main__":
-
-    # Get the current date formatted as as YYYY_MM_DD
-    # current_date = datetime.now()
-    # formatted_date = current_date.strftime("%Y_%m_%d")
-    # formatted_date = "2024_08_05"
-    formatted_date = "2025_11_06"
-
+def main(formatted_date="2025_11_06"):
     base_out_dir = os.path.abspath(
         os.path.join(ABS_PATH_OF_OBJATHOR, "out", formatted_date, "thor_object_data")
     )
@@ -309,3 +300,13 @@ if __name__ == "__main__":
 
     for p in processes:
         p.join()
+
+
+if __name__ == "__main__":
+    # Get the current date formatted as as YYYY_MM_DD
+    # current_date = datetime.now()
+    # formatted_date = current_date.strftime("%Y_%m_%d")
+    # formatted_date = "2024_08_05"
+    formatted_date = "2025_11_06"
+
+    main(formatted_date=formatted_date)
