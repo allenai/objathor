@@ -13,5 +13,8 @@ msgpack>=1.0.7
 filelock>=3.13.1
 # TODO will be removed once THOR depends on objathor
 # ai2thor @ git+https://github.com/allenai/ai2thor@455cf72a1c8e0759a452422f2128fbc93a3cb06b
+
+# short descriptions additions
 attrs
 openai
+setproctitle
