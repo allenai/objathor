@@ -18,3 +18,6 @@ filelock>=3.13.1
 attrs
 openai
 setproctitle
+ai2thor
+nltk @ git+https://github.com/nltk/nltk@582e6e35f0e6c984b44ec49dcb8846d9c011d0a8
+scikit-learn
